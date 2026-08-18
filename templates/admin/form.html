@@ -1,0 +1,32 @@
+{{define "content"}}
+<form id="resource-form" method="post" action="{{.FormAction}}"
+      hx-post="{{.FormAction}}" hx-target="#resource-form" hx-swap="outerHTML"
+      class="w-full max-w-xl rounded-lg border border-neutral-200/70 bg-white p-7 shadow-sm">
+  {{if .NonFieldErrors}}
+  <div class="relative mb-4 rounded-lg border border-transparent bg-red-600 p-4 text-white">
+    <h5 class="mb-1 text-sm font-medium leading-none tracking-tight">Couldn't save {{.VerboseName}}</h5>
+    <div class="text-sm opacity-80">
+      {{range .NonFieldErrors}}<p>{{.}}</p>{{end}}
+    </div>
+  </div>
+  {{end}}
+  {{range .Inputs}}{{.}}{{end}}
+  {{/* name="_continue" rides along only when *this* button is the one
+       that submitted the form (per the HTML spec, an unclicked submit
+       button's name/value never makes it into the form data) -- the
+       handler reads its presence to redirect back to this same edit
+       page instead of the detail page, Django-admin style. */}}
+  <div class="flex flex-col gap-2 sm:flex-row">
+    <button type="submit"
+            class="inline-flex items-center justify-center gap-1.5 rounded-md bg-neutral-950 px-4 py-2 text-sm font-medium tracking-wide text-white transition-colors duration-200 hover:bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-900">
+      {{icon "check" "w-4 h-4"}} Save</button>
+    <button type="submit" name="_continue" value="1"
+            class="inline-flex items-center justify-center gap-1.5 rounded-md border-2 border-neutral-900 bg-white px-4 py-2 text-sm font-medium tracking-wide text-neutral-900 transition-colors duration-100 hover:bg-neutral-900 hover:text-white">
+      {{icon "edit" "w-4 h-4"}} Save and continue editing</button>
+    <a href="{{.BasePath}}/{{.CurrentSlug}}"
+       class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium tracking-wide text-neutral-600 transition-colors duration-100 hover:bg-neutral-100 hover:text-neutral-900">
+      Cancel</a>
+  </div>
+</form>
+{{range .InlineSections}}{{template "inlineSection" .}}{{end}}
+{{end}}

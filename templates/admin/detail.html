@@ -1,0 +1,33 @@
+{{define "content"}}
+<div class="mb-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+  {{if .Permissions.CanUpdate}}
+  <a href="{{.BasePath}}/{{.Slug}}/{{.PK}}/edit"
+     class="inline-flex items-center justify-center gap-1.5 rounded-md border-2 border-neutral-900 bg-white px-4 py-2 text-sm font-medium tracking-wide text-neutral-900 transition-colors duration-100 hover:bg-neutral-900 hover:text-white">
+    {{icon "edit" "w-4 h-4"}} Edit</a>
+  {{end}}
+  {{if .Permissions.CanDelete}}
+  <a href="{{.BasePath}}/{{.Slug}}/{{.PK}}/delete"
+     class="inline-flex items-center justify-center gap-1.5 rounded-md border-2 border-red-600 bg-white px-4 py-2 text-sm font-medium tracking-wide text-red-600 transition-colors duration-100 hover:bg-red-600 hover:text-white">
+    {{icon "delete" "w-4 h-4"}} Delete</a>
+  {{end}}
+  {{range .Actions}}
+  <form method="post" action="{{$.BasePath}}/{{$.Slug}}/actions/{{.Name}}"
+        {{if .Confirm}}data-confirm="{{.Confirm}}"{{end}}
+        onsubmit="return window.adminConfirmSubmit(event, this, this.dataset.confirm)">
+    <input type="hidden" name="pks" value="{{$.PK}}">
+    <button type="submit"
+            class="inline-flex items-center justify-center gap-1.5 rounded-md border-2 border-neutral-900 bg-white px-4 py-2 text-sm font-medium tracking-wide text-neutral-900 transition-colors duration-100 hover:bg-neutral-900 hover:text-white">
+      {{.Label}}</button>
+  </form>
+  {{end}}
+</div>
+<dl class="divide-y divide-neutral-200 rounded-lg border border-neutral-200/70 bg-white">
+  {{range .Fields}}
+  <div class="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-3 sm:gap-4">
+    <dt class="text-sm font-medium text-neutral-500">{{.Label}}</dt>
+    <dd class="text-sm text-neutral-900 sm:col-span-2">{{.Value}}</dd>
+  </div>
+  {{end}}
+</dl>
+{{range .InlineSections}}{{template "inlineSection" .}}{{end}}
+{{end}}

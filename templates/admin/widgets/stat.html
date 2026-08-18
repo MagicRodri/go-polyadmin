@@ -1,0 +1,25 @@
+{{/* Headline number + period-over-period change, adapted from
+     Flowbite's admin-dashboard "Sales this week" card. Mirrors the
+     Python adapter's widgets/stat.html.
+
+     Green/red here are deliberate, unlike in widgets/donut.html which
+     avoids them: a delta really is a good/bad signal, so it should
+     read in the same colors as toasts.html's success/danger. The
+     arrow carries the direction too, so the meaning survives for
+     anyone who can't separate the two hues. */}}
+{{define "admin/widgets/stat.html"}}
+<div class="flex items-end justify-between gap-3">
+  <p class="text-3xl font-semibold text-neutral-900">{{.Value}}</p>
+  {{if eq .Direction "up"}}
+  <span class="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-green-600">
+    {{icon "arrow-up" "h-4 w-4"}}{{.Delta}}%
+  </span>
+  {{else if eq .Direction "down"}}
+  <span class="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-red-600">
+    {{icon "arrow-down" "h-4 w-4"}}{{.Delta}}%
+  </span>
+  {{else}}
+  <span class="shrink-0 text-sm font-medium text-neutral-400">no change</span>
+  {{end}}
+</div>
+{{end}}

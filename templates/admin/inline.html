@@ -1,0 +1,113 @@
+{{/* Inline related records (Django-admin StackedInline/TabularInline
+     style) -- see core/inline.go and docs/inlines.md. One
+     inlineSectionData per ModelAdmin.Inlines() declaration;
+     "inlineSection" dispatches on .Mode (placeholder/readonly/edit)
+     and .Layout (stacked/tabular). Cells are already fully rendered
+     template.HTML by the time these defines run (see
+     render.go:buildInlineSections) -- which builder function ran
+     (formInputHTML/inlineTableCellHTML/fieldValueHTML/
+     inlineDetailRowHTML) already encodes the Stacked-vs-Tabular
+     difference, so these defines just print and wrap. */}}
+
+{{define "inlineSection"}}
+<div id="inline-{{.Slug}}" class="mt-8">
+  <h3 class="mb-2 text-sm font-semibold text-neutral-900">{{.Label}}</h3>
+  {{if eq .Mode "placeholder"}}
+  <div class="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-500">
+    Save to add {{.Label}}.
+  </div>
+  {{else if eq .Layout "tabular"}}
+    {{template "inlineTable" .}}
+  {{else}}
+    {{template "inlineStacked" .}}
+  {{end}}
+</div>
+{{end}}
+
+{{define "inlineStacked"}}
+{{$slug := .Slug}}
+{{range .Rows}}
+<form class="mb-3 rounded-lg border border-neutral-200/70 bg-white p-4"
+      hx-post="{{.UpdateURL}}" hx-target="#inline-{{$slug}}" hx-swap="outerHTML">
+  {{range .Cells}}{{.}}{{end}}
+  <div class="flex gap-2">
+    {{if $.CanChange}}
+    <button type="submit"
+            class="inline-flex items-center justify-center gap-1.5 rounded-md bg-neutral-950 px-3 py-1.5 text-xs font-medium tracking-wide text-white hover:bg-neutral-900">
+      {{icon "check" "w-3.5 h-3.5"}} Save</button>
+    {{end}}
+    {{if $.CanDelete}}
+    <button type="button" hx-delete="{{.DeleteURL}}" hx-target="#inline-{{$slug}}"
+            hx-swap="outerHTML swap:0.2s" hx-confirm="Remove this {{$.Label}}?"
+            class="inline-flex items-center justify-center gap-1.5 rounded-md bg-red-50 px-3 py-1.5 text-xs font-medium tracking-wide text-red-600 hover:bg-red-100">
+      {{icon "delete" "w-3.5 h-3.5"}} Remove</button>
+    {{end}}
+  </div>
+</form>
+{{end}}
+{{if .AddRow}}
+<form class="rounded-lg border border-dashed border-neutral-300 bg-white p-4"
+      hx-post="{{.AddRow.CreateURL}}" hx-target="#inline-{{$slug}}" hx-swap="outerHTML">
+  {{range .AddRow.Cells}}{{.}}{{end}}
+  <button type="submit"
+          class="inline-flex items-center justify-center gap-1.5 rounded-md border-2 border-neutral-900 bg-white px-3 py-1.5 text-xs font-medium tracking-wide text-neutral-900 hover:bg-neutral-900 hover:text-white">
+    {{icon "plus" "w-3.5 h-3.5"}} Add</button>
+</form>
+{{end}}
+{{if and (not .Rows) (not .AddRow)}}
+<p class="text-sm text-neutral-500">No {{.Label}}.</p>
+{{end}}
+{{end}}
+
+{{define "inlineTable"}}
+{{$slug := .Slug}}
+<div class="overflow-x-auto rounded-lg border border-neutral-200/70 bg-white">
+<table class="min-w-full divide-y divide-neutral-200">
+  <thead class="bg-neutral-50"><tr>
+    {{range .Columns}}<th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-neutral-500">{{.Label}}</th>{{end}}
+    {{if eq .Mode "edit"}}<th></th>{{end}}
+  </tr></thead>
+  <tbody class="divide-y divide-neutral-200">
+    {{range .Rows}}
+    <tr>
+      {{range .Cells}}<td class="px-3 py-2">{{.}}</td>{{end}}
+      {{if eq $.Mode "edit"}}
+      <td class="px-3 py-2 text-right whitespace-nowrap">
+        {{if $.CanChange}}
+        <button type="button" hx-post="{{.UpdateURL}}" hx-include="closest tr"
+                hx-target="#inline-{{$slug}}" hx-swap="outerHTML"
+                class="inline-flex items-center justify-center rounded-md p-1.5 text-neutral-500 bg-neutral-50 hover:bg-neutral-100 hover:text-neutral-700">
+          {{icon "check" "w-4 h-4"}}<span class="sr-only">Save</span></button>
+        {{end}}
+        {{if $.CanDelete}}
+        <button type="button" hx-delete="{{.DeleteURL}}" hx-target="#inline-{{$slug}}"
+                hx-swap="outerHTML swap:0.2s" hx-confirm="Remove this {{$.Label}}?"
+                class="inline-flex items-center justify-center rounded-md p-1.5 text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700">
+          {{icon "delete" "w-4 h-4"}}<span class="sr-only">Remove</span></button>
+        {{end}}
+      </td>
+      {{else}}
+      <td class="px-3 py-2 text-right whitespace-nowrap">
+        <a href="{{.DetailURL}}" class="text-blue-600 hover:underline text-xs">View</a>
+      </td>
+      {{end}}
+    </tr>
+    {{end}}
+    {{if .AddRow}}
+    <tr>
+      {{range .AddRow.Cells}}<td class="px-3 py-2">{{.}}</td>{{end}}
+      <td class="px-3 py-2 text-right">
+        <button type="button" hx-post="{{.AddRow.CreateURL}}" hx-include="closest tr"
+                hx-target="#inline-{{$slug}}" hx-swap="outerHTML"
+                class="inline-flex items-center justify-center rounded-md p-1.5 text-neutral-500 bg-neutral-50 hover:bg-neutral-100 hover:text-neutral-700">
+          {{icon "plus" "w-4 h-4"}}<span class="sr-only">Add</span></button>
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{if and (not .Rows) (not .AddRow)}}
+<p class="px-4 py-6 text-sm text-neutral-500">No {{.Label}}.</p>
+{{end}}
+</div>
+{{end}}
