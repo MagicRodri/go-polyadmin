@@ -9,6 +9,44 @@ two share no runtime code — they're the same design implemented twice,
 at feature parity. The `docs/` here cover both, so most pages show
 Python and Go side by side.
 
+## What you get from declaring a `ModelAdmin`
+
+Point one at your model (fields, `ListDisplay`, search/filter config,
+permissions) and you get:
+
+- Full CRUD with search, filter, sort, and pagination, all swapped in
+  via HTMX partials — no full-page reloads
+- A dashboard of pluggable widgets: metric, stat (value + trend),
+  progress bar, bar chart, donut/pie breakdown, table, activity feed,
+  timeline, and tabs (several widgets in one card)
+- Sidebar grouping — resources sharing a `category` collapse into one
+  collapsible accordion section, e.g. everything CRUD-shaped under
+  one "Directory" group
+- Custom admin pages (`admin.Route`) for functionality that isn't
+  resource CRUD — reports, wizards, internal tools — rendered inside
+  the same layout, auth, and sidebar grouping as everything else
+- Relation fields rendered as links, or as a searchable PinesUI
+  Command-style autocomplete backed by a server-side `/lookup` route
+  (never dumps the target model's full queryset into the page)
+- Inline related records (`StackedInline`/`TabularInline`) — a
+  parent's create/detail/edit pages can show and manage a child's
+  records that point back at it, Django-admin style
+- Record and bulk Actions, with a PinesUI modal confirmation step for
+  destructive ones
+- Authentication/authorization hooks gating every route *and* every
+  control the templates render
+- CSV and XLSX export
+- Toast notifications for every create/update/delete/action
+- Per-resource (and per-widget) template overrides, so an application
+  can replace one view's markup without forking the framework
+
+Styling follows [PinesUI](https://devdojo.com/pines) conventions
+throughout (Tailwind's neutral palette, Alpine.js, no separate JS
+component framework): a mobile-first layout with a collapsible
+sidebar, a Django-admin-style right-hand filter panel on wider
+screens, and breadcrumbs as the page title. Tailwind/Alpine/HTMX are
+all CDN-loaded — no frontend build step.
+
 ## Quickstart
 
 ```bash
@@ -29,8 +67,8 @@ import (
 	"log"
 	"strconv"
 
-	"polyadmin/core"
-	fiberadapter "polyadmin/fiber"
+	"github.com/MagicRodri/go-polyadmin/core"
+	fiberadapter "github.com/MagicRodri/go-polyadmin/fiber"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -149,7 +187,7 @@ instead of `can_*`, field/form HTML built in Go functions rather than
 inside `html/template` files for tighter control over escaping).
 
 ```
-go/polyadmin/
+.
 ├── core/       # Admin, ModelAdmin, Field, Relation, Filter, query
 │               # pipeline, Authenticator/Authorizer, Dashboard/Widget,
 │               # Exporter (CSV, XLSX via excelize)
@@ -162,7 +200,6 @@ go/polyadmin/
 Run the tests:
 
 ```bash
-cd go/polyadmin
 go test ./...
 ```
 
