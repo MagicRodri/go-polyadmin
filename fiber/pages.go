@@ -27,7 +27,7 @@ func (pc *PageContext) IsHTMX() bool { return isHTMXRequest(pc.C) }
 // inside the shared admin layout, popping and clearing any pending
 // flash message the same way the framework's own views do.
 func (pc *PageContext) Render(templateName string, data any) error {
-	html, err := pc.renderer.RenderPage(pc.Page, templateName, data, popFlash(pc.C))
+	html, err := pc.renderer.RenderPage(pc.Principal, pc.Page, templateName, data, popFlash(pc.C))
 	if err != nil {
 		return err
 	}

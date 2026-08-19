@@ -189,13 +189,23 @@ type donutSlice struct {
 	Color      string
 }
 
-// donutColors is a distinct qualitative palette, spaced around the
-// color wheel (blue/violet/teal/amber/rose/cyan @ 500) so up to 6
-// categories stay visually distinguishable at a glance -- deliberately
-// skips green/orange/red, which templates/toasts.html already uses
-// for success/warning/danger, so a slice is never mistaken for a
-// status color.
-var donutColors = [...]string{"blue-500", "violet-500", "teal-500", "amber-500", "rose-500", "cyan-500"}
+// donutColors is the qualitative palette for Donut slices, spaced
+// around the color wheel so up to 6 categories stay visually
+// distinguishable at a glance.
+//
+// These name shadcn/ui's --chart-* CSS variables (declared in
+// templates/admin/theme.html) rather than literal Tailwind shades,
+// which is the distinction shadcn itself draws: chart tokens are for
+// *categorical data*, separate from the UI-chrome tokens, but still
+// theme-owned. So a Donut follows the active theme and gets a palette
+// re-tuned for dark mode, instead of keeping colors chosen against
+// white. Overriding admin/theme.html restyles the slices along with
+// everything else.
+//
+// A slice never lands on the success/warning/danger hues that
+// templates/toasts.html uses for status, so it can't be mistaken for
+// one.
+var donutColors = [...]string{"chart-1", "chart-2", "chart-3", "chart-4", "chart-5", "chart-6"}
 
 // Donut is a share-of-total breakdown, e.g. "Traffic by device"
 // (Desktop / Phone / Tablet), rendered as an SVG ring with a legend --

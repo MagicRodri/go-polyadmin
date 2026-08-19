@@ -2,16 +2,16 @@
 <div class="overflow-x-auto">
 <table class="min-w-full text-sm">
   <thead>
-    <tr class="bg-neutral-50">{{range .Columns}}<th class="px-2 py-1.5 text-left text-xs font-medium uppercase tracking-wide text-neutral-500 whitespace-nowrap">{{.}}</th>{{end}}</tr>
+    <tr class="border-b border-border">{{range .Columns}}<th class="{{ui "table" "th-compact"}}">{{.}}</th>{{end}}</tr>
   </thead>
-  <tbody class="divide-y divide-neutral-100">
+  <tbody class="divide-y divide-border">
     {{$columns := .Columns}}
     {{range .Rows}}
     {{$row := .}}
-    <tr class="hover:bg-neutral-50">{{range $columns}}<td class="px-2 py-1.5 text-neutral-700 whitespace-nowrap">{{index $row .}}</td>{{end}}</tr>
+    <tr class="hover:bg-muted/50">{{range $columns}}<td class="px-2 py-1.5 text-foreground whitespace-nowrap">{{index $row .}}</td>{{end}}</tr>
     {{end}}
   </tbody>
 </table>
-{{if not .Rows}}<p class="text-sm text-neutral-400">No data.</p>{{end}}
+{{if not .Rows}}<p class="text-sm text-muted-foreground">No data.</p>{{end}}
 </div>
 {{end}}

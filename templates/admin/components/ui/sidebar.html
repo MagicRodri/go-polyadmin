@@ -1,0 +1,156 @@
+{{/* Sidebar, ported from shadcn/ui's sidebar-07 block ("a sidebar that
+     collapses to icons"). Mirrors the Python adapter's
+     components/ui/sidebar.html.
+
+     Three regions, exactly as the block has them:
+       SidebarHeader  -- the brand, styled as the block's team-switcher
+                         button (square logo + two stacked lines).
+       SidebarContent -- one SidebarGroup of SidebarMenu items; a
+                         grouped category becomes a Collapsible with a
+                         SidebarMenuSub, matching the block's NavMain.
+       SidebarFooter  -- NavUser: avatar + name, opening a dropdown.
+     Plus SidebarRail, the hairline on the outer edge that toggles it.
+
+     `collapsed` (the desktop icon rail) and `sidebarOpen` (the mobile
+     sheet) both come from base.html's SidebarProvider x-data. They are
+     separate axes on purpose: a phone gets the overlay, never the rail.
+
+     Collapsing hides labels rather than re-templating the markup, so
+     there is exactly one copy of the nav. Every label sits in an
+     x-show="!collapsed" span while the icon stays put -- nav-item's p-2
+     plus a size-4 icon is precisely the 3rem collapsed width, so
+     nothing slides sideways as the width animates. */}}
+{{define "ui/sidebar"}}
+<aside x-cloak
+       :class="[
+         sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+         collapsed ? '{{ui "sidebar" "collapsed"}}' : '{{ui "sidebar" "expanded"}}'
+       ]"
+       class="{{ui "sheet" "content"}} {{ui "sheet" "side-left"}} {{ui "sidebar"}}
+              !w-72 md:!w-auto md:static md:!transform-none md:shadow-none">
+
+  {{/* -- SidebarHeader: the block's TeamSwitcher slot -- */}}
+  <div class="{{ui "sidebar" "header"}}">
+    <a href="{{.BasePath}}" class="{{ui "nav-item"}} {{ui "nav-item" "inactive"}} {{ui "nav-item" "size-lg"}}">
+      <span class="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        {{if .SiteLogoURL}}
+        <img src="{{.SiteLogoURL}}" alt="" class="size-5 rounded object-contain">
+        {{else}}
+        <span class="text-xs font-semibold">{{siteInitials .SiteTitle}}</span>
+        {{end}}
+      </span>
+      <span x-show="!collapsed" class="grid flex-1 text-left leading-tight">
+        <span class="truncate font-semibold text-foreground">{{.SiteTitle}}</span>
+        <span class="truncate text-xs text-muted-foreground">Admin</span>
+      </span>
+    </a>
+  </div>
+
+  {{/* -- SidebarContent: the block's NavMain -- */}}
+  <div class="{{ui "sidebar" "content"}}">
+    <div class="{{ui "sidebar" "group"}}">
+      <div x-show="!collapsed" class="{{ui "sidebar" "group-label"}}">Platform</div>
+      <nav class="{{ui "sidebar" "menu"}}">
+        <a href="{{.BasePath}}" :title="collapsed ? 'Dashboard' : null"
+           class="{{ui "nav-item"}} {{if not .CurrentNavKey}}{{ui "nav-item" "active"}}{{else}}{{ui "nav-item" "inactive"}}{{end}}">
+          {{icon "home" "size-4 shrink-0"}}
+          <span x-show="!collapsed" class="truncate">Dashboard</span>
+        </a>
+        {{range .NavItems}}
+          {{if not .IsGroup}}
+          {{with .Link}}
+          <a href="{{.URL}}" :title="collapsed ? '{{.Label}}' : null"
+             class="{{ui "nav-item"}} {{if .Active}}{{ui "nav-item" "active"}}{{else}}{{ui "nav-item" "inactive"}}{{end}}">
+            {{icon .Icon "size-4 shrink-0"}}
+            <span x-show="!collapsed" class="truncate">{{.Label}}</span>
+          </a>
+          {{end}}
+          {{else}}
+          {{/* Collapsible + SidebarMenuSub, per the block's NavMain. The
+               chevron rotates 90deg on open, as there. Collapsed to the
+               icon rail there's nowhere to put a sub-menu, so the group
+               behaves as a plain link to its first child instead of
+               expanding into nothing. */}}
+          {{with .Group}}
+          <div x-data="{ open: {{if .Expanded}}true{{else}}false{{end}} }">
+            <a x-show="collapsed" href="{{if .Links}}{{(index .Links 0).URL}}{{else}}#{{end}}"
+               :title="'{{.Label}}'"
+               class="{{ui "nav-item"}} {{if .Expanded}}{{ui "nav-item" "active"}}{{else}}{{ui "nav-item" "inactive"}}{{end}}">
+              {{icon .Icon "size-4 shrink-0"}}
+            </a>
+            <button type="button" x-show="!collapsed" @click="open = !open"
+                    :aria-expanded="open ? 'true' : 'false'"
+                    class="{{ui "nav-item"}} {{ui "nav-item" "inactive"}}">
+              {{icon .Icon "size-4 shrink-0"}}
+              <span class="flex-1 truncate">{{.Label}}</span>
+              <span :class="open ? 'rotate-90' : ''" class="ml-auto transition-transform duration-200">
+                {{icon "chevron-right" "size-4"}}
+              </span>
+            </button>
+            <div x-show="open && !collapsed" x-collapse class="{{ui "sidebar" "menu-sub"}}">
+              {{range .Links}}
+              <a href="{{.URL}}"
+                 class="{{ui "nav-item"}} {{if .Active}}{{ui "nav-item" "active"}}{{else}}{{ui "nav-item" "inactive"}}{{end}}">
+                <span class="truncate">{{.Label}}</span>
+              </a>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
+          {{end}}
+        {{end}}
+      </nav>
+    </div>
+  </div>
+
+  {{/* -- SidebarFooter: the block's NavUser -- */}}
+  {{with .Principal}}
+  {{$name := .DisplayName}}{{if not $name}}{{$name = .ID}}{{end}}
+  <div class="{{ui "sidebar" "footer"}}">
+    <div class="relative" x-data="{ open: false }" @keydown.escape="open = false" @click.outside="open = false">
+      <button type="button" x-ref="userTrigger" @click="open = !open"
+              :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu"
+              :class="open ? 'bg-accent text-accent-foreground' : ''"
+              class="{{ui "nav-item"}} {{ui "nav-item" "inactive"}} {{ui "nav-item" "size-lg"}}">
+        <span class="{{ui "avatar"}} size-8 rounded-lg">
+          <span class="{{ui "avatar" "fallback"}} rounded-lg">{{siteInitials $name}}</span>
+        </span>
+        <span x-show="!collapsed" class="grid flex-1 text-left leading-tight">
+          <span class="truncate font-medium text-foreground">{{$name}}</span>
+          <span class="truncate text-xs text-muted-foreground">
+            {{if .IsSuperuser}}Superuser{{else}}Signed in{{end}}
+          </span>
+        </span>
+        <span x-show="!collapsed">{{icon "chevrons-up-down" "ml-auto size-4"}}</span>
+      </button>
+      {{/* side="right" like the block's desktop placement -- the footer
+           is at the very bottom, so a downward menu would open
+           offscreen. */}}
+      <div x-show="open" x-cloak role="menu"
+           x-anchor.right-end.offset.8="$refs.userTrigger"
+           x-transition:enter="transition ease-out duration-150"
+           x-transition:enter-start="opacity-0 scale-95"
+           x-transition:enter-end="opacity-100 scale-100"
+           class="{{ui "dropdown" "content"}} min-w-56">
+        <div class="{{ui "dropdown" "label"}} flex items-center gap-2">
+          <span class="{{ui "avatar"}} size-8 rounded-lg">
+            <span class="{{ui "avatar" "fallback"}} rounded-lg">{{siteInitials $name}}</span>
+          </span>
+          <span class="grid flex-1 leading-tight">
+            <span class="truncate font-medium text-foreground">{{$name}}</span>
+            <span class="truncate text-xs font-normal text-muted-foreground">
+              {{if .IsSuperuser}}Superuser{{else}}Signed in{{end}}
+            </span>
+          </span>
+        </div>
+        <div class="{{ui "dropdown" "separator"}}"></div>
+      </div>
+    </div>
+  </div>
+  {{end}}
+
+  {{/* -- SidebarRail -- */}}
+  <button type="button" @click="toggle()" tabindex="-1" aria-label="Toggle sidebar"
+          class="{{ui "sidebar" "rail"}}"></button>
+</aside>
+{{end}}

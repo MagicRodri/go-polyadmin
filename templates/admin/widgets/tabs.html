@@ -17,19 +17,19 @@
 {{define "admin/widgets/tabs.html"}}
 <div x-data="{ active: 0 }">
   {{if .Panels}}
-  <div class="mb-3 flex gap-1 border-b border-neutral-200" role="tablist">
+  <div class="{{ui "tabs" "underline-list"}}" role="tablist">
     {{range $i, $panel := .Panels}}
     <button type="button" role="tab" @click="active = {{$i}}"
             :aria-selected="active === {{$i}}"
-            :class="active === {{$i}} ? 'border-neutral-900 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'"
-            class="-mb-px border-b-2 px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300">{{$panel.Label}}</button>
+            :class="active === {{$i}} ? '{{ui "tabs" "underline-trigger-on"}}' : '{{ui "tabs" "underline-trigger-off"}}'"
+            class="{{ui "tabs" "underline-trigger"}}">{{$panel.Label}}</button>
     {{end}}
   </div>
   {{range $i, $panel := .Panels}}
   <div role="tabpanel" x-show="active === {{$i}}"{{if $i}} x-cloak{{end}}>{{$panel.Body}}</div>
   {{end}}
   {{else}}
-  <p class="text-sm text-neutral-400">No panels configured.</p>
+  <p class="text-sm text-muted-foreground">No panels configured.</p>
   {{end}}
 </div>
 {{end}}

@@ -1,0 +1,37 @@
+{{/* Breadcrumb, ported from shadcn/ui (which is markup-only -- no
+     Radix primitive behind it, so this is a straight class-for-class
+     port onto the theme tokens). Mirrors
+     python-polyadmin/.../components/ui/breadcrumb.html.
+
+     A home-icon crumb (always links to the dashboard) followed by the
+     page's own trail, chevron-separated, with the current page as a
+     plain (non-link) item carrying aria-current. Doubles as the page's
+     header now that base.html has no separate <h1> -- the active
+     crumb is weighted like a title so it still reads as one.
+
+     Called from admin/base.html, guarded by {{if .Breadcrumbs}}, with
+     the pageBase context (.BasePath, .Breadcrumbs). */}}
+{{define "ui/breadcrumb"}}
+<nav aria-label="Breadcrumb">
+  <ol class="{{ui "breadcrumb"}}">
+    <li class="flex items-center">
+      <a href="{{.BasePath}}" class="{{ui "breadcrumb" "link"}} p-0.5">
+        {{icon "home" "w-4 h-4"}}
+        <span class="sr-only">Dashboard</span>
+      </a>
+    </li>
+    {{range .Breadcrumbs}}
+    <li class="{{ui "breadcrumb" "item"}}">
+      <span class="{{ui "breadcrumb" "separator"}}">{{icon "chevron-right" "w-3.5 h-3.5"}}</span>
+      {{if .URL}}
+      <a href="{{.URL}}" class="{{ui "breadcrumb" "link"}}">{{.Label}}</a>
+      {{else if .Active}}
+      <span class="{{ui "breadcrumb" "page"}}" aria-current="page">{{.Label}}</span>
+      {{else}}
+      <span class="{{ui "breadcrumb" "plain"}}">{{.Label}}</span>
+      {{end}}
+    </li>
+    {{end}}
+  </ol>
+</nav>
+{{end}}

@@ -1,6 +1,6 @@
 {{define "admin/widgets/activity.html"}}
-<ul class="space-y-2 text-sm text-neutral-700">
+<ul class="space-y-2 text-sm text-foreground">
   {{range .Entries}}<li>{{.}}</li>{{end}}
 </ul>
-{{if not .Entries}}<p class="text-sm text-neutral-400">No recent activity.</p>{{end}}
+{{if not .Entries}}<p class="text-sm text-muted-foreground">No recent activity.</p>{{end}}
 {{end}}

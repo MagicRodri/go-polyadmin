@@ -14,7 +14,7 @@
 <div x-data="{ active: null }" class="flex flex-col items-center gap-6 sm:flex-row">
   <div class="relative h-36 w-36 shrink-0">
     <svg viewBox="0 0 36 36" class="h-36 w-36">
-      <circle cx="18" cy="18" r="15.9155" fill="none" stroke="currentColor" stroke-width="3" class="text-neutral-100"></circle>
+      <circle cx="18" cy="18" r="15.9155" fill="none" stroke="currentColor" stroke-width="3" class="text-muted"></circle>
       {{range $i, $slice := .Slices}}
       <circle cx="18" cy="18" r="15.9155" fill="none" stroke="currentColor" stroke-width="3"
               stroke-dasharray="{{$slice.Percent}} {{$slice.Remainder}}"
@@ -27,15 +27,15 @@
     <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
       <template x-if="active === null">
         <div>
-          <p class="text-lg font-semibold text-neutral-900">{{.Total}}</p>
-          <p class="text-[11px] text-neutral-500">Total</p>
+          <p class="text-lg font-semibold text-foreground">{{.Total}}</p>
+          <p class="text-[11px] text-muted-foreground">Total</p>
         </div>
       </template>
       {{range $i, $slice := .Slices}}
       <template x-if="active === {{$i}}">
         <div>
-          <p class="text-lg font-semibold text-neutral-900">{{$slice.Percent}}%</p>
-          <p class="text-[11px] text-neutral-500">{{$slice.Label}}</p>
+          <p class="text-lg font-semibold text-foreground">{{$slice.Percent}}%</p>
+          <p class="text-[11px] text-muted-foreground">{{$slice.Label}}</p>
         </div>
       </template>
       {{end}}
@@ -44,16 +44,16 @@
   <ul class="w-full space-y-1 text-sm">
     {{range $i, $slice := .Slices}}
     <li class="-mx-2 flex items-center justify-between gap-2 rounded-md px-2 py-1 transition-colors"
-        :class="active === {{$i}} ? 'bg-neutral-50' : ''"
+        :class="active === {{$i}} ? 'bg-muted/50' : ''"
         @mouseenter="active = {{$i}}" @mouseleave="active = null">
-      <span class="flex items-center gap-2 text-neutral-700">
+      <span class="flex items-center gap-2 text-foreground">
         <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-{{$slice.Color}}"></span>
         {{$slice.Label}}
       </span>
-      <span class="text-neutral-500">{{$slice.Value}} <span class="text-neutral-400">&middot; {{$slice.Percent}}%</span></span>
+      <span class="text-muted-foreground">{{$slice.Value}} <span class="text-muted-foreground">&middot; {{$slice.Percent}}%</span></span>
     </li>
     {{end}}
-    {{if not .Slices}}<li class="text-sm text-neutral-400">No data.</li>{{end}}
+    {{if not .Slices}}<li class="text-sm text-muted-foreground">No data.</li>{{end}}
   </ul>
 </div>
 {{end}}

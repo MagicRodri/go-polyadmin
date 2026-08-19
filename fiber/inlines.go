@@ -81,17 +81,19 @@ func excluding(names []string, exclude string) []string {
 // per-type branches rather than trying to strip its wrapper.
 func inlineTableCellHTML(basePath string, field core.Field, value any, errs []string, relation *relationFieldOptions) template.HTML {
 	name := html.EscapeString(field.Name)
-	fieldClasses := "flex h-9 w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm focus:border-neutral-400 focus:outline-none"
+	// Compact flavors of the same shadcn controls the full form uses.
+	fieldClasses := classInputCompact
+	selectClasses := classSelectSmall
 
 	var b strings.Builder
 	switch field.Type {
 	case core.FieldTypeBoolean:
 		checked, _ := value.(bool)
-		fmt.Fprintf(&b, `<input type="checkbox" name="%s" value="true" autocomplete="off" %s class="h-4 w-4 rounded border-neutral-300 bg-neutral-100 text-neutral-900 focus:outline-none">`,
-			name, attr(checked, "checked"))
+		fmt.Fprintf(&b, `<input type="checkbox" name="%s" value="true" autocomplete="off" %s class="%s">`,
+			name, attr(checked, "checked"), classCheckbox)
 
 	case core.FieldTypeForeignKey, core.FieldTypeOneToOne:
-		fmt.Fprintf(&b, `<select name="%s" autocomplete="off" class="%s"><option value="">&mdash;</option>`, name, fieldClasses)
+		fmt.Fprintf(&b, `<select name="%s" autocomplete="off" class="%s"><option value="">&mdash;</option>`, name, selectClasses)
 		if relation != nil {
 			for _, opt := range relation.Options {
 				selected := fmt.Sprint(opt.PK) == fmt.Sprint(relation.SelectedPK)
@@ -105,7 +107,7 @@ func inlineTableCellHTML(basePath string, field core.Field, value any, errs []st
 		if relation != nil && len(relation.Options) > size {
 			size = len(relation.Options)
 		}
-		fmt.Fprintf(&b, `<select multiple name="%s" autocomplete="off" size="%d" class="%s h-auto">`, name, size, fieldClasses)
+		fmt.Fprintf(&b, `<select multiple name="%s" autocomplete="off" size="%d" class="%s">`, name, size, classSelectAuto)
 		if relation != nil {
 			for _, opt := range relation.Options {
 				selected := false
@@ -121,7 +123,7 @@ func inlineTableCellHTML(basePath string, field core.Field, value any, errs []st
 		b.WriteString(`</select>`)
 
 	case core.FieldTypeEnum:
-		fmt.Fprintf(&b, `<select name="%s" autocomplete="off" class="%s">`, name, fieldClasses)
+		fmt.Fprintf(&b, `<select name="%s" autocomplete="off" class="%s">`, name, selectClasses)
 		for _, choice := range field.Choices {
 			choiceStr := fmt.Sprint(choice)
 			selected := choiceStr == stringOrEmpty(value)
@@ -134,7 +136,7 @@ func inlineTableCellHTML(basePath string, field core.Field, value any, errs []st
 			inputTypeFor(field.Type), name, html.EscapeString(stringOrEmpty(value)), fieldClasses)
 	}
 	for _, e := range errs {
-		fmt.Fprintf(&b, `<p class="mt-0.5 text-xs text-red-600">%s</p>`, html.EscapeString(e))
+		fmt.Fprintf(&b, `<p class="mt-0.5 %s">%s</p>`, classTextError, html.EscapeString(e))
 	}
 	_ = basePath // no autocomplete combobox in the compact tabular cell -- see docs/inlines.md's known limitations
 	return template.HTML(b.String())
@@ -146,7 +148,7 @@ func inlineTableCellHTML(basePath string, field core.Field, value any, errs []st
 // already carries the label, so its cells stay bare fieldValueHTML).
 func inlineDetailRowHTML(label string, valueHTML template.HTML) template.HTML {
 	return template.HTML(fmt.Sprintf(
-		`<div class="flex justify-between gap-4 py-1 text-sm"><dt class="text-neutral-500">%s</dt><dd class="text-right">%s</dd></div>`,
+		`<div class="flex justify-between gap-4 py-1 text-sm"><dt class="text-muted-foreground">%s</dt><dd class="text-right">%s</dd></div>`,
 		html.EscapeString(label), valueHTML,
 	))
 }

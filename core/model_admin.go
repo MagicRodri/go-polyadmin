@@ -54,6 +54,15 @@ type ModelAdmin interface {
 	CanUpdate() bool
 	CanDelete() bool
 	CanExport() bool
+	// Reorderable shows a drag handle on this ModelAdmin's list view.
+	// Unlike Can*/Disable* above, dragging never persists anywhere --
+	// it only reorders the <tr> elements already on the page, and
+	// reverts on the next reload, sort, search, or page change
+	// re-rendering the table from the server's own order. It exists
+	// for admins who want to eyeball/triage a list by hand without the
+	// framework taking a position on how (or whether) that order is
+	// stored.
+	Reorderable() bool
 
 	ListDisplayValues(obj any) map[string]any
 	Validate(data map[string]any) map[string][]string
@@ -121,6 +130,10 @@ type BaseModelAdmin struct {
 	DisableUpdate bool
 	DisableDelete bool
 	DisableExport bool
+
+	// EnableReordering defaults to false (opt-in, unlike Disable*
+	// above) -- see the doc comment on Reorderable().
+	EnableReordering bool
 }
 
 func (b BaseModelAdmin) Slug() string {
@@ -227,6 +240,8 @@ func (b BaseModelAdmin) CanCreate() bool { return !b.DisableCreate }
 func (b BaseModelAdmin) CanUpdate() bool { return !b.DisableUpdate }
 func (b BaseModelAdmin) CanDelete() bool { return !b.DisableDelete }
 func (b BaseModelAdmin) CanExport() bool { return !b.DisableExport }
+
+func (b BaseModelAdmin) Reorderable() bool { return b.EnableReordering }
 
 func (b BaseModelAdmin) ListDisplayValues(obj any) map[string]any {
 	fields := b.Fields()

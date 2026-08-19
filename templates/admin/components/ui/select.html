@@ -1,0 +1,59 @@
+{{/* Select, ported from shadcn/ui (Radix Select) -- a styled trigger
+     + listbox for a plain, static choice list, the shadcn-equivalent
+     of a native <select>. Mirrors python-polyadmin/.../components/
+     ui/select.html and reuses the same trigger+listbox mechanics as
+     ui/bulk-actions.html, generalized into a value-holding form
+     control: a hidden input carries the posted value (matching
+     ui/field.html's relation combobox, which does the same for the
+     same reason -- Validate()/GetObject() never has to know a value
+     came from anything but a plain <select>), and Alpine owns only
+     open/close and which option is currently shown as the label.
+
+     Not used for <select multiple> (manytomany): a multi-value
+     combobox is a different control (shadcn ships no base component
+     for it either), so that field type keeps its native
+     <select multiple> for now.
+
+     Argument (via dict):
+       .name         form field name
+       .options      []{Value, Label, Selected}
+       .placeholder  shown when nothing is selected
+       .required     bool -- native validation doesn't apply to a
+                     hidden input (the HTML spec forbids `required` on
+                     type=hidden), so this only marks the field's own
+                     asterisk elsewhere; a missing value still fails
+                     server-side Validate() same as any other field.
+       .disabled     bool */}}
+{{define "ui/select"}}
+{{$selected := ""}}
+{{range .options}}{{if .Selected}}{{$selected = .Label}}{{end}}{{end}}
+<div class="{{ui "combobox"}}" x-data="{ open: false, label: {{printf "%q" (or $selected .placeholder)}} }"
+     @keydown.escape="open = false" @click.outside="open = false">
+  <input type="hidden" name="{{.name}}" x-ref="hiddenInput"
+         value="{{range .options}}{{if .Selected}}{{.Value}}{{end}}{{end}}">
+  <button type="button" x-ref="trigger" @click="open = !open"
+          :aria-expanded="open ? 'true' : 'false'" aria-haspopup="listbox"
+          {{if .disabled}}disabled{{end}}
+          class="{{ui "select"}} justify-between">
+    <span x-text="label" class="truncate text-left"></span>
+    {{icon "chevron-down" "w-3.5 h-3.5 shrink-0 text-muted-foreground"}}
+  </button>
+  <div x-show="open" x-cloak role="listbox"
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-100"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="{{ui "combobox" "content"}}">
+    {{range .options}}
+    <div role="option" tabindex="0" data-value="{{.Value}}" data-label="{{.Label}}"
+         @click="label = $el.dataset.label; open = false;
+                 $refs.hiddenInput.value = $el.dataset.value;
+                 $refs.hiddenInput.dispatchEvent(new Event('change', { bubbles: true }))"
+         class="{{ui "combobox" "item"}}">{{.Label}}</div>
+    {{end}}
+    {{if not .options}}<div class="{{ui "combobox" "empty"}}">No options.</div>{{end}}
+  </div>
+</div>
+{{end}}

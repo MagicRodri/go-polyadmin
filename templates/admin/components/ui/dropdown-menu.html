@@ -1,0 +1,81 @@
+{{/* DropdownMenu, ported from shadcn/ui (Radix DropdownMenu).
+
+     Mirrors python-polyadmin/.../components/ui/dropdown-menu.html.
+
+     Radix -> Alpine, per plan/shadcnui-usage.md §6:
+       Portal            -> not needed; the panel is absolutely
+                            positioned inside a `relative` wrapper,
+                            which keeps it inside the same stacking
+                            context as its trigger.
+       Floating UI       -> x-anchor (Alpine's anchor plugin), so the
+                            panel stays put when the header scrolls.
+       Escape / outside  -> @keydown.escape + @click.outside.
+       Roving tabindex   -> the items are real <button>/<a> elements, so
+                            Tab already walks them in order and
+                            @keydown.escape returns focus to the
+                            trigger.
+
+     Argument (via the `dict` func, since {{template}} takes only one
+     value):
+       .label    accessible name for the trigger
+       .icon     trigger icon name
+       .text     optional visible trigger label; omit for icon-only
+       .variant  trigger button variant (default "ghost-muted",
+                 or "outline" when .text is set)
+       .items    list of dicts: .Label, .Icon, .URL, or .Separator
+                 (a dict with neither .URL nor .Separator renders as a
+                 non-interactive section label)
+
+     The panel always anchors bottom-end. Making the alignment an
+     argument would mean building the `x-anchor.bottom-{end,start}`
+     *attribute name* out of a template action, which html/template
+     rejects outright (it can't determine an escaping context for a
+     dynamic attribute name) -- so a start-aligned variant, if one is
+     ever needed, belongs in its own define rather than a flag here.
+
+     Items are data, not markup, so nothing here has to trust an
+     application-supplied HTML string. */}}
+{{define "ui/dropdown-menu"}}
+<div class="relative inline-flex" x-data="{ open: false }"
+     @keydown.escape="open = false; $refs.trigger.focus()"
+     @click.outside="open = false">
+  {{if .text}}
+  <button type="button" x-ref="trigger" @click="open = !open"
+          :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu"
+          class="{{ui "button" (or .variant "outline") "size-default"}}">
+    {{if .icon}}{{icon .icon "w-4 h-4"}}{{end}}{{.text}}
+    <span :class="open ? 'rotate-180' : ''" class="transition-transform duration-200">
+      {{icon "chevron-down" "w-3.5 h-3.5"}}
+    </span>
+  </button>
+  {{else}}
+  <button type="button" x-ref="trigger" @click="open = !open"
+          :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu"
+          aria-label="{{.label}}"
+          class="{{ui "button" (or .variant "ghost-muted") "size-icon-sm"}}">
+    {{icon .icon "w-4 h-4"}}
+  </button>
+  {{end}}
+  <div x-show="open" x-cloak role="menu"
+       x-anchor.bottom-end.offset.6="$refs.trigger"
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-100"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="{{ui "dropdown" "content"}}">
+    {{range .items}}
+    {{if .Separator}}
+    <div role="separator" class="{{ui "dropdown" "separator"}}"></div>
+    {{else if .URL}}
+    <a href="{{.URL}}" role="menuitem" class="{{ui "dropdown" "item"}}">
+      {{if .Icon}}{{icon .Icon "w-4 h-4 shrink-0"}}{{end}}<span class="truncate">{{.Label}}</span>
+    </a>
+    {{else}}
+    <div role="presentation" class="{{ui "dropdown" "label"}}">{{.Label}}</div>
+    {{end}}
+    {{end}}
+  </div>
+</div>
+{{end}}

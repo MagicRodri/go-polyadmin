@@ -1,32 +1,82 @@
+{{/* Form (create/edit) page.
+
+     HTMX posts to itself and swaps its own outerHTML with the response,
+     so a validation error redisplays this form in place; a plain HTML
+     POST to `action` works identically without JS.
+
+     The swap targets #resource-form-wrapper -- this whole element --
+     and not the <form> inside it, because the error response *is* this
+     template. Targeting the <form> nested a fresh copy of the wrapper
+     inside the old one on every failed save, duplicating the inline
+     sections and the action bar each time.
+
+     Layout comes from ui "page": the record scrolls in a vertically
+     centered column and Save/Cancel stay pinned to the bottom of the
+     viewport, so a long form never buries its own submit button. See
+     fiber/ui.go's "page" entry for why sticky beats fixed here.
+     Mirrors the Python adapter's components/form_wrapper.html. */}}
 {{define "content"}}
-<form id="resource-form" method="post" action="{{.FormAction}}"
-      hx-post="{{.FormAction}}" hx-target="#resource-form" hx-swap="outerHTML"
-      class="w-full max-w-xl rounded-lg border border-neutral-200/70 bg-white p-7 shadow-sm">
-  {{if .NonFieldErrors}}
-  <div class="relative mb-4 rounded-lg border border-transparent bg-red-600 p-4 text-white">
-    <h5 class="mb-1 text-sm font-medium leading-none tracking-tight">Couldn't save {{.VerboseName}}</h5>
-    <div class="text-sm opacity-80">
-      {{range .NonFieldErrors}}<p>{{.}}</p>{{end}}
-    </div>
+<div id="resource-form-wrapper" class="{{ui "page"}}">
+  <div class="{{ui "page" "body"}}">
+    <form id="resource-form" method="post" action="{{.FormAction}}"
+          hx-post="{{.FormAction}}" hx-target="#resource-form-wrapper" hx-swap="outerHTML"
+          class="{{ui "panel" "form"}}">
+      {{if .NonFieldErrors}}
+      {{/* Alert (destructive), ported from shadcn/ui: a tinted, outlined
+           panel rather than the solid red block this used to be -- solid
+           destructive is reserved for buttons, so an error summary doesn't
+           out-shout the Save button. */}}
+      <div role="alert" class="{{ui "alert" "destructive"}} mb-4">
+        <h5 class="{{ui "alert" "title"}}">Couldn't save {{.VerboseName}}</h5>
+        <div class="{{ui "alert" "description"}}">
+          {{range .NonFieldErrors}}<p>{{.}}</p>{{end}}
+        </div>
+      </div>
+      {{end}}
+      {{range .Inputs}}{{.}}{{end}}
+    </form>
+    {{/* Inline sections carry their own <form> elements, so they have to
+         stay siblings of the record form -- HTML forbids nesting one
+         form inside another. */}}
+    {{range .InlineSections}}{{template "inlineSection" .}}{{end}}
   </div>
-  {{end}}
-  {{range .Inputs}}{{.}}{{end}}
-  {{/* name="_continue" rides along only when *this* button is the one
+  {{/* The buttons sit outside #resource-form so the bar can span the
+       full content width instead of being trapped in the centered
+       column. form="resource-form" re-associates them: the browser
+       submits the form normally, and htmx resolves the same attribute
+       (its getRelatedFormData checks '#' + the form attribute before
+       falling back to the closest ancestor form), so the _continue
+       submitter value below still reaches the handler over HTMX.
+
+       name="_continue" rides along only when *this* button is the one
        that submitted the form (per the HTML spec, an unclicked submit
        button's name/value never makes it into the form data) -- the
        handler reads its presence to redirect back to this same edit
        page instead of the detail page, Django-admin style. */}}
-  <div class="flex flex-col gap-2 sm:flex-row">
-    <button type="submit"
-            class="inline-flex items-center justify-center gap-1.5 rounded-md bg-neutral-950 px-4 py-2 text-sm font-medium tracking-wide text-white transition-colors duration-200 hover:bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-900">
-      {{icon "check" "w-4 h-4"}} Save</button>
-    <button type="submit" name="_continue" value="1"
-            class="inline-flex items-center justify-center gap-1.5 rounded-md border-2 border-neutral-900 bg-white px-4 py-2 text-sm font-medium tracking-wide text-neutral-900 transition-colors duration-100 hover:bg-neutral-900 hover:text-white">
-      {{icon "edit" "w-4 h-4"}} Save and continue editing</button>
-    <a href="{{.BasePath}}/{{.CurrentSlug}}"
-       class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium tracking-wide text-neutral-600 transition-colors duration-100 hover:bg-neutral-100 hover:text-neutral-900">
-      Cancel</a>
+  <div class="{{ui "page" "actions"}}">
+    <div class="{{ui "page" "actions-inner"}}">
+      {{/* Delete lives here, on the edit form, and nowhere else: there's
+           nothing to delete while creating (PK is unset), and the detail
+           page deliberately no longer offers it. Kept alone on the left,
+           away from Save, so the destructive action is never adjacent to
+           the one people click by reflex. */}}
+      {{if and .PK .Permissions.CanDelete}}
+      <a href="{{.BasePath}}/{{.Slug}}/{{.PK}}/delete"
+         class="{{ui "button" "destructive-outline"}}">
+        {{icon "delete" "w-4 h-4"}} Delete</a>
+      {{end}}
+      <div class="{{ui "page" "actions-primary"}}">
+        <button type="submit" form="resource-form"
+                class="{{ui "button"}}">
+          {{icon "check" "w-4 h-4"}} Save</button>
+        <button type="submit" form="resource-form" name="_continue" value="1"
+                class="{{ui "button" "outline"}}">
+          {{icon "edit" "w-4 h-4"}} Save and continue editing</button>
+        <a href="{{.BasePath}}/{{.CurrentSlug}}"
+           class="{{ui "button" "ghost-muted"}}">
+          Cancel</a>
+      </div>
+    </div>
   </div>
-</form>
-{{range .InlineSections}}{{template "inlineSection" .}}{{end}}
+</div>
 {{end}}

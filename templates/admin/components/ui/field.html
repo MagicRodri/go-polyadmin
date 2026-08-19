@@ -1,0 +1,143 @@
+{{/* Form/FormItem, ported from shadcn/ui (plan/shadcnui-usage.md
+     Phase D): label + control + description + error, one wrapper for
+     every generated form input. Mirrors
+     python-polyadmin/.../components/ui/field.html's render_form_input
+     macro branch-for-branch -- see it for the shared rationale (why
+     native controls stay native, why the combobox pk/label never flow
+     through an interpolated JS expression).
+
+     Controls that must survive a plain (JS-free) form POST stay native
+     elements styled to match shadcn -- <select>, checkbox, and
+     <input type="date"> -- rather than the Radix-backed listbox,
+     checkbox, and day-picker shadcn uses. See ui.go for the
+     per-component reasoning. The two genuinely Alpine-driven ports
+     here are the relation combobox and the date picker's calendar
+     popover (rendered via ui/date-picker).
+
+     Called from render_helpers.go's formInputHTML, which does every
+     bit of per-type derivation (stringifying values, matching
+     selections, building option lists) in Go before handing this
+     partial a flat, pre-resolved struct -- so every branch below is a
+     pure dispatch-and-print, with no comparison or lookup logic
+     living in the template. That was a deliberate choice, not a
+     stylistic one: html/template's `eq`/`and`/truthiness semantics on
+     typed values (a nil interface holding a zero int, a named string
+     type) have sharp edges a plain Go `==` doesn't, and getting one
+     wrong here would silently corrupt a selected value rather than
+     fail loudly. Takes:
+       .Name .Label .Required .ReadOnly .Disabled .Placeholder .HelpText
+       .Type          the field's core.FieldType, as a plain string
+       .InputType     the <input type="..."> for the default branch
+       .StringValue   the value, already stringified
+       .Checked       bool, boolean fields only
+       .Options       []{Value, Label, Selected}, enum/relation/m2m
+       .Size          <select multiple>'s size attribute, m2m only
+       .Autocomplete  bool, foreignkey/onetoone only
+       .ComboboxSelectedPK/.ComboboxSelectedLabel/.ComboboxResultsID/.LookupTarget
+       .Errors        []string
+       .BasePath      for the combobox's /lookup URL */}}
+{{define "ui/field"}}
+<div class="{{ui "field"}}">
+  <label for="field-{{.Name}}" class="{{ui "field" "label"}}">
+    {{.Label}}{{if .Required}}<span class="{{ui "field" "required"}}" aria-hidden="true">*</span>{{end}}
+  </label>
+  <div class="{{ui "field" "control"}}">
+    {{if eq .Type "text"}}
+    <textarea id="field-{{.Name}}" name="{{.Name}}" placeholder="{{.Placeholder}}" autocomplete="off"
+              {{if .Required}}required{{end}} {{if .ReadOnly}}readonly{{end}} {{if .Disabled}}disabled{{end}}
+              class="{{ui "textarea"}}">{{.StringValue}}</textarea>
+
+    {{else if eq .Type "boolean"}}
+    <input type="checkbox" id="field-{{.Name}}" name="{{.Name}}" value="true" autocomplete="off"
+           {{if .Checked}}checked{{end}} {{if .Disabled}}disabled{{end}} class="{{ui "checkbox"}}">
+
+    {{else if eq .Type "date"}}
+    {{/* DatePicker: a native date input (already posts YYYY-MM-DD with
+         no JS, gets the platform picker on mobile) plus the shadcn
+         Calendar port in a popover beside it -- see
+         admin/components/ui/calendar.html. */}}
+    {{template "ui/date-picker" dict
+        "name" .Name "value" .StringValue "required" .Required "disabled" .Disabled}}
+
+    {{else if eq .Type "enum"}}
+    {{template "ui/select" dict
+        "name" .Name "options" .Options "placeholder" "Select…" "disabled" .Disabled}}
+
+    {{else if or (eq .Type "foreignkey") (eq .Type "onetoone")}}
+      {{if .Autocomplete}}
+      {{/* Combobox, ported from shadcn/ui (Radix Popover + cmdk). cmdk
+           filters a client-side item array; the whole point of
+           AutocompleteFieldNames is never loading the target's full
+           dataset into the page, so the filtering stays server-side on
+           the /lookup route -- htmx owns the round-trip and Alpine owns
+           only open/close and arrow-key navigation of whatever came
+           back.
+
+           The pk/label of a *searched* result flow through that
+           result's data-pk/data-label attributes (read via
+           `$el.dataset` in selectItem), and the *initial* selection's
+           pk/label are just the hidden/text inputs' own
+           server-rendered `value` attributes -- selectItem writes a
+           new pk straight to $refs.hiddenInput.value (imperatively,
+           not via a reactive `:value` binding) so there's no risk of
+           Alpine's x-bind/x-init ordering clobbering the
+           server-rendered value with empty state before it's ever
+           read (x-bind directives run before x-init, so a `:value`
+           tied to x-data would blank the field on every page load).
+           Both routes go through ordinary HTML-attribute escaping, so
+           a label containing quotes never has to survive being
+           embedded in a JS expression. */}}
+      <div class="{{ui "combobox"}}"
+           x-data="{
+             open: false, query: '', activeEl: null,
+             selectItem(pk, label) { this.$refs.hiddenInput.value = pk; this.query = label; this.open = false; this.activeEl = null; },
+             moveActive(delta) {
+               const items = Array.from(this.$refs.results.children).filter(el => el.dataset.pk !== undefined);
+               if (!items.length) return;
+               let idx = items.indexOf(this.activeEl);
+               idx = (idx + delta + items.length) % items.length;
+               items.forEach(el => el.classList.remove('{{ui "combobox" "item-active"}}'));
+               this.activeEl = items[idx];
+               this.activeEl.classList.add('{{ui "combobox" "item-active"}}');
+               this.activeEl.scrollIntoView({ block: 'nearest' });
+             },
+             selectActive() { if (this.activeEl) this.activeEl.click(); }
+           }"
+           x-init="query = $refs.textInput.value;"
+           @click.outside="open = false">
+        <input x-ref="hiddenInput" type="hidden" name="{{.Name}}" value="{{.ComboboxSelectedPK}}">
+        <div class="{{ui "combobox" "trigger"}}">
+          {{icon "search" (ui "combobox" "icon")}}
+          <input x-ref="textInput" type="text" autocomplete="off" placeholder="Search&hellip;"
+                 value="{{.ComboboxSelectedLabel}}" x-model="query" @focus="open = true"
+                 @keydown.escape="open = false" @keydown.down.prevent="open = true; moveActive(1)"
+                 @keydown.up.prevent="moveActive(-1)" @keydown.enter.prevent="selectActive()"
+                 {{if .Disabled}}disabled{{end}}
+                 hx-get="{{.BasePath}}/{{.LookupTarget}}/lookup" hx-trigger="keyup changed delay:300ms, focus"
+                 hx-target="#{{.ComboboxResultsID}}" hx-swap="innerHTML"
+                 class="{{ui "input" "bare"}}">
+        </div>
+        <div x-ref="results" id="{{.ComboboxResultsID}}" class="{{ui "combobox" "content"}}" x-show="open" x-cloak></div>
+      </div>
+      {{else}}
+      {{template "ui/select" dict
+          "name" .Name "options" .Options "placeholder" "—" "disabled" .Disabled}}
+      {{end}}
+
+    {{else if eq .Type "manytomany"}}
+    <select multiple id="field-{{.Name}}" name="{{.Name}}" autocomplete="off" {{if .Disabled}}disabled{{end}}
+            size="{{.Size}}" class="{{ui "select" "size-auto"}}">
+      {{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+
+    {{else}}
+    <input type="{{.InputType}}" id="field-{{.Name}}" name="{{.Name}}" value="{{.StringValue}}"
+           placeholder="{{.Placeholder}}" autocomplete="off"
+           {{if .Required}}required{{end}} {{if .ReadOnly}}readonly{{end}} {{if .Disabled}}disabled{{end}}
+           class="{{ui "input"}}">
+    {{end}}
+  </div>
+  {{if .HelpText}}<p class="{{ui "field" "description"}}">{{.HelpText}}</p>{{end}}
+  {{range .Errors}}<p class="{{ui "field" "message"}}">{{.}}</p>{{end}}
+</div>
+{{end}}

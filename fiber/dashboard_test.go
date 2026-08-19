@@ -113,7 +113,9 @@ func TestDashboardStatRendersDeltaDirection(t *testing.T) {
 	app := newTestApp(t, admin)
 
 	text := body(t, doGet(t, app, "/admin/", nil))
-	if !strings.Contains(text, "$45,385") || !strings.Contains(text, "12.5%") || !strings.Contains(text, "text-red-600") {
+	// A negative delta reads in the destructive token (not a literal
+	// red), so it follows whichever theme is active -- see ui.go.
+	if !strings.Contains(text, "$45,385") || !strings.Contains(text, "12.5%") || !strings.Contains(text, "text-destructive") {
 		t.Fatalf("got %s", text)
 	}
 }

@@ -11,11 +11,11 @@
 {{range .}}
 <div data-pk="{{.PK}}" data-label="{{.Label}}"
      @click="selectItem($el.dataset.pk, $el.dataset.label)"
-     class="relative flex cursor-pointer select-none items-center rounded px-3 py-1.5 text-neutral-700 hover:bg-neutral-100">
+     class="{{ui "combobox" "item"}}">
   {{.Label}}
 </div>
 {{end}}
 {{if not .}}
-<div class="px-3 py-1.5 text-neutral-400">No matches.</div>
+<div class="{{ui "combobox" "empty"}}">No matches.</div>
 {{end}}
 {{end}}

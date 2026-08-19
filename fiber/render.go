@@ -13,6 +13,8 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -89,9 +91,13 @@ func categoryBreadcrumb(category string) []breadcrumb {
 }
 
 type pageBase struct {
-	Title    string
-	Header   string
-	BasePath string
+	// Principal is who is signed in, for the sidebar footer's NavUser
+	// (shadcn sidebar-07). Every page renders a sidebar, so it has to
+	// reach every page's data.
+	Principal *core.Principal
+	Title     string
+	Header    string
+	BasePath  string
 	// CurrentSlug is the bare resource slug for a ModelAdmin view
 	// ("" for the dashboard or a custom page) -- used directly by
 	// form.html/delete.html to link back to the resource's list view.
@@ -158,7 +164,7 @@ func (r *Renderer) buildNav(activeKey string) []navEntry {
 	return order
 }
 
-func (r *Renderer) pageBase(title, header, navKey string, breadcrumbs []breadcrumb, messages []flashMessage) pageBase {
+func (r *Renderer) pageBase(principal *core.Principal, title, header, navKey string, breadcrumbs []breadcrumb, messages []flashMessage) pageBase {
 	siteTitle := r.admin.SiteTitle
 	if siteTitle == "" {
 		siteTitle = "PolyAdmin"
@@ -168,7 +174,8 @@ func (r *Renderer) pageBase(title, header, navKey string, breadcrumbs []breadcru
 		currentSlug = slug
 	}
 	return pageBase{
-		Title: title, Header: header, BasePath: r.basePath,
+		Principal: principal,
+		Title:     title, Header: header, BasePath: r.basePath,
 		CurrentSlug: currentSlug, CurrentNavKey: navKey, NavItems: r.buildNav(navKey),
 		SiteTitle: siteTitle, SiteLogoURL: r.admin.SiteLogoURL, Breadcrumbs: breadcrumbs, Messages: messages,
 	}
@@ -242,6 +249,13 @@ type Renderer struct {
 	lookup         *template.Template
 	inlineFragment *template.Template
 
+	// uiSet holds just the shadcn-derived component partials, so Go
+	// code that builds HTML directly (render_helpers.go's
+	// formInputHTML) can still render one -- the date field's Calendar
+	// popover -- instead of duplicating its markup as a Go string. See
+	// uiHTML.
+	uiSet *template.Template
+
 	// templateDirs are application-supplied override directories,
 	// searched in the order given before the framework's own embedded
 	// templates -- see WithTemplateDirs and docs/templates.md. Empty
@@ -258,37 +272,89 @@ type Renderer struct {
 	overrideCache map[string]*template.Template
 }
 
+// layoutFiles are the framework templates every full-page template set
+// needs: the layout itself, the theme's token/dark-mode block, and the
+// two globally-teleported overlays. Kept as one list so adding a shared
+// partial doesn't mean editing six ParseFS calls (and forgetting the
+// override path in contentTemplate/PageTemplate).
+var layoutFiles = []string{
+	"admin/base.html",
+	"admin/theme.html",
+	"admin/toasts.html",
+	"admin/action_confirm_modal.html",
+}
+
+// uiComponentsGlob matches the shadcn-derived component partials (see
+// plan/shadcnui-usage.md §5). Parsed into every template set -- unlike
+// the `ui` template func, which only yields a class string, these are
+// whole markup+Alpine blocks (dialog, sheet, dropdown, tooltip, ...)
+// invoked as {{template "ui/dialog" dict ...}}.
+const uiComponentsGlob = "admin/components/ui/*.html"
+
+// buildTemplate parses the shared layout + ui component partials plus
+// the given content files into one set.
+func buildTemplate(contentFiles ...string) (*template.Template, error) {
+	files := append(append([]string{}, layoutFiles...), contentFiles...)
+	tmpl, err := template.New(path.Base(files[0])).Funcs(templateFuncs).ParseFS(coretemplates.FS, files...)
+	if err != nil {
+		return nil, err
+	}
+	return tmpl.ParseFS(coretemplates.FS, uiComponentsGlob)
+}
+
 func NewRenderer(admin *core.Admin, basePath string, templateDirs ...string) (*Renderer, error) {
 	r := &Renderer{admin: admin, basePath: basePath, templateDirs: templateDirs, overrideCache: make(map[string]*template.Template)}
-	build := func(files ...string) (*template.Template, error) {
-		return template.New(path.Base(files[0])).Funcs(iconFuncMap).ParseFS(coretemplates.FS, files...)
+	// Fragment-only sets (widgets, lookup, inline) render without the
+	// base layout, so they take the ui partials and funcs but not
+	// layoutFiles.
+	buildFragment := func(files ...string) (*template.Template, error) {
+		tmpl, err := template.New(path.Base(files[0])).Funcs(templateFuncs).ParseFS(coretemplates.FS, files...)
+		if err != nil {
+			return nil, err
+		}
+		return tmpl.ParseFS(coretemplates.FS, uiComponentsGlob)
 	}
 	var err error
-	if r.list, err = build("admin/base.html", "admin/toasts.html", "admin/action_confirm_modal.html", "admin/list.html"); err != nil {
+	if r.list, err = buildTemplate("admin/list.html"); err != nil {
 		return nil, err
 	}
-	if r.detail, err = build("admin/base.html", "admin/toasts.html", "admin/action_confirm_modal.html", "admin/inline.html", "admin/detail.html"); err != nil {
+	if r.detail, err = buildTemplate("admin/inline.html", "admin/detail.html"); err != nil {
 		return nil, err
 	}
-	if r.form, err = build("admin/base.html", "admin/toasts.html", "admin/action_confirm_modal.html", "admin/inline.html", "admin/form.html"); err != nil {
+	if r.form, err = buildTemplate("admin/inline.html", "admin/form.html"); err != nil {
 		return nil, err
 	}
-	if r.deleteTpl, err = build("admin/base.html", "admin/toasts.html", "admin/action_confirm_modal.html", "admin/delete.html"); err != nil {
+	if r.deleteTpl, err = buildTemplate("admin/delete.html"); err != nil {
 		return nil, err
 	}
-	if r.dashboard, err = build("admin/base.html", "admin/toasts.html", "admin/action_confirm_modal.html", "admin/dashboard.html"); err != nil {
+	if r.dashboard, err = buildTemplate("admin/dashboard.html"); err != nil {
 		return nil, err
 	}
-	if r.widgets, err = build("admin/widgets/*.html"); err != nil {
+	if r.widgets, err = buildFragment("admin/widgets/*.html"); err != nil {
 		return nil, err
 	}
-	if r.lookup, err = build("admin/lookup.html"); err != nil {
+	if r.lookup, err = buildFragment("admin/lookup.html"); err != nil {
 		return nil, err
 	}
-	if r.inlineFragment, err = build("admin/inline.html", "admin/inline_fragment.html"); err != nil {
+	if r.inlineFragment, err = buildFragment("admin/inline.html", "admin/inline_fragment.html"); err != nil {
+		return nil, err
+	}
+	if r.uiSet, err = template.New("ui").Funcs(templateFuncs).ParseFS(coretemplates.FS, uiComponentsGlob); err != nil {
 		return nil, err
 	}
 	return r, nil
+}
+
+// uiHTML renders one shadcn-derived component partial to HTML, for the
+// Go-built markup in render_helpers.go. Returns template.HTML because
+// the caller is assembling a larger HTML string by hand -- the partial's
+// own output is already escaped by html/template.
+func (r *Renderer) uiHTML(name string, data any) (template.HTML, error) {
+	var buf bytes.Buffer
+	if err := r.uiSet.ExecuteTemplate(&buf, name, data); err != nil {
+		return "", err
+	}
+	return template.HTML(buf.String()), nil
 }
 
 // templateCandidates mirrors the Python adapter's
@@ -357,14 +423,17 @@ func (r *Renderer) contentTemplate(modelAdmin core.ModelAdmin, view string, fall
 		return cached, nil
 	}
 
-	baseFiles := []string{"admin/base.html", "admin/toasts.html", "admin/action_confirm_modal.html"}
+	baseFiles := append([]string{}, layoutFiles...)
 	if view == "form" || view == "detail" {
 		// form/detail content may render inline sections via
 		// {{template "inlineSection" .}} -- see admin/inline.html.
 		baseFiles = append(baseFiles, "admin/inline.html")
 	}
-	tmpl, err := template.New(path.Base(name)).Funcs(iconFuncMap).ParseFS(coretemplates.FS, baseFiles...)
+	tmpl, err := template.New(path.Base(name)).Funcs(templateFuncs).ParseFS(coretemplates.FS, baseFiles...)
 	if err != nil {
+		return nil, err
+	}
+	if tmpl, err = tmpl.ParseFS(coretemplates.FS, uiComponentsGlob); err != nil {
 		return nil, err
 	}
 	if tmpl, err = tmpl.ParseFS(source, name); err != nil {
@@ -383,6 +452,29 @@ type columnHeader struct {
 	Label     string
 	NextSort  string
 	Indicator string
+	// Sort dropdown (shadcn Tasks example's DataTableColumnHeader):
+	// explicit Asc/Desc choices rather than a link that cycles, so a
+	// click's effect is knowable before making it. Direction is "asc",
+	// "desc", or "" when this column isn't the one being sorted by.
+	Direction string
+	AscURL    string
+	DescURL   string
+}
+
+// pageSizeOption is one choice in the footer's rows-per-page control.
+type pageSizeOption struct {
+	Size     int
+	Selected bool
+	URL      string
+}
+
+// pageURLs are the four jumps in the tasks-style pagination footer.
+// Empty means the jump is unavailable from where we are.
+type pageURLs struct {
+	First    string
+	Previous string
+	Next     string
+	Last     string
 }
 
 type listRow struct {
@@ -401,6 +493,11 @@ type filterControl struct {
 	Name    string
 	Label   string
 	Choices []filterChoice
+	// The toolbar renders each filter as a dropdown trigger, so it needs
+	// the active choice's label for the trigger itself and a URL that
+	// clears just this filter.
+	Active   string
+	ClearURL string
 }
 
 // actionInfo is an Action's template-facing shape --
@@ -423,23 +520,32 @@ func actionInfos(modelAdmin core.ModelAdmin) []actionInfo {
 
 type listData struct {
 	pageBase
-	Slug           string
-	VerboseName    string
-	Columns        []columnHeader
-	Rows           []listRow
-	Page           core.Page
-	RangeStart     int
-	RangeEnd       int
-	Search         string
-	Filters        map[string]string
-	FilterControls []filterControl
-	Ordering       string
-	ExportQuery    string
-	Actions        []actionInfo
-	Permissions    permissions
+	Slug            string
+	VerboseName     string
+	Columns         []columnHeader
+	Rows            []listRow
+	Page            core.Page
+	RangeStart      int
+	RangeEnd        int
+	Search          string
+	Filters         map[string]string
+	FilterControls  []filterControl
+	PageSizeOptions []pageSizeOption
+	PageURLs        pageURLs
+	// ResetURL clears search and every filter but keeps sort and page
+	// size -- those are how you're reading the table, not what you're
+	// narrowing it to.
+	ResetURL         string
+	HasActiveFilters bool
+	Ordering         string
+	ExportQuery      string
+	Actions          []actionInfo
+	Permissions      permissions
+	Reorderable      bool
 }
 
 func (r *Renderer) buildListData(
+	principal *core.Principal,
 	modelAdmin core.ModelAdmin,
 	page core.Page,
 	req core.ListRequest,
@@ -460,7 +566,18 @@ func (r *Renderer) buildListData(
 			nextSort = name
 			indicator = " ▼"
 		}
-		columns = append(columns, columnHeader{Label: field.Label, NextSort: nextSort, Indicator: indicator})
+		direction := ""
+		if req.Ordering == name {
+			direction = "asc"
+		} else if req.Ordering == "-"+name {
+			direction = "desc"
+		}
+		columns = append(columns, columnHeader{
+			Label: field.Label, NextSort: nextSort, Indicator: indicator,
+			Direction: direction,
+			AscURL:    listURL(r.basePath, slug, req, listURLOpts{Ordering: name, HasOrder: true}),
+			DescURL:   listURL(r.basePath, slug, req, listURLOpts{Ordering: "-" + name, HasOrder: true}),
+		})
 	}
 
 	rows := make([]listRow, 0, len(page.Items))
@@ -490,7 +607,46 @@ func (r *Renderer) buildListData(
 				URL:      filterChoiceURL(r.basePath, slug, req, filter.Name(), pair[0]),
 			})
 		}
-		filterControls = append(filterControls, filterControl{Name: filter.Name(), Label: filter.Label(), Choices: choices})
+		active := ""
+		for _, choice := range choices {
+			if choice.Selected && choice.Value != "" {
+				active = choice.Label
+			}
+		}
+		others := make(map[string]string, len(req.Filters))
+		for name, other := range req.Filters {
+			if name != filter.Name() {
+				others[name] = other
+			}
+		}
+		filterControls = append(filterControls, filterControl{
+			Name: filter.Name(), Label: filter.Label(), Choices: choices,
+			Active:   active,
+			ClearURL: listURL(r.basePath, slug, req, listURLOpts{Filters: others, HasFilters: true}),
+		})
+	}
+
+	// Rows-per-page choices. Changing the size returns to page 1 --
+	// staying on page 7 while quadrupling the page size would land the
+	// reader somewhere they never asked to be.
+	sizeOptions := make([]pageSizeOption, 0, len(pageSizeChoices))
+	for _, size := range pageSizeChoices {
+		sizeOptions = append(sizeOptions, pageSizeOption{
+			Size:     size,
+			Selected: size == req.PageSize,
+			URL:      listURL(r.basePath, slug, req, listURLOpts{PageSize: size, HasSize: true}),
+		})
+	}
+
+	jumps := pageURLs{
+		First: listURL(r.basePath, slug, req, listURLOpts{}),
+		Last:  listURL(r.basePath, slug, req, listURLOpts{Page: page.NumPages()}),
+	}
+	if page.HasPrevious() {
+		jumps.Previous = listURL(r.basePath, slug, req, listURLOpts{Page: page.PreviousPage()})
+	}
+	if page.HasNext() {
+		jumps.Next = listURL(r.basePath, slug, req, listURLOpts{Page: page.NextPage()})
 	}
 
 	rangeStart, rangeEnd := 0, 0
@@ -503,21 +659,28 @@ func (r *Renderer) buildListData(
 	}
 
 	return listData{
-		pageBase:       r.pageBase(modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+slug, listBreadcrumbs(modelAdmin), messages),
-		Slug:           slug,
-		VerboseName:    modelAdmin.VerboseName(),
-		Columns:        columns,
-		Rows:           rows,
-		Page:           page,
-		RangeStart:     rangeStart,
-		RangeEnd:       rangeEnd,
-		Search:         req.Search,
-		Filters:        req.Filters,
-		FilterControls: filterControls,
-		Ordering:       req.Ordering,
-		ExportQuery:    exportQuery(req),
-		Actions:        actionInfos(modelAdmin),
-		Permissions:    perms,
+		pageBase:        r.pageBase(principal, modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+slug, listBreadcrumbs(modelAdmin), messages),
+		Slug:            slug,
+		VerboseName:     modelAdmin.VerboseName(),
+		Columns:         columns,
+		Rows:            rows,
+		Page:            page,
+		RangeStart:      rangeStart,
+		RangeEnd:        rangeEnd,
+		Search:          req.Search,
+		Filters:         req.Filters,
+		FilterControls:  filterControls,
+		PageSizeOptions: sizeOptions,
+		PageURLs:        jumps,
+		ResetURL: listURL(r.basePath, slug, req, listURLOpts{
+			HasSearch: true, Filters: nil, HasFilters: true,
+		}),
+		HasActiveFilters: req.Search != "" || len(req.Filters) > 0,
+		Ordering:         req.Ordering,
+		ExportQuery:      exportQuery(req),
+		Actions:          actionInfos(modelAdmin),
+		Permissions:      perms,
+		Reorderable:      modelAdmin.Reorderable(),
 	}
 }
 
@@ -556,24 +719,95 @@ func exportQuery(req core.ListRequest) string {
 // value is "", meaning the choice clears that filter). Page is
 // deliberately omitted, resetting to page 1, matching search/sort.
 func filterChoiceURL(basePath, slug string, req core.ListRequest, filterName, value string) string {
-	var q queryString
-	q.add("search", req.Search)
+	filters := make(map[string]string, len(req.Filters))
 	for name, other := range req.Filters {
 		if name != filterName {
-			q.add("filter["+name+"]", other)
+			filters[name] = other
 		}
 	}
-	q.add("filter["+filterName+"]", value)
-	q.add("sort", req.Ordering)
+	if value != "" {
+		filters[filterName] = value
+	}
+	return listURL(basePath, slug, req, listURLOpts{Filters: filters, HasFilters: true})
+}
+
+// pageSizeChoices are the sizes the footer's rows-per-page control
+// offers. defaultPageSize matches the handler's own fallback, so it's
+// the one size a URL never has to spell out.
+var pageSizeChoices = [...]int{10, 25, 50, 100}
+
+const defaultPageSize = 25
+
+// listURLOpts overrides individual parameters of the current list
+// request. Go has no keyword arguments, so each override pairs with a
+// Has* flag -- otherwise "clear the search" and "leave the search
+// alone" would both be the zero value.
+type listURLOpts struct {
+	Search     string
+	HasSearch  bool
+	Filters    map[string]string
+	HasFilters bool
+	Ordering   string
+	HasOrder   bool
+	Page       int
+	PageSize   int
+	HasSize    bool
+}
+
+// listURL builds one list-view URL, carrying over every parameter from
+// the current request except those explicitly overridden. Every control
+// on the list page (filters, sort, paging, rows-per-page, reset) is a
+// link, so they all need the same "keep what's there, change one thing"
+// rule; building it once here is what keeps the templates free of
+// query-string assembly. Mirrors the Python adapter's _list_url.
+func listURL(basePath, slug string, req core.ListRequest, opts listURLOpts) string {
+	search := req.Search
+	if opts.HasSearch {
+		search = opts.Search
+	}
+	filters := req.Filters
+	if opts.HasFilters {
+		filters = opts.Filters
+	}
+	ordering := req.Ordering
+	if opts.HasOrder {
+		ordering = opts.Ordering
+	}
+	pageSize := req.PageSize
+	if opts.HasSize {
+		pageSize = opts.PageSize
+	}
+
+	var q queryString
+	q.add("search", search)
+	// Sorted so a URL is stable across renders -- Go map iteration is
+	// randomised, and an unstable href breaks both caching and tests.
+	names := make([]string, 0, len(filters))
+	for name := range filters {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		q.add("filter["+name+"]", filters[name])
+	}
+	q.add("sort", ordering)
+	// Page 1 and the default size are the implied state; leaving them
+	// out keeps the common URL clean and makes "reset" a bare path.
+	if opts.Page > 1 {
+		q.add("page", strconv.Itoa(opts.Page))
+	}
+	if pageSize > 0 && pageSize != defaultPageSize {
+		q.add("page_size", strconv.Itoa(pageSize))
+	}
 	return basePath + "/" + slug + q.values
 }
 
-func (r *Renderer) RenderList(modelAdmin core.ModelAdmin, page core.Page, req core.ListRequest, perms permissions, relationPermissions map[string]bool, messages []flashMessage) (string, error) {
+func (r *Renderer) RenderList(principal *core.Principal, modelAdmin core.ModelAdmin, page core.Page, req core.ListRequest, perms permissions, relationPermissions map[string]bool, messages []flashMessage) (string, error) {
 	tmpl, err := r.contentTemplate(modelAdmin, "list", r.list)
 	if err != nil {
 		return "", err
 	}
-	data := r.buildListData(modelAdmin, page, req, perms, relationPermissions, messages)
+	data := r.buildListData(principal, modelAdmin, page, req, perms, relationPermissions, messages)
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "base", data); err != nil {
 		return "", err
@@ -581,12 +815,12 @@ func (r *Renderer) RenderList(modelAdmin core.ModelAdmin, page core.Page, req co
 	return buf.String(), nil
 }
 
-func (r *Renderer) RenderListFragment(modelAdmin core.ModelAdmin, page core.Page, req core.ListRequest, perms permissions, relationPermissions map[string]bool) (string, error) {
+func (r *Renderer) RenderListFragment(principal *core.Principal, modelAdmin core.ModelAdmin, page core.Page, req core.ListRequest, perms permissions, relationPermissions map[string]bool) (string, error) {
 	tmpl, err := r.contentTemplate(modelAdmin, "list", r.list)
 	if err != nil {
 		return "", err
 	}
-	data := r.buildListData(modelAdmin, page, req, perms, relationPermissions, nil)
+	data := r.buildListData(principal, modelAdmin, page, req, perms, relationPermissions, nil)
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
 		return "", err
@@ -625,7 +859,7 @@ func (r *Renderer) RenderDetail(principal *core.Principal, modelAdmin core.Model
 		return "", err
 	}
 	data := detailData{
-		pageBase:       r.pageBase(modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), detailBreadcrumbs(modelAdmin, obj, r.basePath), messages),
+		pageBase:       r.pageBase(principal, modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), detailBreadcrumbs(modelAdmin, obj, r.basePath), messages),
 		Slug:           modelAdmin.Slug(),
 		PK:             modelAdmin.GetPK(obj),
 		Fields:         fields,
@@ -648,8 +882,14 @@ func (r *Renderer) RenderDetail(principal *core.Principal, modelAdmin core.Model
 
 type formData struct {
 	pageBase
-	VerboseName    string
-	FormAction     string
+	VerboseName string
+	FormAction  string
+	// Slug and PK are set only when editing an existing record, so
+	// form.html can link its Delete button; on create they stay zero and
+	// the button isn't rendered at all.
+	Slug           string
+	PK             any
+	Permissions    permissions
 	NonFieldErrors []string
 	Inputs         []template.HTML
 	InlineSections []inlineSectionData
@@ -708,7 +948,11 @@ func (r *Renderer) executeForm(
 		if !ok && obj != nil {
 			value = field.GetValue(obj)
 		}
-		inputs = append(inputs, formInputHTML(r.basePath, field, value, errs[fieldName], relationOptions[fieldName]))
+		input, err := r.formInputHTML(r.basePath, field, value, errs[fieldName], relationOptions[fieldName])
+		if err != nil {
+			return "", err
+		}
+		inputs = append(inputs, input)
 	}
 
 	mode := "placeholder"
@@ -721,11 +965,20 @@ func (r *Renderer) executeForm(
 	}
 
 	data := formData{
-		pageBase:       r.pageBase(fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), formBreadcrumbs(modelAdmin, obj, r.basePath), nil),
-		VerboseName:    modelAdmin.VerboseName(),
-		FormAction:     action,
+		pageBase:    r.pageBase(principal, fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), formBreadcrumbs(modelAdmin, obj, r.basePath), nil),
+		VerboseName: modelAdmin.VerboseName(),
+		FormAction:  action,
+		// The edit form offers Delete in its action bar, so it needs the
+		// same permission map the detail page gets -- otherwise the
+		// button would render for a principal the authorizer would then
+		// reject at the route.
+		Permissions:    computePermissions(r.admin, principal, modelAdmin),
 		Inputs:         inputs,
 		InlineSections: inlineSections,
+	}
+	if obj != nil {
+		data.Slug = modelAdmin.Slug()
+		data.PK = modelAdmin.GetPK(obj)
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
@@ -855,7 +1108,11 @@ func (r *Renderer) buildInlineSections(
 					if inline.Layout == core.InlineLayoutTabular {
 						cells = append(cells, inlineTableCellHTML(r.basePath, field, value, errs[name], relOptions[name]))
 					} else {
-						cells = append(cells, formInputHTML(r.basePath, field, value, errs[name], relOptions[name]))
+						input, err := r.formInputHTML(r.basePath, field, value, errs[name], relOptions[name])
+						if err != nil {
+							return nil, err
+						}
+						cells = append(cells, input)
 					}
 				}
 			} else {
@@ -895,7 +1152,11 @@ func (r *Renderer) buildInlineSections(
 				if inline.Layout == core.InlineLayoutTabular {
 					cells = append(cells, inlineTableCellHTML(r.basePath, field, value, errs[name], relOptions[name]))
 				} else {
-					cells = append(cells, formInputHTML(r.basePath, field, value, errs[name], relOptions[name]))
+					input, err := r.formInputHTML(r.basePath, field, value, errs[name], relOptions[name])
+					if err != nil {
+						return nil, err
+					}
+					cells = append(cells, input)
 				}
 			}
 			section.AddRow = &inlineAddRowData{
@@ -943,9 +1204,9 @@ type deleteData struct {
 	VerboseName string
 }
 
-func (r *Renderer) RenderDelete(modelAdmin core.ModelAdmin, obj any) (string, error) {
+func (r *Renderer) RenderDelete(principal *core.Principal, modelAdmin core.ModelAdmin, obj any) (string, error) {
 	data := deleteData{
-		pageBase:    r.pageBase("Delete "+modelAdmin.VerboseName(), "Delete "+modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), deleteBreadcrumbs(modelAdmin, obj, r.basePath), nil),
+		pageBase:    r.pageBase(principal, "Delete "+modelAdmin.VerboseName(), "Delete "+modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), deleteBreadcrumbs(modelAdmin, obj, r.basePath), nil),
 		VerboseName: modelAdmin.VerboseName(),
 	}
 	tmpl, err := r.contentTemplate(modelAdmin, "delete", r.deleteTpl)
@@ -1024,8 +1285,11 @@ func (r *Renderer) widgetTemplate(name string) (*template.Template, error) {
 		if _, statErr := os.Stat(dir + "/" + name); statErr != nil {
 			continue
 		}
-		tmpl, err := template.New(path.Base(name)).Funcs(iconFuncMap).ParseFS(os.DirFS(dir), name)
+		tmpl, err := template.New(path.Base(name)).Funcs(templateFuncs).ParseFS(coretemplates.FS, uiComponentsGlob)
 		if err != nil {
+			return nil, err
+		}
+		if tmpl, err = tmpl.ParseFS(os.DirFS(dir), name); err != nil {
 			return nil, err
 		}
 		r.overrideMu.Lock()
@@ -1069,7 +1333,7 @@ func (r *Renderer) renderWidgetBody(widget core.Widget, depth int) (template.HTM
 	return template.HTML(buf.String()), nil
 }
 
-func (r *Renderer) RenderDashboard(dashboard core.Dashboard, widgets []core.Widget) (string, error) {
+func (r *Renderer) RenderDashboard(principal *core.Principal, dashboard core.Dashboard, widgets []core.Widget) (string, error) {
 	rendered := make([]renderedWidget, 0, len(widgets))
 	for _, widget := range widgets {
 		body, err := r.renderWidgetBody(widget, 0)
@@ -1088,7 +1352,7 @@ func (r *Renderer) RenderDashboard(dashboard core.Dashboard, widgets []core.Widg
 	}
 	// A single active crumb -- since base.html has no separate <h1>,
 	// this is the only page-title element the dashboard gets.
-	data := dashboardData{pageBase: r.pageBase(title, title, "", []breadcrumb{{Label: title, Active: true}}, nil), Widgets: rendered}
+	data := dashboardData{pageBase: r.pageBase(principal, title, title, "", []breadcrumb{{Label: title, Active: true}}, nil), Widgets: rendered}
 	var buf bytes.Buffer
 	if err := r.dashboard.ExecuteTemplate(&buf, "base", data); err != nil {
 		return "", err
@@ -1122,9 +1386,12 @@ func (r *Renderer) PageTemplate(templateName string) (*template.Template, error)
 		if _, statErr := os.Stat(dir + "/" + templateName); statErr != nil {
 			continue
 		}
-		tmpl, err := template.New(path.Base(templateName)).Funcs(iconFuncMap).
-			ParseFS(coretemplates.FS, "admin/base.html", "admin/toasts.html", "admin/action_confirm_modal.html")
+		tmpl, err := template.New(path.Base(templateName)).Funcs(templateFuncs).
+			ParseFS(coretemplates.FS, layoutFiles...)
 		if err != nil {
+			return nil, err
+		}
+		if tmpl, err = tmpl.ParseFS(coretemplates.FS, uiComponentsGlob); err != nil {
 			return nil, err
 		}
 		if tmpl, err = tmpl.ParseFS(os.DirFS(dir), templateName); err != nil {
@@ -1142,14 +1409,14 @@ func (r *Renderer) PageTemplate(templateName string) (*template.Template, error)
 // shared admin layout (sidebar, breadcrumbs, flash toasts). data is
 // handed to the template as .Data, alongside .Page (the AdminPage
 // itself, for label/path access).
-func (r *Renderer) RenderPage(page core.AdminPage, templateName string, data any, messages []flashMessage) (string, error) {
+func (r *Renderer) RenderPage(principal *core.Principal, page core.AdminPage, templateName string, data any, messages []flashMessage) (string, error) {
 	tmpl, err := r.PageTemplate(templateName)
 	if err != nil {
 		return "", err
 	}
 	breadcrumbs := append(categoryBreadcrumb(page.Category), breadcrumb{Label: page.Label, Active: true})
 	pd := pageData{
-		pageBase: r.pageBase(page.Label, page.Label, "page:"+page.Path, breadcrumbs, messages),
+		pageBase: r.pageBase(principal, page.Label, page.Label, "page:"+page.Path, breadcrumbs, messages),
 		Page:     page,
 		Data:     data,
 	}

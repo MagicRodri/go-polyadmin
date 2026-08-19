@@ -77,9 +77,9 @@ func handleList(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rendere
 
 		var html string
 		if isHTMXRequest(c) {
-			html, err = renderer.RenderListFragment(modelAdmin, page, req, perms, relPerms)
+			html, err = renderer.RenderListFragment(principal, modelAdmin, page, req, perms, relPerms)
 		} else {
-			html, err = renderer.RenderList(modelAdmin, page, req, perms, relPerms, popFlash(c))
+			html, err = renderer.RenderList(principal, modelAdmin, page, req, perms, relPerms, popFlash(c))
 		}
 		if err != nil {
 			return err
@@ -262,7 +262,8 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Ren
 func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
-		if _, result := authorize(admin, c, core.ResourcePermission(slug, "delete"), modelAdmin); result != authOK {
+		principal, result := authorize(admin, c, core.ResourcePermission(slug, "delete"), modelAdmin)
+		if result != authOK {
 			return writeAuthError(c, result)
 		}
 		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
@@ -272,7 +273,7 @@ func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Re
 		if core.IsNil(obj) {
 			return c.Status(fiber.StatusNotFound).SendString("Not found")
 		}
-		html, err := renderer.RenderDelete(modelAdmin, obj)
+		html, err := renderer.RenderDelete(principal, modelAdmin, obj)
 		if err != nil {
 			return err
 		}
@@ -325,9 +326,10 @@ func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin) fiber.Handl
 
 // handleLookup serves GET /{slug}/lookup?q=... -- an HTML fragment of
 // matching options for this resource, meant to be consumed
-// by another resource's autocomplete combobox (render_helpers.go's
-// autocompleteComboboxHTML). Gated on *this* resource's own "view"
-// permission, since that's what's actually being browsed.
+// by another resource's autocomplete combobox (the ui/field.html
+// template's combobox branch, see render_helpers.go's formInputHTML).
+// Gated on *this* resource's own "view" permission, since that's what's
+// actually being browsed.
 func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {

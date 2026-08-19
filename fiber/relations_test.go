@@ -173,8 +173,15 @@ func TestEditFormPreselectsCurrentRelation(t *testing.T) {
 
 	resp := doGet(t, app, "/admin/users/1/edit", nil)
 	text := body(t, resp)
-	if !strings.Contains(text, `value="1" selected`) {
+	// The plain (non-autocomplete) relation field is now the shadcn
+	// Select port (ui/select.html): a hidden input carries the pk, and
+	// the trigger's initial label text is the target's own label, not
+	// an <option>.
+	if !strings.Contains(text, `value="1"`) {
 		t.Fatalf("got %s", text)
+	}
+	if !strings.Contains(text, "Acme") {
+		t.Fatalf("expected the current relation's label as the trigger text, got %s", text)
 	}
 }
 

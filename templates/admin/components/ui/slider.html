@@ -1,0 +1,32 @@
+{{/* Slider, ported from shadcn/ui (Radix Slider).
+
+     Mirrors python-polyadmin/.../components/ui/slider.html.
+
+     Radix builds the track/range/thumb out of divs and drives them
+     with pointer events. A native <input type="range"> already does
+     that -- including keyboard arrows and, unlike the Radix version,
+     posting with a plain form submit -- so this port keeps the native
+     control, tints it with `accent-primary`, and uses Alpine only for
+     the live value readout beside it (which is presentation, so the
+     control still works with Alpine absent).
+
+     Argument (via `dict`):
+       .name   form field name
+       .label  visible label text
+       .min / .max / .step / .value
+       .suffix optional unit shown after the number (e.g. "/min") */}}
+{{define "ui/slider"}}
+<div class="mb-4" x-data="{ value: {{.value}} }">
+  <div class="flex items-baseline justify-between gap-2">
+    <label for="slider-{{.name}}" class="{{ui "label"}}">{{.label}}</label>
+    <output for="slider-{{.name}}" class="{{ui "slider" "output"}}">
+      <span x-text="value">{{.value}}</span>{{if .suffix}}{{.suffix}}{{end}}
+    </output>
+  </div>
+  <div class="mt-2 {{ui "slider"}}">
+    <input type="range" id="slider-{{.name}}" name="{{.name}}"
+           min="{{.min}}" max="{{.max}}" step="{{.step}}" value="{{.value}}"
+           x-model="value" class="{{ui "slider" "track"}}">
+  </div>
+</div>
+{{end}}

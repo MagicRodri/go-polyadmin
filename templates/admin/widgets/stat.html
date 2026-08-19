@@ -4,22 +4,24 @@
 
      Green/red here are deliberate, unlike in widgets/donut.html which
      avoids them: a delta really is a good/bad signal, so it should
-     read in the same colors as toasts.html's success/danger. The
-     arrow carries the direction too, so the meaning survives for
-     anyone who can't separate the two hues. */}}
+     read in the same colors as toasts.html's success/danger -- the
+     emerald pair (which has no shadcn token to defer to, so it names
+     an explicit dark variant) and the destructive token. The arrow
+     carries the direction too, so the meaning survives for anyone who
+     can't separate the two hues. */}}
 {{define "admin/widgets/stat.html"}}
 <div class="flex items-end justify-between gap-3">
-  <p class="text-3xl font-semibold text-neutral-900">{{.Value}}</p>
+  <p class="{{ui "text" "metric"}}">{{.Value}}</p>
   {{if eq .Direction "up"}}
-  <span class="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-green-600">
+  <span class="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
     {{icon "arrow-up" "h-4 w-4"}}{{.Delta}}%
   </span>
   {{else if eq .Direction "down"}}
-  <span class="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-red-600">
+  <span class="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-destructive">
     {{icon "arrow-down" "h-4 w-4"}}{{.Delta}}%
   </span>
   {{else}}
-  <span class="shrink-0 text-sm font-medium text-neutral-400">no change</span>
+  <span class="shrink-0 text-sm font-medium text-muted-foreground">no change</span>
   {{end}}
 </div>
 {{end}}

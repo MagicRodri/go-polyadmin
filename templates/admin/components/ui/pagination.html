@@ -1,0 +1,77 @@
+{{/* DataTablePagination, ported from shadcn/ui's Tasks example: the
+     selection count on the left, then rows-per-page, the page
+     indicator, and the four jump buttons on the right. Mirrors the
+     Python adapter's components/ui/pagination.html.
+
+     Unlike the old prev/next pair this always renders, even for a
+     single page -- the row count and the rows-per-page control are
+     useful when there's nothing to page through, and a footer that
+     vanishes makes the table appear to jump as you filter.
+
+     Every URL is precomputed by Renderer.buildListData (PageURLs,
+     PageSizeOptions), so this template assembles no query strings.
+     Each is a real href as well as an hx-get, so paging still works
+     with JS off. */}}
+{{define "ui/pagination"}}
+<nav class="{{ui "pagination"}}">
+  {{/* The example shows "N of M row(s) selected". Selection is client
+       side, so the count is filled in by Alpine from the row
+       checkboxes; with no actions declared there are no checkboxes and
+       it degrades to a plain total. */}}
+  <p class="{{ui "pagination" "selection"}}"
+     {{if .Actions}}
+     x-data="{ n: 0 }"
+     x-init="$el.closest('#resource-list').addEventListener('change', () => {
+               n = $el.closest('#resource-list').querySelectorAll('.row-checkbox:checked').length })"
+     {{end}}>
+    {{if .Actions}}<span x-text="n">0</span> of {{end}}{{.Page.TotalCount}} row(s){{if .Actions}} selected{{end}}
+  </p>
+
+  <div class="{{ui "pagination" "controls"}}">
+    <div class="{{ui "pagination" "rows-per-page"}}">
+      <span class="hidden sm:inline">Rows per page</span>
+      <div class="relative" x-data="{ open: false }" @keydown.escape="open = false" @click.outside="open = false">
+        <button type="button" x-ref="sizeTrigger" @click="open = !open"
+                :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu"
+                class="{{ui "button" "outline" "size-xs"}} h-8 w-[70px] justify-between">
+          {{.Page.PageSize}}{{icon "chevrons-up-down" "size-3.5 shrink-0 opacity-50"}}
+        </button>
+        <div x-show="open" x-cloak role="menu"
+             x-anchor.top-start.offset.6="$refs.sizeTrigger"
+             class="{{ui "dropdown" "content"}} min-w-[70px]">
+          {{range .PageSizeOptions}}
+          <a href="{{.URL}}" role="menuitem" @click="open = false"
+             hx-get="{{.URL}}" hx-target="#resource-list" hx-select="#resource-list"
+             hx-swap="outerHTML" hx-push-url="true"
+             class="{{ui "dropdown" "item"}} {{if .Selected}}font-medium text-foreground{{end}}">
+            {{.Size}}</a>
+          {{end}}
+        </div>
+      </div>
+    </div>
+
+    <div class="{{ui "pagination" "page-indicator"}}">
+      Page {{.Page.Number}} of {{if .Page.NumPages}}{{.Page.NumPages}}{{else}}1{{end}}
+    </div>
+
+    <div class="{{ui "pagination" "jumps"}}">
+      {{template "pageJump" dict "URL" .PageURLs.First    "Enabled" .Page.HasPrevious "Icon" "chevron-double-left"  "Label" "First page"    "Edge" true}}
+      {{template "pageJump" dict "URL" .PageURLs.Previous "Enabled" .Page.HasPrevious "Icon" "chevron-left"         "Label" "Previous page" "Edge" false}}
+      {{template "pageJump" dict "URL" .PageURLs.Next     "Enabled" .Page.HasNext     "Icon" "chevron-right"        "Label" "Next page"     "Edge" false}}
+      {{template "pageJump" dict "URL" .PageURLs.Last     "Enabled" .Page.HasNext     "Icon" "chevron-double-right" "Label" "Last page"     "Edge" true}}
+    </div>
+  </div>
+</nav>
+{{end}}
+
+{{/* One of the four jump buttons. Split out because html/template has
+     no loop over heterogeneous literals the way the Jinja side does. */}}
+{{define "pageJump"}}
+<a title="{{.Label}}" aria-disabled="{{if .Enabled}}false{{else}}true{{end}}"
+   {{if .Enabled}}href="{{.URL}}" hx-get="{{.URL}}" hx-target="#resource-list" hx-select="#resource-list" hx-swap="outerHTML" hx-push-url="true"{{else}}tabindex="-1"{{end}}
+   class="{{ui "button" "outline" "size-xs"}}
+          {{if .Edge}}{{ui "pagination" "jump-edge"}}{{else}}{{ui "pagination" "jump"}}{{end}}
+          {{if not .Enabled}}{{ui "pagination" "disabled"}}{{end}}">
+  {{icon .Icon "size-4"}}<span class="sr-only">{{.Label}}</span>
+</a>
+{{end}}

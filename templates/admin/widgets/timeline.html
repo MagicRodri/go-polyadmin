@@ -7,17 +7,17 @@
      that 1px border. */}}
 {{define "admin/widgets/timeline.html"}}
 {{if .Entries}}
-<ol class="relative ml-1 space-y-4 border-l border-neutral-200">
+<ol class="relative ml-1 space-y-4 border-l border-border">
   {{range .Entries}}
   <li class="ml-4">
-    <span class="absolute -left-[4.5px] mt-1.5 h-2 w-2 rounded-full bg-neutral-300 ring-2 ring-white"></span>
-    {{if .Time}}<time class="text-xs text-neutral-400">{{.Time}}</time>{{end}}
-    <p class="text-sm font-medium text-neutral-900">{{.Title}}</p>
-    {{if .Description}}<p class="mt-0.5 text-sm text-neutral-500">{{.Description}}</p>{{end}}
+    <span class="absolute -left-[4.5px] mt-1.5 h-2 w-2 rounded-full bg-border ring-2 ring-background"></span>
+    {{if .Time}}<time class="text-xs text-muted-foreground">{{.Time}}</time>{{end}}
+    <p class="text-sm font-medium text-foreground">{{.Title}}</p>
+    {{if .Description}}<p class="mt-0.5 text-sm text-muted-foreground">{{.Description}}</p>{{end}}
   </li>
   {{end}}
 </ol>
 {{else}}
-<p class="text-sm text-neutral-400">No recent activity.</p>
+<p class="text-sm text-muted-foreground">No recent activity.</p>
 {{end}}
 {{end}}

@@ -38,9 +38,26 @@ func broadcastHandler(users *UserRepository) fiberadapter.PageHandler {
 					recipients++
 				}
 			}
+			// The RadioGroup/Switch/Slider on the page post like any
+			// other form control -- each is a native input underneath
+			// (or, for the Switch, a hidden input Alpine writes to), so
+			// there's no JSON body or client-side state to unpack here.
+			urgency := pc.C.FormValue("urgency")
+			if urgency == "" {
+				urgency = "normal"
+			}
+			channels := "in-app"
+			if pc.C.FormValue("also_email") == "true" {
+				channels = "in-app + email"
+			}
+			rate := pc.C.FormValue("rate")
+			if rate == "" {
+				rate = "100"
+			}
 			return pc.RedirectWithFlash(
 				pc.BasePath+"/tools/broadcast", "success",
-				"Broadcast sent to "+strconv.Itoa(recipients)+" active user(s).",
+				"Broadcast sent to "+strconv.Itoa(recipients)+" active user(s) ("+
+					urgency+" urgency, "+channels+", "+rate+"/min).",
 			)
 		}
 		return pc.Render("pages/broadcast.html", broadcastPageData{})
