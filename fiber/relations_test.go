@@ -427,3 +427,50 @@ func TestFilterDrawerTrapsFocus(t *testing.T) {
 		t.Error("the filter drawer declares aria-modal but does not trap focus")
 	}
 }
+
+// The autocomplete relation field is the fourth listbox in the tree.
+// It always had arrow keys, but announced nothing: no combobox role and
+// no way for a screen reader to know which result was highlighted.
+func TestRelationComboboxIsAnnouncedToAssistiveTech(t *testing.T) {
+	// newAutocompleteRelUserAdmin, not makeRelationApp: the plain
+	// fixture renders a ui/select for the relation and a multi-select
+	// for the m2m, both of which carry these same attributes -- the
+	// assertions below would pass without the combobox being on the
+	// page at all. This fixture drops the m2m and is the only one that
+	// renders the component under test.
+	userAdmin := newAutocompleteRelUserAdmin()
+	orgAdmin := newTestOrgAdmin()
+	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
+	admin := core.New(core.WithModelAdmins(userAdmin, orgAdmin))
+	app := newTestApp(t, admin)
+
+	page := body(t, doGet(t, app, "/admin/users/create", nil))
+	if strings.Contains(page, "adminMultiSelect()") || strings.Contains(page, "adminSelect()") {
+		t.Fatal("fixture leaked another listbox onto the page; these assertions would be vacuous")
+	}
+
+	for _, want := range []string{
+		`role="combobox"`,
+		`aria-autocomplete="list"`,
+		`:aria-activedescendant="activeId || null"`,
+		`role="listbox"`,
+		// A swap replaces the results, so the remembered highlight has
+		// to be dropped or activeId names a detached node.
+		`@htmx:after-swap="clearActive()"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("relation combobox is missing %q", want)
+		}
+	}
+}
+
+// The /lookup fragment's rows are the options of that listbox.
+func TestLookupResultsAreListboxOptions(t *testing.T) {
+	app, _, orgAdmin := makeRelationApp(t)
+	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
+
+	fragment := body(t, doGet(t, app, "/admin/organizations/lookup?q=acme", nil))
+	if !strings.Contains(fragment, `role="option"`) {
+		t.Error("lookup results must be options, or the panel is a listbox with no options in it")
+	}
+}

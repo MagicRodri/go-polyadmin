@@ -7,9 +7,14 @@
      in, same as any other dynamically-inserted content. pk/label flow
      through data-* attributes rather than an interpolated JS
      expression, so a label containing quotes or backslashes can never
-     break the handler. */}}
+     break the handler.
+
+     role="option" is what makes the results panel an actual listbox for
+     assistive tech -- the panel itself carries role="listbox" and the
+     search input names the highlighted item through
+     aria-activedescendant (see ui/field.html). */}}
 {{range .}}
-<div data-pk="{{.PK}}" data-label="{{.Label}}"
+<div role="option" data-pk="{{.PK}}" data-label="{{.Label}}"
      @click="selectItem($el.dataset.pk, $el.dataset.label)"
      class="{{ui "combobox" "item"}}">
   {{.Label}}
