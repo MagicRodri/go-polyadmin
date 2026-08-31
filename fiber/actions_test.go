@@ -328,3 +328,29 @@ func TestDeleteButtonHiddenWhenAuthorizerDeniesIt(t *testing.T) {
 		t.Error("expected Delete to be omitted when the authorizer denies it")
 	}
 }
+
+func TestActionIgnoresAnOffSiteReferer(t *testing.T) {
+	app, userAdmin := makeActionApp(t)
+	a := userAdmin.createUser("a@example.com", true)
+
+	resp := doPostForm(t, app, "/admin/users/actions/deactivate",
+		url.Values{"pks": {strconv.Itoa(a.ID)}},
+		map[string]string{"Referer": "https://evil.example.com/admin/users"})
+
+	if got := resp.Header.Get("Location"); got != "/admin/users" {
+		t.Errorf("Location = %q, want the list view -- an attacker-supplied Referer must not be followed", got)
+	}
+}
+
+func TestActionKeepsAnOnSiteReferer(t *testing.T) {
+	app, userAdmin := makeActionApp(t)
+	a := userAdmin.createUser("a@example.com", true)
+
+	resp := doPostForm(t, app, "/admin/users/actions/deactivate",
+		url.Values{"pks": {strconv.Itoa(a.ID)}},
+		map[string]string{"Referer": "/admin/users?page=2"})
+
+	if got := resp.Header.Get("Location"); got != "/admin/users?page=2" {
+		t.Errorf("Location = %q, want the filtered list preserved", got)
+	}
+}

@@ -398,10 +398,10 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 		}
 
 		raw := c.Context().PostArgs().PeekMulti("pks")
-		redirectTarget := c.Get("Referer")
-		if redirectTarget == "" {
-			redirectTarget = basePath + "/" + slug
-		}
+		// The Referer is attacker-controlled, so it is validated before
+		// being used as a redirect target -- see core.SafeRedirectPath.
+		redirectTarget := core.SafeRedirectPath(
+			c.Get("Referer"), string(c.Request().Host()), basePath, basePath+"/"+slug)
 		if len(raw) == 0 {
 			setFlash(c, "warning", "No items selected.")
 			return redirectTo(c, redirectTarget)
