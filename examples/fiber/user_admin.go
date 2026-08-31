@@ -9,10 +9,16 @@ import (
 
 var organizationRelation = core.Relation{Name: "Organization", Target: "organizations", DisplayField: "Name"}
 
+// Cardinality many is what marks this as the collection side; the
+// adapter reads the field's current value as []any and renders every
+// role in the target's queryset as a choice.
+var rolesRelation = core.Relation{Name: "Roles", Target: "roles", DisplayField: "Name", Cardinality: core.CardinalityMany}
+
 type UserAdmin struct {
 	core.BaseModelAdmin
 	repository    *UserRepository
 	organizations *OrganizationRepository
+	roles         *RoleRepository
 }
 
 func setActive(ctx context.Context, modelAdmin core.ModelAdmin, objects []any, principal *core.Principal, active bool) (string, error) {
@@ -26,7 +32,7 @@ func setActive(ctx context.Context, modelAdmin core.ModelAdmin, objects []any, p
 	return verb + " " + strconv.Itoa(len(objects)) + " user(s).", nil
 }
 
-func NewUserAdmin(repository *UserRepository, organizations *OrganizationRepository) *UserAdmin {
+func NewUserAdmin(repository *UserRepository, organizations *OrganizationRepository, roles *RoleRepository) *UserAdmin {
 	return &UserAdmin{
 		BaseModelAdmin: core.BaseModelAdmin{
 			ModelName: "User",
@@ -34,8 +40,12 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 			// docs/routing.md's "Sidebar categories" section.
 			NavCategory:      "Directory",
 			DisplayFields:    []string{"ID", "Email", "IsActive", "Organization"},
-			DetailFieldNames: []string{"ID", "Email", "IsActive", "Organization"},
-			FormFieldNames:   []string{"Email", "IsActive", "Organization"},
+			DetailFieldNames: []string{"ID", "Email", "IsActive", "Organization", "Roles"},
+			// Roles is on the form but not in DisplayFields: a
+			// many-to-many column costs a lookup per row and reads as
+			// noise in a table, which is why Django keeps it off
+			// list_display too.
+			FormFieldNames:   []string{"Email", "IsActive", "Organization", "Roles"},
 			SearchFieldNames: []string{"Email"},
 			DeclaredFilters:  []core.Filter{core.NewBooleanFilter("IsActive")},
 			// Routes the "Organization" relation through the /lookup
@@ -56,10 +66,15 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 				core.NewField("Email", core.FieldTypeEmail, core.WithRequired()),
 				core.NewField("IsActive", core.FieldTypeBoolean, core.WithDefault(true)),
 				core.NewField("Organization", core.FieldTypeForeignKey, core.WithRelation(organizationRelation)),
+				// Renders as the searchable multi-select
+				// (ui/multi-select.html) -- the whole point of seeding
+				// eight roles below.
+				core.NewField("Roles", core.FieldTypeManyToMany, core.WithRelation(rolesRelation)),
 			},
 		},
 		repository:    repository,
 		organizations: organizations,
+		roles:         roles,
 	}
 }
 
@@ -95,17 +110,36 @@ func (a *UserAdmin) resolveOrganization(data map[string]any) *Organization {
 	return a.organizations.Get(id)
 }
 
+// resolveRoles turns the posted pks back into role objects. The form
+// posts one value per selection under "Roles" (exactly what a
+// <select multiple> posted), which parseFormData hands over as
+// []string.
+func (a *UserAdmin) resolveRoles(data map[string]any) []any {
+	raw, _ := data["Roles"].([]string)
+	out := make([]any, 0, len(raw))
+	for _, value := range raw {
+		id, err := strconv.Atoi(value)
+		if err != nil {
+			continue
+		}
+		if role := a.roles.Get(id); role != nil {
+			out = append(out, role)
+		}
+	}
+	return out
+}
+
 func (a *UserAdmin) Create(ctx context.Context, data map[string]any) (any, error) {
 	email, _ := data["Email"].(string)
 	isActive, _ := data["IsActive"].(bool)
-	return a.repository.Create(email, isActive, a.resolveOrganization(data)), nil
+	return a.repository.Create(email, isActive, a.resolveOrganization(data), a.resolveRoles(data)), nil
 }
 
 func (a *UserAdmin) Update(ctx context.Context, obj any, data map[string]any) (any, error) {
 	user := obj.(*User)
 	email, _ := data["Email"].(string)
 	isActive, _ := data["IsActive"].(bool)
-	return a.repository.Update(user, email, isActive, a.resolveOrganization(data)), nil
+	return a.repository.Update(user, email, isActive, a.resolveOrganization(data), a.resolveRoles(data)), nil
 }
 
 func (a *UserAdmin) Delete(ctx context.Context, obj any) error {

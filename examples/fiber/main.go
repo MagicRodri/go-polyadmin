@@ -21,7 +21,8 @@ import (
 func main() {
 	users := NewUserRepository()
 	organizations := NewOrganizationRepository()
-	seed(users, organizations)
+	roles := NewRoleRepository()
+	seed(users, organizations, roles)
 
 	dashboard := &core.Dashboard{
 		Title: "Overview",
@@ -117,7 +118,7 @@ func main() {
 	// Stand-ins for a real app's own session/IAM integration:
 	// swap these for something that reads your actual auth state.
 	admin := core.New(
-		core.WithModelAdmins(NewUserAdmin(users, organizations), NewOrganizationAdmin(organizations)),
+		core.WithModelAdmins(NewUserAdmin(users, organizations, roles), NewOrganizationAdmin(organizations), NewRoleAdmin(roles)),
 		core.WithDashboard(dashboard),
 		core.WithAuthenticator(core.NewAllowAllAuthenticator(&core.Principal{ID: "demo", DisplayName: "Demo Admin", IsSuperuser: true})),
 		core.WithAuthorizer(core.SuperuserAuthorizer{}),

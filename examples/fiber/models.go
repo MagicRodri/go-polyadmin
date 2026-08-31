@@ -40,11 +40,58 @@ func (r *OrganizationRepository) Create(name string) *Organization {
 	return o
 }
 
+// Role is the many-to-many target: a user holds any number of them.
+// Modelled after the permissions list Django's admin is known for, and
+// what the searchable multi-select on the user form is there to make
+// bearable once the list is long.
+type Role struct {
+	ID   int
+	Name string
+}
+
+type RoleRepository struct {
+	roles  map[int]*Role
+	nextID int
+}
+
+func NewRoleRepository() *RoleRepository {
+	return &RoleRepository{roles: make(map[int]*Role), nextID: 1}
+}
+
+// List returns roles in insertion order. The other repositories here
+// range over their map directly and so reorder between requests, which
+// a table shrugs off; a searchable option list that reshuffles under
+// the cursor on every page load does not.
+func (r *RoleRepository) List() []*Role {
+	out := make([]*Role, 0, len(r.roles))
+	for id := 1; id < r.nextID; id++ {
+		if role := r.roles[id]; role != nil {
+			out = append(out, role)
+		}
+	}
+	return out
+}
+
+func (r *RoleRepository) Get(pk int) *Role { return r.roles[pk] }
+
+func (r *RoleRepository) Create(name string) *Role {
+	role := &Role{ID: r.nextID, Name: name}
+	r.roles[role.ID] = role
+	r.nextID++
+	return role
+}
+
 type User struct {
 	ID           int
 	Email        string
 	IsActive     bool
 	Organization *Organization
+	// []any, not []*Role: the Fiber adapter reads a many-to-many's
+	// current value with a `.([]any)` assertion, the same "collections
+	// are []any" convention its GetQueryset note spells out. A typed
+	// slice here asserts to nothing and the field would render as an
+	// empty selection.
+	Roles []any
 }
 
 type UserRepository struct {
@@ -68,17 +115,18 @@ func (r *UserRepository) Get(pk int) *User {
 	return r.users[pk]
 }
 
-func (r *UserRepository) Create(email string, isActive bool, organization *Organization) *User {
-	u := &User{ID: r.nextID, Email: email, IsActive: isActive, Organization: organization}
+func (r *UserRepository) Create(email string, isActive bool, organization *Organization, roles []any) *User {
+	u := &User{ID: r.nextID, Email: email, IsActive: isActive, Organization: organization, Roles: roles}
 	r.users[u.ID] = u
 	r.nextID++
 	return u
 }
 
-func (r *UserRepository) Update(u *User, email string, isActive bool, organization *Organization) *User {
+func (r *UserRepository) Update(u *User, email string, isActive bool, organization *Organization, roles []any) *User {
 	u.Email = email
 	u.IsActive = isActive
 	u.Organization = organization
+	u.Roles = roles
 	return u
 }
 
@@ -86,16 +134,29 @@ func (r *UserRepository) Delete(u *User) {
 	delete(r.users, u.ID)
 }
 
-func seed(users *UserRepository, organizations *OrganizationRepository) {
+func seed(users *UserRepository, organizations *OrganizationRepository, roles *RoleRepository) {
 	acme := organizations.Create("Acme Corp")
 	widgets := organizations.Create("Widgets Inc")
 	globex := organizations.Create("Globex Corporation")
 	initech := organizations.Create("Initech")
-	users.Create("admin@example.com", true, acme)
-	users.Create("jane@example.com", true, acme)
-	users.Create("john@example.com", false, widgets)
-	users.Create("mary@example.com", true, widgets)
-	users.Create("peter@example.com", true, globex)
-	users.Create("samir@example.com", true, initech)
-	users.Create("milton@example.com", false, nil)
+
+	// Enough roles that the multi-select's search box has something to
+	// do -- the control only earns its keep past the point where
+	// scanning the whole list stops being quick.
+	admin := roles.Create("Administrator")
+	billing := roles.Create("Billing")
+	support := roles.Create("Support")
+	roles.Create("Auditor")
+	roles.Create("Content Editor")
+	roles.Create("Release Manager")
+	roles.Create("Read Only")
+	security := roles.Create("Security Officer")
+
+	users.Create("admin@example.com", true, acme, []any{admin, security})
+	users.Create("jane@example.com", true, acme, []any{billing})
+	users.Create("john@example.com", false, widgets, nil)
+	users.Create("mary@example.com", true, widgets, []any{support, billing})
+	users.Create("peter@example.com", true, globex, []any{support})
+	users.Create("samir@example.com", true, initech, nil)
+	users.Create("milton@example.com", false, nil, nil)
 }
