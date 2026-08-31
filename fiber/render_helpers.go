@@ -221,12 +221,8 @@ func (r *Renderer) formInputHTML(basePath string, field core.Field, value any, e
 		}
 
 	case core.FieldTypeManyToMany:
-		size := 1
 		options := make([]fieldOptionData, 0)
 		if relation != nil {
-			if len(relation.Options) > size {
-				size = len(relation.Options)
-			}
 			selected := make(map[string]bool, len(relation.SelectedPKs))
 			for _, spk := range relation.SelectedPKs {
 				selected[fmt.Sprint(spk)] = true
@@ -236,7 +232,6 @@ func (r *Renderer) formInputHTML(basePath string, field core.Field, value any, e
 				options = append(options, fieldOptionData{Value: pk, Label: opt.Label, Selected: selected[pk]})
 			}
 		}
-		data["Size"] = size
 		data["Options"] = options
 	}
 

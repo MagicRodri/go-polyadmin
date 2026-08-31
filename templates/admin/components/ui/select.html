@@ -27,7 +27,15 @@
 {{define "ui/select"}}
 {{$selected := ""}}
 {{range .options}}{{if .Selected}}{{$selected = .Label}}{{end}}{{end}}
-<div class="{{ui "combobox"}}" x-data="{ open: false, label: {{printf "%q" (or $selected .placeholder)}} }"
+{{/* The initial label rides in as a data attribute and is read back
+     with $el.dataset in x-init, never interpolated into the x-data
+     expression: a label is arbitrary application text, and quoting it
+     into a JS string literal inside an HTML attribute is exactly the
+     trap ui/multi-select and the relation combobox avoid. (The Python
+     mirror hit it for real -- its tojson emitted a raw double quote
+     that closed the attribute early.) */}}
+<div class="{{ui "combobox"}}" data-label="{{or $selected .placeholder}}"
+     x-data="{ open: false, label: '' }" x-init="label = $el.dataset.label"
      @keydown.escape="open = false" @click.outside="open = false">
   <input type="hidden" name="{{.name}}" x-ref="hiddenInput"
          value="{{range .options}}{{if .Selected}}{{.Value}}{{end}}{{end}}">

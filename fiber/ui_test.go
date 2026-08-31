@@ -271,6 +271,7 @@ func TestUIRegistryMatchesThePythonImplementationKeyForKey(t *testing.T) {
 		"breadcrumb": true, "pagination": true, "table": true,
 		// Phase D
 		"field": true, "combobox": true, "calendar": true, "slider": true,
+		"multi-select": true,
 		// dashboard / misc
 		"widget": true, "panel": true, "page": true, "toolbar": true,
 		"filter-panel": true,

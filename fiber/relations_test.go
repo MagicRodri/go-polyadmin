@@ -59,9 +59,19 @@ type relUser struct {
 	ID           int
 	Email        string
 	Organization *testOrg
+	// []any, not []*testOrg: the adapter reads a many-to-many's current
+	// value with current.([]any), the same "collections are []any"
+	// convention its GetQueryset note spells out. A typed slice here
+	// asserts to nothing and the field renders as an empty selection.
+	Teams []any
 }
 
 var orgRelation = core.Relation{Name: "Organization", Target: "organizations", DisplayField: "Name"}
+
+// Teams reuses the organizations admin as its target -- the widget only
+// cares that a relation resolves to (pk, label) pairs, not what the
+// target models.
+var teamsRelation = core.Relation{Name: "Teams", Target: "organizations", DisplayField: "Name"}
 
 type relUserAdmin struct {
 	core.BaseModelAdmin
@@ -74,11 +84,12 @@ func newRelUserAdmin() *relUserAdmin {
 		BaseModelAdmin: core.BaseModelAdmin{
 			ModelName:        "User",
 			DisplayFields:    []string{"ID", "Email", "Organization"},
-			DetailFieldNames: []string{"ID", "Email", "Organization"},
-			FormFieldNames:   []string{"Email", "Organization"},
+			DetailFieldNames: []string{"ID", "Email", "Organization", "Teams"},
+			FormFieldNames:   []string{"Email", "Organization", "Teams"},
 			DeclaredFields: []core.Field{
 				core.NewField("Email", core.FieldTypeEmail),
 				core.NewField("Organization", core.FieldTypeForeignKey, core.WithRelation(orgRelation)),
+				core.NewField("Teams", core.FieldTypeManyToMany, core.WithRelation(teamsRelation)),
 			},
 		},
 		store:  make(map[int]*relUser),
@@ -203,6 +214,67 @@ func TestLookupRouteReturnsMatchingOptions(t *testing.T) {
 	}
 }
 
+// -- many-to-many: the searchable multi-select --------------------------
+
+func TestManyToManyRendersSearchableMultiSelectNotANativeMultiple(t *testing.T) {
+	app, _, orgAdmin := makeRelationApp(t)
+	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
+	orgAdmin.store[2] = &testOrg{ID: 2, Name: "Widgets Inc"}
+
+	text := body(t, doGet(t, app, "/admin/users/create", nil))
+
+	if strings.Contains(text, "<select multiple") {
+		t.Error("expected the native <select multiple> to be gone")
+	}
+	if !strings.Contains(text, `x-data="adminMultiSelect()"`) {
+		t.Error("expected the multi-select component")
+	}
+	// The list is "what you can still add": a chosen option leaves it
+	// for a chip, so nothing in it is ever in a selected state -- no
+	// check indicator, and no aria-selected to carry.
+	if !strings.Contains(text, `x-show="available($el)"`) {
+		t.Error("expected the list to hide options once they are chosen")
+	}
+	if strings.Contains(text, "aria-selected") || strings.Contains(text, "aria-multiselectable") {
+		t.Error("expected no selected-state ARIA on a list that never shows selected options")
+	}
+	// Every option is in the page -- a many-to-many's list is already
+	// fully rendered, which is what lets the search filter client-side.
+	for _, want := range []string{`data-value="1"`, `data-value="2"`, "Acme", "Widgets Inc"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("expected option %q in the page", want)
+		}
+	}
+	if !strings.Contains(text, `placeholder="Search&hellip;"`) {
+		t.Error("expected the search box that makes a long list usable")
+	}
+}
+
+// The widget posts what a <select multiple> posted: repeated inputs
+// under the field's own name, which is what parseFormData's PeekMulti
+// reads.
+func TestManyToManySelectionPostsUnderTheFieldName(t *testing.T) {
+	app, userAdmin, orgAdmin := makeRelationApp(t)
+	acme := &testOrg{ID: 1, Name: "Acme"}
+	widgets := &testOrg{ID: 2, Name: "Widgets Inc"}
+	orgAdmin.store[1], orgAdmin.store[2] = acme, widgets
+	userAdmin.store[1] = &relUser{ID: 1, Email: "john@example.com", Teams: []any{widgets}}
+
+	text := body(t, doGet(t, app, "/admin/users/1/edit", nil))
+
+	if !strings.Contains(text, `<input type="hidden" name="Teams"`) {
+		t.Error("expected the hidden input template posting under the field name")
+	}
+	// The current selection is marked on the option, which is what the
+	// component hydrates its initial state from.
+	if !strings.Contains(text, `data-value="2" data-label="Widgets Inc" data-selected="true"`) {
+		t.Errorf("expected the chosen option pre-marked, got %s", text)
+	}
+	if strings.Contains(text, `data-value="1" data-label="Acme" data-selected="true"`) {
+		t.Error("expected an unchosen option not to be marked selected")
+	}
+}
+
 type denyOrgViewAuthorizer struct{}
 
 func (denyOrgViewAuthorizer) Can(principal *core.Principal, permission string, resource any) bool {
@@ -228,6 +300,11 @@ type autocompleteRelUserAdmin struct {
 func newAutocompleteRelUserAdmin() *autocompleteRelUserAdmin {
 	a := &autocompleteRelUserAdmin{relUserAdmin: *newRelUserAdmin()}
 	a.AutocompleteFieldNames = []string{"Organization"}
+	// Drop the many-to-many: it targets the same admin and renders every
+	// option inline (that is what a multi-select is), which would defeat
+	// the "an autocomplete field never dumps its target's queryset into
+	// the page" assertion these fixtures exist to make.
+	a.FormFieldNames = []string{"Email", "Organization"}
 	return a
 }
 

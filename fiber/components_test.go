@@ -237,6 +237,19 @@ func TestStackedToolbarControlsPutTheLabelLeftAndTheIconRight(t *testing.T) {
 // expression, where one stray quote closes the attribute and every
 // select on the page fails to initialise. (The Python mirror shipped
 // exactly that bug via tojson.)
+func TestSelectLabelIsADataAttributeNotAJSStringLiteral(t *testing.T) {
+	page := datedFormPage(t, "/admin/tasks/1/edit")
+
+	if !strings.Contains(page, `x-data="{ open: false, label: '' }"`) {
+		t.Error("expected the x-data to carry no interpolated label")
+	}
+	if !strings.Contains(page, `x-init="label = $el.dataset.label"`) {
+		t.Error("expected the label to be hydrated from the DOM")
+	}
+	if !strings.Contains(page, `data-label="Medium"`) {
+		t.Error("expected the current value's label as a data attribute")
+	}
+}
 
 // -- booleans as icons ----------------------------------------------------
 
@@ -249,6 +262,31 @@ func TestStackedToolbarControlsPutTheLabelLeftAndTheIconRight(t *testing.T) {
 // an SVG.
 
 // -- shadcn Select for plain choice fields -------------------------------
+
+func TestEnumFieldRendersShadcnSelectNotNativeOptions(t *testing.T) {
+	page := datedFormPage(t, "/admin/tasks/1/edit")
+	if strings.Contains(page, "<option") {
+		t.Error("expected no native <option> elements once enum uses ui/select")
+	}
+	if !strings.Contains(page, `aria-haspopup="listbox"`) {
+		t.Error("expected the Select trigger")
+	}
+	if !strings.Contains(page, `name="Priority"`) {
+		t.Error("expected a hidden input still posting the field under its own name")
+	}
+	if !strings.Contains(page, "Medium") {
+		t.Error("expected the current value's label as the trigger text")
+	}
+}
+
+func TestEnumFieldSelectListsAllChoicesAsOptions(t *testing.T) {
+	page := datedFormPage(t, "/admin/tasks/create")
+	for _, want := range []string{`data-value="Low"`, `data-value="Medium"`, `data-value="High"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("expected choice %q as a listbox option", want)
+		}
+	}
+}
 
 // -- export dropdown (Phase B) ------------------------------------------
 

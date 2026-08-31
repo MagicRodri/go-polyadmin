@@ -6,13 +6,13 @@
      native controls stay native, why the combobox pk/label never flow
      through an interpolated JS expression).
 
-     Controls that must survive a plain (JS-free) form POST stay native
-     elements styled to match shadcn -- <select>, checkbox, and
-     <input type="date"> -- rather than the Radix-backed listbox,
-     checkbox, and day-picker shadcn uses. See ui.go for the
-     per-component reasoning. The two genuinely Alpine-driven ports
-     here are the relation combobox and the date picker's calendar
-     popover (rendered via ui/date-picker).
+     The checkbox and the date input stay native elements styled to
+     match shadcn, so they keep working with JS off; the choice
+     controls do not, and haven't since ui/select replaced the native
+     <select> -- see ui/select.html and ui/multi-select.html for what
+     each posts instead. The Alpine-driven ports here are the relation
+     combobox, the date picker's calendar popover (ui/date-picker),
+     ui/select, and ui/multi-select.
 
      Called from render_helpers.go's formInputHTML, which does every
      bit of per-type derivation (stringifying values, matching
@@ -31,7 +31,6 @@
        .StringValue   the value, already stringified
        .Checked       bool, boolean fields only
        .Options       []{Value, Label, Selected}, enum/relation/m2m
-       .Size          <select multiple>'s size attribute, m2m only
        .Autocomplete  bool, foreignkey/onetoone only
        .ComboboxSelectedPK/.ComboboxSelectedLabel/.ComboboxResultsID/.LookupTarget
        .Errors        []string
@@ -125,10 +124,8 @@
       {{end}}
 
     {{else if eq .Type "manytomany"}}
-    <select multiple id="field-{{.Name}}" name="{{.Name}}" autocomplete="off" {{if .Disabled}}disabled{{end}}
-            size="{{.Size}}" class="{{ui "select" "size-auto"}}">
-      {{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}
-    </select>
+    {{template "ui/multi-select" dict
+        "name" .Name "options" .Options "placeholder" "Select…" "disabled" .Disabled}}
 
     {{else}}
     <input type="{{.InputType}}" id="field-{{.Name}}" name="{{.Name}}" value="{{.StringValue}}"
