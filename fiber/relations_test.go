@@ -216,6 +216,22 @@ func TestLookupRouteReturnsMatchingOptions(t *testing.T) {
 
 // -- many-to-many: the searchable multi-select --------------------------
 
+// multiSelectMarkup returns just the multi-select component's markup:
+// from its x-data to the next component's, so an assertion about this
+// control can neither be satisfied nor broken by a sibling field.
+func multiSelectMarkup(t *testing.T, page string) string {
+	t.Helper()
+	start := strings.Index(page, `x-data="adminMultiSelect()"`)
+	if start < 0 {
+		t.Fatal("no multi-select on the page")
+	}
+	rest := page[start+len(`x-data="adminMultiSelect()"`):]
+	if end := strings.Index(rest, `x-data=`); end >= 0 {
+		rest = rest[:end]
+	}
+	return rest
+}
+
 func TestManyToManyRendersSearchableMultiSelectNotANativeMultiple(t *testing.T) {
 	app, _, orgAdmin := makeRelationApp(t)
 	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
@@ -235,7 +251,11 @@ func TestManyToManyRendersSearchableMultiSelectNotANativeMultiple(t *testing.T) 
 	if !strings.Contains(text, `x-show="available($el)"`) {
 		t.Error("expected the list to hide options once they are chosen")
 	}
-	if strings.Contains(text, "aria-selected") || strings.Contains(text, "aria-multiselectable") {
+	// Scoped to the multi-select's own markup: this form also renders a
+	// ui/select for the foreign key, and that one carries aria-selected
+	// legitimately (its list does show a chosen option).
+	if ms := multiSelectMarkup(t, text); strings.Contains(ms, "aria-selected") ||
+		strings.Contains(ms, "aria-multiselectable") {
 		t.Error("expected no selected-state ARIA on a list that never shows selected options")
 	}
 	// Every option is in the page -- a many-to-many's list is already
@@ -370,5 +390,40 @@ func TestRelatedLinkHiddenWhenTargetNotViewable(t *testing.T) {
 	}
 	if !strings.Contains(text, "Acme") {
 		t.Fatalf("expected plain-text label still shown, got %s", text)
+	}
+}
+
+// The multi-select declares role=combobox/listbox, which promises
+// assistive tech that the keyboard works. Focus stays in the search
+// box -- typing is the point of this control -- so the arrows move an
+// aria-activedescendant highlight rather than real focus.
+func TestMultiSelectIsKeyboardOperable(t *testing.T) {
+	app, _, orgAdmin := makeRelationApp(t)
+	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
+	ms := multiSelectMarkup(t, body(t, doGet(t, app, "/admin/users/create", nil)))
+
+	for _, want := range []string{
+		`@keydown.down.prevent="move(1)"`,
+		`@keydown.up.prevent="move(-1)"`,
+		`@keydown.enter.prevent="chooseActive()"`,
+		`:aria-activedescendant="activeId || null"`,
+		`role="combobox"`,
+	} {
+		if !strings.Contains(ms, want) {
+			t.Errorf("multi-select is missing %q", want)
+		}
+	}
+	if strings.Contains(ms, `role="option" tabindex="0"`) {
+		t.Error("options must not be individually tabbable -- the search box holds focus")
+	}
+}
+
+// aria-modal="true" is a promise that focus cannot leave the drawer.
+// x-trap is what keeps it; without it Tab walks straight out into the
+// page behind the overlay.
+func TestFilterDrawerTrapsFocus(t *testing.T) {
+	page := filterablePage(t, nil)
+	if !strings.Contains(page, `x-trap="open"`) {
+		t.Error("the filter drawer declares aria-modal but does not trap focus")
 	}
 }

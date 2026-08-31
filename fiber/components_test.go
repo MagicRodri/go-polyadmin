@@ -240,11 +240,16 @@ func TestStackedToolbarControlsPutTheLabelLeftAndTheIconRight(t *testing.T) {
 func TestSelectLabelIsADataAttributeNotAJSStringLiteral(t *testing.T) {
 	page := datedFormPage(t, "/admin/tasks/1/edit")
 
-	if !strings.Contains(page, `x-data="{ open: false, label: '' }"`) {
-		t.Error("expected the x-data to carry no interpolated label")
+	if !strings.Contains(page, `x-data="adminSelect()"`) {
+		t.Error("expected the x-data to be the bare factory call, with no interpolated label")
 	}
-	if !strings.Contains(page, `x-init="label = $el.dataset.label"`) {
+	if !strings.Contains(page, `x-init="hydrate()"`) {
 		t.Error("expected the label to be hydrated from the DOM")
+	}
+	// The point of the whole arrangement: the label must never appear
+	// inside the Alpine expression, only as an HTML attribute value.
+	if strings.Contains(page, `label: 'Medium'`) || strings.Contains(page, `label: "Medium"`) {
+		t.Error("the label must not be interpolated into a JS string literal")
 	}
 	if !strings.Contains(page, `data-label="Medium"`) {
 		t.Error("expected the current value's label as a data attribute")
@@ -437,5 +442,32 @@ func TestToastViewportSitsBottomRightAndDoesNotBlockClicks(t *testing.T) {
 	app := newTestApp(t, core.New(core.WithModelAdmins(ua)))
 	if !strings.Contains(body(t, doGet(t, app, "/admin/users", nil)), viewport) {
 		t.Error("expected the toast viewport on the page")
+	}
+}
+
+// The three listbox-ish components declare ARIA roles, which is a
+// promise to assistive tech that the keyboard works. These pin the
+// mechanics that make the promise true; the behaviour itself is
+// exercised in a browser (see the accessibility CDP run).
+func TestSelectIsKeyboardOperable(t *testing.T) {
+	page := datedFormPage(t, "/admin/tasks/1/edit")
+
+	for _, want := range []string{
+		`@keydown.down.prevent="openAndMove(1)"`,
+		`@keydown.up.prevent="openAndMove(-1)"`,
+		`@keydown.home.prevent="if (open) setActive(optionEls()[0])"`,
+		// Focus stays on the trigger, so the trigger is what names the
+		// highlighted option.
+		`:aria-activedescendant="open ? activeId : null"`,
+		`:aria-controls="$id('select-listbox')"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("select is missing %q", want)
+		}
+	}
+	// tabindex="0" on every option would make Tab walk the whole list;
+	// with a roving highlight the options must be out of the tab order.
+	if strings.Contains(page, `role="option" tabindex="0"`) {
+		t.Error("options must not be individually tabbable")
 	}
 }
