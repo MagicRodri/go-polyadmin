@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"net/url"
 	"strings"
 )
 
@@ -47,4 +48,35 @@ func CSRFTokensMatch(a, b string) bool {
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
+// SafeRedirectPath validates a client-supplied Referer before it is used
+// as a redirect target, returning fallback when it cannot be trusted.
+//
+// A raw Referer is attacker-controlled: without this, an action could be
+// made to bounce the signed-in admin to any site on the internet. The
+// returned value is always a path (never absolute), so the redirect can
+// only ever land inside this admin.
+func SafeRedirectPath(referer, host, basePath, fallback string) string {
+	if referer == "" {
+		return fallback
+	}
+	parsed, err := url.Parse(referer)
+	if err != nil {
+		return fallback
+	}
+	// A non-empty host must be ours. This also rejects protocol-relative
+	// "//evil.example.com/admin", which parses with an empty scheme but a
+	// foreign host.
+	if parsed.Host != "" && parsed.Host != host {
+		return fallback
+	}
+	// Exact match, or a child path -- "/adminX" must not pass for "/admin".
+	if parsed.Path != basePath && !strings.HasPrefix(parsed.Path, basePath+"/") {
+		return fallback
+	}
+	if parsed.RawQuery != "" {
+		return parsed.Path + "?" + parsed.RawQuery
+	}
+	return parsed.Path
 }

@@ -46,3 +46,29 @@ func TestCSRFTokensMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestSafeRedirectPath(t *testing.T) {
+	const host, base, fallback = "admin.example.com", "/admin", "/admin/users"
+
+	cases := []struct {
+		name    string
+		referer string
+		want    string
+	}{
+		{"relative under base", "/admin/users?page=2", "/admin/users?page=2"},
+		{"absolute same host", "https://admin.example.com/admin/users", "/admin/users"},
+		{"base path itself", "/admin", "/admin"},
+		{"empty referer", "", fallback},
+		{"other host", "https://evil.example.com/admin/users", fallback},
+		{"path outside base", "/etc/passwd", fallback},
+		// "/adminX" must not pass a naive prefix check for "/admin".
+		{"prefix lookalike", "/adminX/pwned", fallback},
+		{"unparseable", "://not a url", fallback},
+		{"protocol-relative to other host", "//evil.example.com/admin", fallback},
+	}
+	for _, tc := range cases {
+		if got := SafeRedirectPath(tc.referer, host, base, fallback); got != tc.want {
+			t.Errorf("%s: SafeRedirectPath(%q) = %q, want %q", tc.name, tc.referer, got, tc.want)
+		}
+	}
+}
