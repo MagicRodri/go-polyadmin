@@ -9,3 +9,4 @@ examples/fiber/admin-example-fiber
 
 # Editors / OS
 .DS_Store
+.idea/
