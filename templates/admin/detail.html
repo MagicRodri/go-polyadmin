@@ -43,6 +43,7 @@
         <form method="post" action="{{$.BasePath}}/{{$.Slug}}/actions/{{.Name}}"
               {{if .Confirm}}data-confirm="{{.Confirm}}"{{end}}
               onsubmit="return window.adminConfirmSubmit(event, this, this.dataset.confirm)">
+          {{template "csrf-field" $.CSRFToken}}
           <input type="hidden" name="pks" value="{{$.PK}}">
           <button type="submit"
                   class="{{ui "button" "outline"}} w-full sm:w-auto">

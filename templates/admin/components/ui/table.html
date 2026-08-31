@@ -54,6 +54,7 @@
 <form id="bulk-actions-form" method="post" action="{{.BasePath}}/{{.Slug}}/actions/"
       onsubmit="return window.adminConfirmSubmit(event, this, this.dataset.confirm)"
       class="{{ui "toolbar" "item"}}">
+  {{template "csrf-field" .CSRFToken}}
   {{/* w-full on both the positioning wrapper and the trigger: a button
        can only fill a box that is itself full width, and the <form>
        above is what the stacked toolbar actually stretches. */}}

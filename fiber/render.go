@@ -95,6 +95,10 @@ type pageBase struct {
 	// (shadcn sidebar-07). Every page renders a sidebar, so it has to
 	// reach every page's data.
 	Principal *core.Principal
+	// CSRFToken is per-request state like Principal, and reaches every
+	// page for the same reason: base.html renders it as a meta tag, and
+	// every no-JS form renders it as a hidden field.
+	CSRFToken string
 	Title     string
 	Header    string
 	BasePath  string
@@ -164,7 +168,7 @@ func (r *Renderer) buildNav(activeKey string) []navEntry {
 	return order
 }
 
-func (r *Renderer) pageBase(principal *core.Principal, title, header, navKey string, breadcrumbs []breadcrumb, messages []flashMessage) pageBase {
+func (r *Renderer) pageBase(principal *core.Principal, csrfToken, title, header, navKey string, breadcrumbs []breadcrumb, messages []flashMessage) pageBase {
 	siteTitle := r.admin.SiteTitle
 	if siteTitle == "" {
 		siteTitle = "PolyAdmin"
@@ -174,8 +178,8 @@ func (r *Renderer) pageBase(principal *core.Principal, title, header, navKey str
 		currentSlug = slug
 	}
 	return pageBase{
-		Principal: principal,
-		Title:     title, Header: header, BasePath: r.basePath,
+		Principal: principal, CSRFToken: csrfToken,
+		Title: title, Header: header, BasePath: r.basePath,
 		CurrentSlug: currentSlug, CurrentNavKey: navKey, NavItems: r.buildNav(navKey),
 		SiteTitle: siteTitle, SiteLogoURL: r.admin.SiteLogoURL, Breadcrumbs: breadcrumbs, Messages: messages,
 	}
@@ -291,6 +295,27 @@ var layoutFiles = []string{
 // invoked as {{template "ui/dialog" dict ...}}.
 const uiComponentsGlob = "admin/components/ui/*.html"
 
+// sharedPartials are framework partials that are not shadcn components
+// and so live outside uiComponentsGlob, but that any template set may
+// invoke. They go into every set, fragment sets included: csrf-field is
+// used by ui/bulk-actions, and Go resolves {{template}} names at
+// execution time, so a set that parses a component without its
+// dependencies fails only when that page is actually rendered.
+var sharedPartials = []string{
+	"admin/components/csrf-field.html",
+}
+
+// parseComponents parses the shadcn ui partials plus sharedPartials
+// into tmpl -- the pair every template set needs, whether or not it
+// also gets layoutFiles.
+func parseComponents(tmpl *template.Template) (*template.Template, error) {
+	tmpl, err := tmpl.ParseFS(coretemplates.FS, uiComponentsGlob)
+	if err != nil {
+		return nil, err
+	}
+	return tmpl.ParseFS(coretemplates.FS, sharedPartials...)
+}
+
 // buildTemplate parses the shared layout + ui component partials plus
 // the given content files into one set.
 func buildTemplate(contentFiles ...string) (*template.Template, error) {
@@ -299,7 +324,7 @@ func buildTemplate(contentFiles ...string) (*template.Template, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tmpl.ParseFS(coretemplates.FS, uiComponentsGlob)
+	return parseComponents(tmpl)
 }
 
 func NewRenderer(admin *core.Admin, basePath string, templateDirs ...string) (*Renderer, error) {
@@ -312,7 +337,7 @@ func NewRenderer(admin *core.Admin, basePath string, templateDirs ...string) (*R
 		if err != nil {
 			return nil, err
 		}
-		return tmpl.ParseFS(coretemplates.FS, uiComponentsGlob)
+		return parseComponents(tmpl)
 	}
 	var err error
 	if r.list, err = buildTemplate("admin/list.html"); err != nil {
@@ -339,7 +364,7 @@ func NewRenderer(admin *core.Admin, basePath string, templateDirs ...string) (*R
 	if r.inlineFragment, err = buildFragment("admin/inline.html", "admin/inline_fragment.html"); err != nil {
 		return nil, err
 	}
-	if r.uiSet, err = template.New("ui").Funcs(templateFuncs).ParseFS(coretemplates.FS, uiComponentsGlob); err != nil {
+	if r.uiSet, err = parseComponents(template.New("ui").Funcs(templateFuncs)); err != nil {
 		return nil, err
 	}
 	return r, nil
@@ -433,7 +458,7 @@ func (r *Renderer) contentTemplate(modelAdmin core.ModelAdmin, view string, fall
 	if err != nil {
 		return nil, err
 	}
-	if tmpl, err = tmpl.ParseFS(coretemplates.FS, uiComponentsGlob); err != nil {
+	if tmpl, err = parseComponents(tmpl); err != nil {
 		return nil, err
 	}
 	if tmpl, err = tmpl.ParseFS(source, name); err != nil {
@@ -553,6 +578,7 @@ type listData struct {
 
 func (r *Renderer) buildListData(
 	principal *core.Principal,
+	csrfToken string,
 	modelAdmin core.ModelAdmin,
 	page core.Page,
 	req core.ListRequest,
@@ -673,7 +699,7 @@ func (r *Renderer) buildListData(
 	}
 
 	return listData{
-		pageBase:        r.pageBase(principal, modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+slug, listBreadcrumbs(modelAdmin), messages),
+		pageBase:        r.pageBase(principal, csrfToken, modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+slug, listBreadcrumbs(modelAdmin), messages),
 		Slug:            slug,
 		VerboseName:     modelAdmin.VerboseName(),
 		Columns:         columns,
@@ -817,12 +843,12 @@ func listURL(basePath, slug string, req core.ListRequest, opts listURLOpts) stri
 	return basePath + "/" + slug + q.values
 }
 
-func (r *Renderer) RenderList(principal *core.Principal, modelAdmin core.ModelAdmin, page core.Page, req core.ListRequest, perms permissions, relationPermissions map[string]bool, messages []flashMessage) (string, error) {
+func (r *Renderer) RenderList(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, page core.Page, req core.ListRequest, perms permissions, relationPermissions map[string]bool, messages []flashMessage) (string, error) {
 	tmpl, err := r.contentTemplate(modelAdmin, "list", r.list)
 	if err != nil {
 		return "", err
 	}
-	data := r.buildListData(principal, modelAdmin, page, req, perms, relationPermissions, messages)
+	data := r.buildListData(principal, csrfToken, modelAdmin, page, req, perms, relationPermissions, messages)
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "base", data); err != nil {
 		return "", err
@@ -830,12 +856,12 @@ func (r *Renderer) RenderList(principal *core.Principal, modelAdmin core.ModelAd
 	return buf.String(), nil
 }
 
-func (r *Renderer) RenderListFragment(principal *core.Principal, modelAdmin core.ModelAdmin, page core.Page, req core.ListRequest, perms permissions, relationPermissions map[string]bool) (string, error) {
+func (r *Renderer) RenderListFragment(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, page core.Page, req core.ListRequest, perms permissions, relationPermissions map[string]bool) (string, error) {
 	tmpl, err := r.contentTemplate(modelAdmin, "list", r.list)
 	if err != nil {
 		return "", err
 	}
-	data := r.buildListData(principal, modelAdmin, page, req, perms, relationPermissions, nil)
+	data := r.buildListData(principal, csrfToken, modelAdmin, page, req, perms, relationPermissions, nil)
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
 		return "", err
@@ -860,7 +886,7 @@ type detailData struct {
 	InlineSections []inlineSectionData
 }
 
-func (r *Renderer) RenderDetail(principal *core.Principal, modelAdmin core.ModelAdmin, obj any, perms permissions, relationPermissions map[string]bool, messages []flashMessage) (string, error) {
+func (r *Renderer) RenderDetail(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, perms permissions, relationPermissions map[string]bool, messages []flashMessage) (string, error) {
 	fields := make([]detailField, 0, len(modelAdmin.DetailFields()))
 	for _, name := range modelAdmin.DetailFields() {
 		field, _ := modelAdmin.Field(name)
@@ -874,7 +900,7 @@ func (r *Renderer) RenderDetail(principal *core.Principal, modelAdmin core.Model
 		return "", err
 	}
 	data := detailData{
-		pageBase:       r.pageBase(principal, modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), detailBreadcrumbs(modelAdmin, obj, r.basePath), messages),
+		pageBase:       r.pageBase(principal, csrfToken, modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), detailBreadcrumbs(modelAdmin, obj, r.basePath), messages),
 		Slug:           modelAdmin.Slug(),
 		PK:             modelAdmin.GetPK(obj),
 		Fields:         fields,
@@ -912,6 +938,7 @@ type formData struct {
 
 func (r *Renderer) RenderForm(
 	principal *core.Principal,
+	csrfToken string,
 	modelAdmin core.ModelAdmin,
 	obj any,
 	submitted map[string]any,
@@ -922,11 +949,12 @@ func (r *Renderer) RenderForm(
 	if err != nil {
 		return "", err
 	}
-	return r.executeForm(tmpl, "base", principal, modelAdmin, obj, submitted, errs, relationOptions)
+	return r.executeForm(tmpl, "base", principal, csrfToken, modelAdmin, obj, submitted, errs, relationOptions)
 }
 
 func (r *Renderer) RenderFormFragment(
 	principal *core.Principal,
+	csrfToken string,
 	modelAdmin core.ModelAdmin,
 	obj any,
 	submitted map[string]any,
@@ -937,13 +965,14 @@ func (r *Renderer) RenderFormFragment(
 	if err != nil {
 		return "", err
 	}
-	return r.executeForm(tmpl, "content", principal, modelAdmin, obj, submitted, errs, relationOptions)
+	return r.executeForm(tmpl, "content", principal, csrfToken, modelAdmin, obj, submitted, errs, relationOptions)
 }
 
 func (r *Renderer) executeForm(
 	tmpl *template.Template,
 	name string,
 	principal *core.Principal,
+	csrfToken string,
 	modelAdmin core.ModelAdmin,
 	obj any,
 	submitted map[string]any,
@@ -980,7 +1009,7 @@ func (r *Renderer) executeForm(
 	}
 
 	data := formData{
-		pageBase:    r.pageBase(principal, fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), formBreadcrumbs(modelAdmin, obj, r.basePath), nil),
+		pageBase:    r.pageBase(principal, csrfToken, fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), formBreadcrumbs(modelAdmin, obj, r.basePath), nil),
 		VerboseName: modelAdmin.VerboseName(),
 		FormAction:  action,
 		// The edit form offers Delete in its action bar, so it needs the
@@ -1219,9 +1248,9 @@ type deleteData struct {
 	VerboseName string
 }
 
-func (r *Renderer) RenderDelete(principal *core.Principal, modelAdmin core.ModelAdmin, obj any) (string, error) {
+func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any) (string, error) {
 	data := deleteData{
-		pageBase:    r.pageBase(principal, "Delete "+modelAdmin.VerboseName(), "Delete "+modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), deleteBreadcrumbs(modelAdmin, obj, r.basePath), nil),
+		pageBase:    r.pageBase(principal, csrfToken, "Delete "+modelAdmin.VerboseName(), "Delete "+modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), deleteBreadcrumbs(modelAdmin, obj, r.basePath), nil),
 		VerboseName: modelAdmin.VerboseName(),
 	}
 	tmpl, err := r.contentTemplate(modelAdmin, "delete", r.deleteTpl)
@@ -1300,7 +1329,7 @@ func (r *Renderer) widgetTemplate(name string) (*template.Template, error) {
 		if _, statErr := os.Stat(dir + "/" + name); statErr != nil {
 			continue
 		}
-		tmpl, err := template.New(path.Base(name)).Funcs(templateFuncs).ParseFS(coretemplates.FS, uiComponentsGlob)
+		tmpl, err := parseComponents(template.New(path.Base(name)).Funcs(templateFuncs))
 		if err != nil {
 			return nil, err
 		}
@@ -1348,7 +1377,7 @@ func (r *Renderer) renderWidgetBody(widget core.Widget, depth int) (template.HTM
 	return template.HTML(buf.String()), nil
 }
 
-func (r *Renderer) RenderDashboard(principal *core.Principal, dashboard core.Dashboard, widgets []core.Widget) (string, error) {
+func (r *Renderer) RenderDashboard(principal *core.Principal, csrfToken string, dashboard core.Dashboard, widgets []core.Widget) (string, error) {
 	rendered := make([]renderedWidget, 0, len(widgets))
 	for _, widget := range widgets {
 		body, err := r.renderWidgetBody(widget, 0)
@@ -1367,7 +1396,7 @@ func (r *Renderer) RenderDashboard(principal *core.Principal, dashboard core.Das
 	}
 	// A single active crumb -- since base.html has no separate <h1>,
 	// this is the only page-title element the dashboard gets.
-	data := dashboardData{pageBase: r.pageBase(principal, title, title, "", []breadcrumb{{Label: title, Active: true}}, nil), Widgets: rendered}
+	data := dashboardData{pageBase: r.pageBase(principal, csrfToken, title, title, "", []breadcrumb{{Label: title, Active: true}}, nil), Widgets: rendered}
 	var buf bytes.Buffer
 	if err := r.dashboard.ExecuteTemplate(&buf, "base", data); err != nil {
 		return "", err
@@ -1406,7 +1435,7 @@ func (r *Renderer) PageTemplate(templateName string) (*template.Template, error)
 		if err != nil {
 			return nil, err
 		}
-		if tmpl, err = tmpl.ParseFS(coretemplates.FS, uiComponentsGlob); err != nil {
+		if tmpl, err = parseComponents(tmpl); err != nil {
 			return nil, err
 		}
 		if tmpl, err = tmpl.ParseFS(os.DirFS(dir), templateName); err != nil {
@@ -1424,14 +1453,14 @@ func (r *Renderer) PageTemplate(templateName string) (*template.Template, error)
 // shared admin layout (sidebar, breadcrumbs, flash toasts). data is
 // handed to the template as .Data, alongside .Page (the AdminPage
 // itself, for label/path access).
-func (r *Renderer) RenderPage(principal *core.Principal, page core.AdminPage, templateName string, data any, messages []flashMessage) (string, error) {
+func (r *Renderer) RenderPage(principal *core.Principal, csrfToken string, page core.AdminPage, templateName string, data any, messages []flashMessage) (string, error) {
 	tmpl, err := r.PageTemplate(templateName)
 	if err != nil {
 		return "", err
 	}
 	breadcrumbs := append(categoryBreadcrumb(page.Category), breadcrumb{Label: page.Label, Active: true})
 	pd := pageData{
-		pageBase: r.pageBase(principal, page.Label, page.Label, "page:"+page.Path, breadcrumbs, messages),
+		pageBase: r.pageBase(principal, csrfToken, page.Label, page.Label, "page:"+page.Path, breadcrumbs, messages),
 		Page:     page,
 		Data:     data,
 	}

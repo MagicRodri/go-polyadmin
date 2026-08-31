@@ -77,9 +77,9 @@ func handleList(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rendere
 
 		var html string
 		if isHTMXRequest(c) {
-			html, err = renderer.RenderListFragment(principal, modelAdmin, page, req, perms, relPerms)
+			html, err = renderer.RenderListFragment(principal, csrfToken(c), modelAdmin, page, req, perms, relPerms)
 		} else {
-			html, err = renderer.RenderList(principal, modelAdmin, page, req, perms, relPerms, popFlash(c))
+			html, err = renderer.RenderList(principal, csrfToken(c), modelAdmin, page, req, perms, relPerms, popFlash(c))
 		}
 		if err != nil {
 			return err
@@ -108,7 +108,7 @@ func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 		}
 		perms := computePermissions(admin, principal, modelAdmin)
 		relPerms := computeRelationPermissions(admin, principal, modelAdmin, modelAdmin.DetailFields())
-		html, err := renderer.RenderDetail(principal, modelAdmin, obj, perms, relPerms, popFlash(c))
+		html, err := renderer.RenderDetail(principal, csrfToken(c), modelAdmin, obj, perms, relPerms, popFlash(c))
 		if err != nil {
 			return err
 		}
@@ -147,7 +147,7 @@ func handleCreateGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Re
 			return writeAuthError(c, result)
 		}
 		relOptions := computeRelationOptions(admin, modelAdmin, nil)
-		html, err := renderer.RenderForm(principal, modelAdmin, nil, nil, nil, relOptions)
+		html, err := renderer.RenderForm(principal, csrfToken(c), modelAdmin, nil, nil, nil, relOptions)
 		if err != nil {
 			return err
 		}
@@ -170,9 +170,9 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *R
 			var html string
 			var err error
 			if isHTMXRequest(c) {
-				html, err = renderer.RenderFormFragment(principal, modelAdmin, nil, data, errs, relOptions)
+				html, err = renderer.RenderFormFragment(principal, csrfToken(c), modelAdmin, nil, data, errs, relOptions)
 			} else {
-				html, err = renderer.RenderForm(principal, modelAdmin, nil, data, errs, relOptions)
+				html, err = renderer.RenderForm(principal, csrfToken(c), modelAdmin, nil, data, errs, relOptions)
 			}
 			if err != nil {
 				return err
@@ -208,7 +208,7 @@ func handleEditGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rend
 			return c.Status(fiber.StatusNotFound).SendString("Not found")
 		}
 		relOptions := computeRelationOptions(admin, modelAdmin, obj)
-		html, err := renderer.RenderForm(principal, modelAdmin, obj, nil, nil, relOptions)
+		html, err := renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, nil, nil, relOptions)
 		if err != nil {
 			return err
 		}
@@ -237,9 +237,9 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Ren
 			relOptions := computeRelationOptions(admin, modelAdmin, obj)
 			var html string
 			if isHTMXRequest(c) {
-				html, err = renderer.RenderFormFragment(principal, modelAdmin, obj, data, errs, relOptions)
+				html, err = renderer.RenderFormFragment(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions)
 			} else {
-				html, err = renderer.RenderForm(principal, modelAdmin, obj, data, errs, relOptions)
+				html, err = renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions)
 			}
 			if err != nil {
 				return err
@@ -273,7 +273,7 @@ func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Re
 		if core.IsNil(obj) {
 			return c.Status(fiber.StatusNotFound).SendString("Not found")
 		}
-		html, err := renderer.RenderDelete(principal, modelAdmin, obj)
+		html, err := renderer.RenderDelete(principal, csrfToken(c), modelAdmin, obj)
 		if err != nil {
 			return err
 		}

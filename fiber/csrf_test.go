@@ -130,6 +130,49 @@ func TestClickjackingHeadersAreSet(t *testing.T) {
 	}
 }
 
+// makeActionApp, not makeApp: the list page's bulk-actions form and the
+// detail page's record-action forms are both inside {{if .Actions}}, so
+// an admin with no declared actions renders neither, and the assertions
+// below would pass or fail for the wrong reason.
+func TestPagesCarryTheTokenForFormsAndHtmx(t *testing.T) {
+	app, userAdmin := makeActionApp(t)
+	u := userAdmin.createUser("a@example.com", true)
+	id := strconv.Itoa(u.ID)
+
+	for _, path := range []string{
+		"/admin/users",        // bulk-actions form
+		"/admin/users/create", // resource form
+		"/admin/users/" + id,  // record actions
+		"/admin/users/" + id + "/edit",
+		"/admin/users/" + id + "/delete",
+	} {
+		resp := doGet(t, app, path, nil)
+		// Compared against the cookie, not merely present: an empty
+		// token still renders both the tag and the field, so a
+		// presence-only assertion would pass even if nothing was
+		// threaded through at all.
+		token := csrfCookie(t, resp)
+		page := body(t, resp)
+		if !strings.Contains(page, `<meta name="csrf-token" content="`+token+`">`) {
+			t.Errorf("%s: no csrf-token meta tag carrying the cookie's token", path)
+		}
+		if !strings.Contains(page, `<input type="hidden" name="_csrf" value="`+token+`">`) {
+			t.Errorf("%s: no hidden _csrf field carrying the cookie's token", path)
+		}
+	}
+}
+
+func TestHtmxRequestsGetTheTokenHeader(t *testing.T) {
+	app, _ := makeApp(t)
+	page := body(t, doGet(t, app, "/admin/users", nil))
+	if !strings.Contains(page, "htmx:configRequest") {
+		t.Error("expected the listener that attaches X-CSRF-Token to htmx requests")
+	}
+	if !strings.Contains(page, core.CSRFHeaderName) {
+		t.Error("expected the header name in the listener")
+	}
+}
+
 func TestCSRFCanBeDisabled(t *testing.T) {
 	userAdmin := newTestUserAdmin()
 	admin := core.New(core.WithModelAdmins(userAdmin), core.WithCSRFDisabled())

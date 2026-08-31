@@ -21,6 +21,7 @@
     <form id="resource-form" method="post" action="{{.FormAction}}"
           hx-post="{{.FormAction}}" hx-target="#resource-form-wrapper" hx-swap="outerHTML"
           class="{{ui "panel" "form"}}">
+      {{template "csrf-field" .CSRFToken}}
       {{if .NonFieldErrors}}
       {{/* Alert (destructive), ported from shadcn/ui: a tinted, outlined
            panel rather than the solid red block this used to be -- solid

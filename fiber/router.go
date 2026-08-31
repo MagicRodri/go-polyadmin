@@ -71,7 +71,7 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		}
 		if admin.Dashboard != nil {
 			widgets := admin.Dashboard.VisibleWidgets(principal, admin.Authorizer)
-			html, err := renderer.RenderDashboard(principal, *admin.Dashboard, widgets)
+			html, err := renderer.RenderDashboard(principal, csrfToken(c), *admin.Dashboard, widgets)
 			if err != nil {
 				return err
 			}

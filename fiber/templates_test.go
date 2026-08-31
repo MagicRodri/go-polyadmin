@@ -147,7 +147,7 @@ func TestPageTemplateResolvedFromTemplateDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new renderer: %v", err)
 	}
-	html, err := renderer.RenderPage(nil, page, "pages/broadcast.html", nil, nil)
+	html, err := renderer.RenderPage(nil, "", page, "pages/broadcast.html", nil, nil)
 	if err != nil {
 		t.Fatalf("render page: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestPageTemplateMissingFromAnyTemplateDirErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new renderer: %v", err)
 	}
-	if _, err := renderer.RenderPage(nil, page, "pages/does-not-exist.html", nil, nil); err == nil {
+	if _, err := renderer.RenderPage(nil, "", page, "pages/does-not-exist.html", nil, nil); err == nil {
 		t.Fatalf("expected an error for a page template with no framework-default fallback")
 	}
 }
