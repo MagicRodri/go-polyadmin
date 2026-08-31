@@ -57,9 +57,9 @@ func fieldValueHTML(admin *core.Admin, basePath string, relationPermissions map[
 			// No shadcn "success" token to defer to, so this picks an
 			// emerald pair that clears contrast against bg-card in both
 			// themes.
-			return `<span class="font-medium text-emerald-600 dark:text-emerald-400">Yes</span>`
+			return boolIconHTML("check", "text-emerald-600 dark:text-emerald-400", "Yes")
 		}
-		return template.HTML(`<span class="` + classPlaceholder + `">No</span>`)
+		return boolIconHTML("close", classPlaceholder, "No")
 	case core.FieldTypePassword:
 		return template.HTML(`<span class="` + classPlaceholder + `">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>`)
 	case core.FieldTypeForeignKey, core.FieldTypeOneToOne:
@@ -77,6 +77,24 @@ func fieldValueHTML(admin *core.Admin, basePath string, relationPermissions map[
 	default:
 		return template.HTML(html.EscapeString(fmt.Sprint(value)))
 	}
+}
+
+// boolIconHTML renders a boolean as a check or a cross rather than the
+// words "Yes"/"No" -- Django admin's convention, and the one thing that
+// makes a column of booleans scannable: a glyph reads as a shape at a
+// glance where two similar-length words have to be read.
+//
+// The word stays in the markup as an sr-only label, so a screen reader
+// still hears "Yes"/"No" and nothing depends on the icon alone (the
+// icon itself is aria-hidden, from iconHTML). Exports are untouched --
+// they stringify through core/exporter.go, never through here.
+//
+// `class` and `label` are package-internal constants, never field data,
+// so neither needs escaping the way the value branches above do.
+func boolIconHTML(icon, class, label string) template.HTML {
+	return template.HTML(`<span class="inline-flex items-center ` + class + `">` +
+		string(iconHTML(icon, "size-4")) +
+		`<span class="sr-only">` + label + `</span></span>`)
 }
 
 func relatedLinkHTML(admin *core.Admin, basePath string, relationPermissions map[string]bool, relation *core.Relation, value any) template.HTML {

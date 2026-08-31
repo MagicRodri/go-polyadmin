@@ -256,10 +256,46 @@ func TestSelectLabelIsADataAttributeNotAJSStringLiteral(t *testing.T) {
 // A column of booleans is scannable as glyphs and not as two
 // similar-length words, so list cells render a check or a cross. The
 // word stays as an sr-only label, so nothing depends on the icon alone.
+func TestBooleanCellsRenderAsIconsWithAnAccessibleLabel(t *testing.T) {
+	app, userAdmin := makeApp(t)
+	userAdmin.createUser("yes@example.com", true)
+	userAdmin.createUser("no@example.com", false)
+
+	page := body(t, doGet(t, app, "/admin/users", nil))
+
+	if !strings.Contains(page, string(iconHTML("check", "size-4"))) {
+		t.Error("expected a check icon for a true boolean")
+	}
+	if !strings.Contains(page, string(iconHTML("close", "size-4"))) {
+		t.Error("expected a cross icon for a false boolean")
+	}
+	for _, want := range []string{`<span class="sr-only">Yes</span>`, `<span class="sr-only">No</span>`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("expected %q so the value is not conveyed by the icon alone", want)
+		}
+	}
+	// The old plain-text rendering is gone: the words survive only as
+	// the sr-only labels asserted above.
+	if strings.Contains(page, `dark:text-emerald-400">Yes<`) {
+		t.Error("expected the bare Yes/No text rendering to be gone")
+	}
+}
 
 // Exports stringify through core/exporter.go, never through
 // fieldValueHTML, so a CSV still carries a readable value rather than
 // an SVG.
+func TestBooleanExportIsUnaffectedByTheIconRendering(t *testing.T) {
+	app, userAdmin := makeApp(t)
+	userAdmin.createUser("yes@example.com", true)
+
+	csv := body(t, doGet(t, app, "/admin/users/export/csv", nil))
+	if strings.Contains(csv, "<svg") || strings.Contains(csv, "sr-only") {
+		t.Errorf("export leaked list markup: %s", csv)
+	}
+	if !strings.Contains(csv, "true") {
+		t.Errorf("expected the boolean as text in the export, got %s", csv)
+	}
+}
 
 // -- shadcn Select for plain choice fields -------------------------------
 
