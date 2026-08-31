@@ -51,6 +51,10 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		opt(cfg)
 	}
 
+	// Before every route, including the static handler and any custom
+	// AdminPage: a mutating custom page has to be covered too.
+	router.Use(csrfMiddleware(admin, basePath))
+
 	if cfg.staticDir != "" {
 		router.Static("/static", cfg.staticDir)
 	}

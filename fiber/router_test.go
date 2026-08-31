@@ -131,6 +131,12 @@ func doPostForm(t *testing.T, app *fiber.App, path string, form url.Values, head
 	t.Helper()
 	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	// Double-submit: the same token as cookie and header, which is what a
+	// real browser does via the meta tag. Tests that assert *rejection*
+	// build their request directly instead.
+	token := core.NewCSRFToken()
+	req.Header.Set("Cookie", core.CSRFCookieName+"="+token)
+	req.Header.Set(core.CSRFHeaderName, token)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -144,6 +150,12 @@ func doPostForm(t *testing.T, app *fiber.App, path string, form url.Values, head
 func doDelete(t *testing.T, app *fiber.App, path string, headers map[string]string) *http.Response {
 	t.Helper()
 	req := httptest.NewRequest("DELETE", path, nil)
+	// Double-submit: the same token as cookie and header, which is what a
+	// real browser does via the meta tag. Tests that assert *rejection*
+	// build their request directly instead.
+	token := core.NewCSRFToken()
+	req.Header.Set("Cookie", core.CSRFCookieName+"="+token)
+	req.Header.Set(core.CSRFHeaderName, token)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}

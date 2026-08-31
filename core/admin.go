@@ -12,6 +12,13 @@ type Admin struct {
 	SiteTitle     string
 	SiteLogoURL   string
 
+	// DisableCSRF turns off CSRF verification. The zero value is
+	// therefore "enabled", matching the Disable* convention on
+	// BaseModelAdmin -- a security control has to be opt-out, never
+	// opt-in. The token cookie is still minted when this is set, so
+	// templates and custom pages behave identically either way.
+	DisableCSRF bool
+
 	registry map[string]ModelAdmin
 	order    []string
 
@@ -48,6 +55,13 @@ func WithModelAdmins(modelAdmins ...ModelAdmin) Option {
 			a.Register(ma)
 		}
 	}
+}
+
+// WithCSRFDisabled turns off CSRF verification, for deployments that
+// already front the admin with their own protection. The clickjacking
+// headers are not affected: framing is a different attack from forgery.
+func WithCSRFDisabled() Option {
+	return func(a *Admin) { a.DisableCSRF = true }
 }
 
 func WithDashboard(dashboard *Dashboard) Option {
