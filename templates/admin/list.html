@@ -4,38 +4,27 @@
      so search/filter/sort/pagination never disagree between a fresh
      load and a partial swap.
 
-     Laid out after shadcn/ui's Tasks example: one full-width column,
-     no side panel. The toolbar is a single row -- search and the
-     faceted filter dropdowns left, the page's own actions right --
-     then the table, then DataTablePagination. The filters that used to
-     live in a Django-admin-style right-hand panel are now those
-     faceted dropdowns, which is what frees the full width.
+     One full-width column, no side panel. The toolbar holds search,
+     the Filters trigger and bulk actions on the left, the page's own
+     actions on the right; then the table, then DataTablePagination.
+     Filtering lives in a right-hand drawer (ui/filter-panel), so a
+     ModelAdmin with six filters costs the toolbar one trigger rather
+     than six.
 
-     Button placement follows the example: everything that *narrows*
-     the table is on the left, everything that *acts on* it is on the
-     right, so the two never interleave as filters come and go. Bulk
-     actions are the one addition -- they appear in the left cluster
-     only once rows are selected, since that's a verb about the current
-     selection rather than a page-level action. Mirrors the Python
-     adapter's components/list_content.html. */}}
+     Button placement: everything that *narrows* the table is on the
+     left, everything that *acts on* it is on the right, so the two
+     never interleave. Below sm the whole toolbar becomes one stacked
+     full-width column -- search, Filters, the action select, Export,
+     New, one per line -- which is what "toolbar item" is for on each
+     control. Mirrors the Python adapter's
+     components/list_content.html. */}}
 {{define "content"}}
 <div id="resource-list" class="space-y-4">
 
   <div class="{{ui "toolbar"}}">
     <div class="{{ui "toolbar" "filters"}}">
       {{template "search" .}}
-      {{template "filters" .}}
-      {{if .HasActiveFilters}}
-      {{/* Reset, exactly as the example has it: appears only once
-           something is actually applied, and clears search + every
-           filter at once (but not sort or page size -- those are how
-           you're reading the table, not what you're narrowing it to). */}}
-      <a href="{{.ResetURL}}"
-         hx-get="{{.ResetURL}}" hx-target="#resource-list" hx-select="#resource-list"
-         hx-swap="outerHTML" hx-push-url="true"
-         class="{{ui "button" "ghost-muted" "size-xs"}} h-8 px-2 lg:px-3">
-        Reset {{icon "close" "size-4"}}</a>
-      {{end}}
+      {{template "ui/filter-panel" .}}
       {{template "ui/bulk-actions" .}}
     </div>
 
@@ -47,13 +36,16 @@
         "label" "Export"
         "icon" "download"
         "text" "Export"
+        "fullWidth" true
         "items" (list
           (dict "Label" "CSV" "URL" (printf "%s/%s/export/csv%s" .BasePath .Slug .ExportQuery))
           (dict "Label" "XLSX" "URL" (printf "%s/%s/export/xlsx%s" .BasePath .Slug .ExportQuery)))}}
       {{end}}
       {{if .Permissions.CanCreate}}
-      <a href="{{.BasePath}}/{{.Slug}}/create" class="{{ui "button"}} {{ui "button" "size-sm"}}">
-        {{icon "plus" "size-4"}} New {{.VerboseName}}</a>
+      <a href="{{.BasePath}}/{{.Slug}}/create"
+         class="{{ui "button"}} {{ui "button" "size-sm"}} {{ui "toolbar" "item"}}">
+        {{icon "plus" (printf "size-4 %s" (ui "toolbar" "item-icon"))}}
+        <span class="{{ui "toolbar" "item-label"}}">New</span></a>
       {{end}}
     </div>
   </div>
@@ -64,7 +56,7 @@
 {{end}}
 
 {{define "search"}}
-<form
+<form class="{{ui "toolbar" "item"}}"
   hx-get="{{.BasePath}}/{{.Slug}}" hx-target="#resource-list" hx-select="#resource-list"
   hx-swap="outerHTML" hx-push-url="true"
   hx-trigger="keyup changed delay:400ms from:input[name='search'], change">
@@ -73,61 +65,6 @@
   <input type="hidden" name="filter[{{$name}}]" value="{{$value}}">
   {{end}}
   <input type="search" id="search" name="search" value="{{.Search}}" placeholder="Search..."
-         class="{{ui "input"}} sm:w-64">
+         class="{{ui "input"}} lg:w-64">
 </form>
-{{end}}
-
-{{define "filters"}}
-{{/* Faceted filter dropdowns, ported from shadcn/ui's Tasks example
-     (DataTableFacetedFilter). Each ModelAdmin filter is one trigger in
-     the toolbar rather than a section of a right-hand panel.
-
-     The trigger is dashed while the filter is unset and solid once
-     it's applied, with the chosen value shown as a badge beside the
-     label -- that's how the example distinguishes "a filter you could
-     apply" from "a filter that is narrowing what you see".
-
-     Each choice is a link, not a form control, so filtering works with
-     JS off; the precomputed URLs come from Renderer.buildListData,
-     keeping query-string assembly out of the template. */}}
-{{range $i, $control := .FilterControls}}
-<div class="relative" x-data="{ open: false }" @keydown.escape="open = false" @click.outside="open = false">
-  <button type="button" x-ref="facet{{$i}}" @click="open = !open"
-          :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu"
-          class="{{ui "button" "outline" "size-xs"}}
-                 {{if $control.Active}}{{ui "toolbar" "facet-active"}}{{else}}{{ui "toolbar" "facet"}}{{end}}">
-    {{icon "plus-circle" "size-4 shrink-0"}}
-    {{$control.Label}}
-    {{if $control.Active}}
-    <span class="{{ui "separator" "vertical"}} mx-1 !h-4"></span>
-    <span class="{{ui "badge" "secondary"}} {{ui "toolbar" "facet-value"}}">{{$control.Active}}</span>
-    {{end}}
-  </button>
-  <div x-show="open" x-cloak role="menu"
-       x-anchor.bottom-start.offset.6="$refs.facet{{$i}}"
-       x-transition:enter="transition ease-out duration-150"
-       x-transition:enter-start="opacity-0 scale-95"
-       x-transition:enter-end="opacity-100 scale-100"
-       class="{{ui "dropdown" "content"}} min-w-48">
-    {{range $control.Choices}}
-    <a href="{{.URL}}" role="menuitem"
-       hx-get="{{.URL}}" hx-target="#resource-list" hx-select="#resource-list"
-       hx-swap="outerHTML" hx-push-url="true" @click="open = false"
-       class="{{ui "dropdown" "item"}}">
-      <span class="flex size-4 shrink-0 items-center justify-center">
-        {{if .Selected}}{{icon "check" "size-4"}}{{end}}</span>
-      <span class="truncate">{{.Label}}</span>
-    </a>
-    {{end}}
-    {{if $control.Active}}
-    <div class="{{ui "dropdown" "separator"}}"></div>
-    <a href="{{$control.ClearURL}}" role="menuitem"
-       hx-get="{{$control.ClearURL}}" hx-target="#resource-list" hx-select="#resource-list"
-       hx-swap="outerHTML" hx-push-url="true" @click="open = false"
-       class="{{ui "dropdown" "item"}} justify-center">
-      Clear filter</a>
-    {{end}}
-  </div>
-</div>
-{{end}}
 {{end}}

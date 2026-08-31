@@ -537,11 +537,18 @@ type listData struct {
 	// narrowing it to.
 	ResetURL         string
 	HasActiveFilters bool
-	Ordering         string
-	ExportQuery      string
-	Actions          []actionInfo
-	Permissions      permissions
-	Reorderable      bool
+	// ActiveFilterCount is how many declared filters are currently
+	// narrowing the list -- the badge on the Filters trigger, so the
+	// panel says how much it's hiding without being opened. Counted
+	// here rather than in the template because html/template has no
+	// arithmetic; search isn't included, since it has its own visible
+	// box in the toolbar.
+	ActiveFilterCount int
+	Ordering          string
+	ExportQuery       string
+	Actions           []actionInfo
+	Permissions       permissions
+	Reorderable       bool
 }
 
 func (r *Renderer) buildListData(
@@ -626,6 +633,13 @@ func (r *Renderer) buildListData(
 		})
 	}
 
+	activeFilterCount := 0
+	for _, control := range filterControls {
+		if control.Active != "" {
+			activeFilterCount++
+		}
+	}
+
 	// Rows-per-page choices. Changing the size returns to page 1 --
 	// staying on page 7 while quadrupling the page size would land the
 	// reader somewhere they never asked to be.
@@ -675,12 +689,13 @@ func (r *Renderer) buildListData(
 		ResetURL: listURL(r.basePath, slug, req, listURLOpts{
 			HasSearch: true, Filters: nil, HasFilters: true,
 		}),
-		HasActiveFilters: req.Search != "" || len(req.Filters) > 0,
-		Ordering:         req.Ordering,
-		ExportQuery:      exportQuery(req),
-		Actions:          actionInfos(modelAdmin),
-		Permissions:      perms,
-		Reorderable:      modelAdmin.Reorderable(),
+		HasActiveFilters:  req.Search != "" || len(req.Filters) > 0,
+		ActiveFilterCount: activeFilterCount,
+		Ordering:          req.Ordering,
+		ExportQuery:       exportQuery(req),
+		Actions:           actionInfos(modelAdmin),
+		Permissions:       perms,
+		Reorderable:       modelAdmin.Reorderable(),
 	}
 }
 

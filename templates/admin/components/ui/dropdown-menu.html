@@ -36,15 +36,31 @@
      Items are data, not markup, so nothing here has to trust an
      application-supplied HTML string. */}}
 {{define "ui/dropdown-menu"}}
-<div class="relative inline-flex" x-data="{ open: false }"
+{{/* .fullWidth makes the trigger fill its line while a stacked
+     toolbar is one column, then shrink back to its content at lg --
+     the wrapper needs it too, since the button can only fill a box
+     that is itself full width. See ui.go's "toolbar" for why lg. */}}
+<div class="relative {{if .fullWidth}}flex w-full lg:inline-flex lg:w-auto{{else}}inline-flex{{end}}"
+     x-data="{ open: false }"
      @keydown.escape="open = false; $refs.trigger.focus()"
      @click.outside="open = false">
   {{if .text}}
+  {{/* Under .fullWidth the label goes hard left and both icons -- the
+       leading one and the chevron -- go hard right, so a stacked
+       full-width trigger reads like the rest of the toolbar rather than
+       floating its content in the middle. Giving them the same
+       order-last keeps their relative order (icon, then chevron); the
+       label's flex-1 is what pushes them there. */}}
   <button type="button" x-ref="trigger" @click="open = !open"
           :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu"
-          class="{{ui "button" (or .variant "outline") "size-default"}}">
-    {{if .icon}}{{icon .icon "w-4 h-4"}}{{end}}{{.text}}
-    <span :class="open ? 'rotate-180' : ''" class="transition-transform duration-200">
+          class="{{ui "button" (or .variant "outline") "size-default"}}{{if .fullWidth}} w-full lg:w-auto{{end}}">
+    {{if .icon}}
+      {{if .fullWidth}}{{icon .icon (printf "w-4 h-4 %s" (ui "toolbar" "item-icon"))}}
+      {{else}}{{icon .icon "w-4 h-4"}}{{end}}
+    {{end}}
+    <span {{if .fullWidth}}class="{{ui "toolbar" "item-label"}}"{{end}}>{{.text}}</span>
+    <span :class="open ? 'rotate-180' : ''"
+          class="transition-transform duration-200{{if .fullWidth}} {{ui "toolbar" "item-icon"}}{{end}}">
       {{icon "chevron-down" "w-3.5 h-3.5"}}
     </span>
   </button>

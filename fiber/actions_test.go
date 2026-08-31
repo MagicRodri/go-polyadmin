@@ -229,6 +229,20 @@ func TestDetailViewShowsRecordActionButton(t *testing.T) {
 	}
 }
 
+func TestDetailRecordActionButtonsStretchWhileTheBarIsStacked(t *testing.T) {
+	// An action's <button> is a grandchild of the flex row (the <form>
+	// posting it sits in between), so the row's align-items:stretch
+	// stops at the form and the button needs w-full of its own to match
+	// the full-width Edit link beside it below sm.
+	app, userAdmin := makeActionApp(t)
+	a := userAdmin.createUser("a@example.com", true)
+
+	text := body(t, doGet(t, app, "/admin/users/"+strconv.Itoa(a.ID), nil))
+	if !strings.Contains(text, `w-full sm:w-auto`) {
+		t.Error("expected the record-action button to stretch while the action bar is stacked")
+	}
+}
+
 // A validation error re-renders the whole form wrapper (executeForm runs
 // the entire "content" block), so the swap has to replace the wrapper.
 // It used to target the inner <form> with outerHTML, which nested a

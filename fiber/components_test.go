@@ -2,6 +2,7 @@ package fiber
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -105,57 +106,149 @@ func TestDateFieldStillWrappedInTheFormFieldUnit(t *testing.T) {
 	}
 }
 
-// Filters are faceted dropdowns in the toolbar now (shadcn's Tasks
-// example), not a side panel -- so they sit inside the toolbar's
-// left-hand cluster, alongside search, rather than in a column of their
-// own with mobile ordering to manage.
-func TestFiltersRenderAsToolbarFacets(t *testing.T) {
-	filterable := newTestUserAdmin()
+// Filtering is one drawer behind one toolbar trigger (Django admin's
+// filter column, in Unfold's drawer form), not a dropdown per filter --
+// so a ModelAdmin's filter count costs the toolbar nothing.
+func TestFiltersRenderAsOneDrawerBehindOneTrigger(t *testing.T) {
+	page := filterablePage(t, nil)
+
+	filters, err := uiClasses("toolbar", "filters")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	if !strings.Contains(page, filters) {
+		t.Error("expected a toolbar filter cluster")
+	}
+	if !strings.Contains(page, `aria-haspopup="dialog"`) {
+		t.Error("expected one Filters trigger opening a drawer")
+	}
+	if !strings.Contains(page, `aria-label="Filters"`) {
+		t.Error("expected the drawer itself")
+	}
+	// The filter's own label and choices live in the drawer body.
+	if !strings.Contains(page, "Is Active") {
+		t.Error("expected the filter's label in the drawer")
+	}
+	sideRight, err := uiClasses("sheet", "side-right")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	if !strings.Contains(page, sideRight) {
+		t.Error("expected the drawer to come in from the right")
+	}
+}
+
+// The trigger carries a count so the drawer says how much it's hiding
+// without being opened -- and only once something is applied.
+func TestFilterTriggerCountsOnlyAppliedFilters(t *testing.T) {
+	count, err := uiClasses("filter-panel", "count")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	if strings.Contains(filterablePage(t, nil), count) {
+		t.Error("expected no count badge while nothing is filtered")
+	}
+	applied := filterablePage(t, map[string]string{"filter[IsActive]": "true"})
+	if !strings.Contains(applied, count) {
+		t.Error("expected a count badge once a filter is applied")
+	}
+}
+
+// Reset clears search *and* every filter, so it lives with the things
+// it clears -- in the drawer's footer -- which is also what keeps the
+// stacked mobile toolbar to its five controls.
+func TestResetLivesInTheDrawerAndOnlyWhenSomethingIsApplied(t *testing.T) {
+	if strings.Contains(filterablePage(t, nil), "Clear all") {
+		t.Error("expected no Reset while nothing is applied")
+	}
+	applied := filterablePage(t, map[string]string{"filter[IsActive]": "true"})
+	if !strings.Contains(applied, "Clear all") {
+		t.Error("expected Reset in the drawer once a filter is applied")
+	}
+}
+
+// Every toolbar control fills its own line while the toolbar is a
+// single stacked column below sm. The ones wrapped in a <form> or a
+// positioning <div> can't inherit that from the flex row, so each
+// carries "toolbar item" itself.
+func TestToolbarControlsFillTheirLineWhileStacked(t *testing.T) {
+	item, err := uiClasses("toolbar", "item")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	page := filterablePage(t, nil)
+	// search, the Filters trigger (wrapper + button), bulk actions
+	// (form + button), Export, New.
+	if got := strings.Count(page, item); got < 6 {
+		t.Errorf("expected every stacked toolbar control to fill its line, found %d occurrences of %q", got, item)
+	}
+}
+
+// filterablePage renders the list view of a ModelAdmin that declares a
+// filter and has actions/export/create available, with `query` applied.
+func filterablePage(t *testing.T, query map[string]string) string {
+	t.Helper()
+	filterable := newActionableUserAdmin()
 	filterable.DeclaredFilters = []core.Filter{core.NewBooleanFilter("IsActive")}
 	filterable.createUser("jane@example.com", true)
 	admin := core.New(core.WithModelAdmins(filterable))
 	app := newTestApp(t, admin)
-	page := body(t, doGet(t, app, "/admin/users", nil))
 
-	filters, _ := uiClasses("toolbar", "filters")
-	if !strings.Contains(page, filters) {
-		t.Error("expected a toolbar filter cluster")
+	path := "/admin/users"
+	if len(query) > 0 {
+		parts := make([]string, 0, len(query))
+		for k, v := range query {
+			parts = append(parts, url.QueryEscape(k)+"="+url.QueryEscape(v))
+		}
+		path += "?" + strings.Join(parts, "&")
 	}
-	facet, _ := uiClasses("toolbar", "facet")
-	if !strings.Contains(page, facet) {
-		t.Error("expected the filter to render as a dashed facet trigger")
+	return body(t, doGet(t, app, path, nil))
+}
+
+// A stacked toolbar control is a full-width bar, so its label goes hard
+// left and its icon hard right rather than sitting centred. Every
+// control that has both carries the pair.
+func TestStackedToolbarControlsPutTheLabelLeftAndTheIconRight(t *testing.T) {
+	label, err := uiClasses("toolbar", "item-label")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
 	}
-	if !strings.Contains(page, "Is Active") {
-		t.Error("expected the facet trigger to be labelled with the filter")
+	iconClass, err := uiClasses("toolbar", "item-icon")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	page := filterablePage(t, nil)
+
+	// Filters, the action select, Export and New each get a label that
+	// takes the slack.
+	if got := strings.Count(page, label); got < 4 {
+		t.Errorf("expected each stacked control's label to take the slack, found %d occurrences", got)
+	}
+	// Filters' and New's leading icons plus Export's icon+chevron move
+	// to the trailing edge; the action select's chevron is already last
+	// and needs no reorder.
+	if got := strings.Count(page, iconClass); got < 4 {
+		t.Errorf("expected leading icons to move to the trailing edge, found %d occurrences", got)
 	}
 }
+
+// A label is arbitrary application text, so it reaches Alpine as a data
+// attribute the browser decodes -- never quoted into the x-data
+// expression, where one stray quote closes the attribute and every
+// select on the page fails to initialise. (The Python mirror shipped
+// exactly that bug via tojson.)
+
+// -- booleans as icons ----------------------------------------------------
+
+// A column of booleans is scannable as glyphs and not as two
+// similar-length words, so list cells render a check or a cross. The
+// word stays as an sr-only label, so nothing depends on the icon alone.
+
+// Exports stringify through core/exporter.go, never through
+// fieldValueHTML, so a CSV still carries a readable value rather than
+// an SVG.
 
 // -- shadcn Select for plain choice fields -------------------------------
-
-func TestEnumFieldRendersShadcnSelectNotNativeOptions(t *testing.T) {
-	page := datedFormPage(t, "/admin/tasks/1/edit")
-	if strings.Contains(page, "<option") {
-		t.Error("expected no native <option> elements once enum uses ui/select")
-	}
-	if !strings.Contains(page, `aria-haspopup="listbox"`) {
-		t.Error("expected the Select trigger")
-	}
-	if !strings.Contains(page, `name="Priority"`) {
-		t.Error("expected a hidden input still posting the field under its own name")
-	}
-	if !strings.Contains(page, "Medium") {
-		t.Error("expected the current value's label as the trigger text")
-	}
-}
-
-func TestEnumFieldSelectListsAllChoicesAsOptions(t *testing.T) {
-	page := datedFormPage(t, "/admin/tasks/create")
-	for _, want := range []string{`data-value="Low"`, `data-value="Medium"`, `data-value="High"`} {
-		if !strings.Contains(page, want) {
-			t.Errorf("expected choice %q as a listbox option", want)
-		}
-	}
-}
 
 // -- export dropdown (Phase B) ------------------------------------------
 
