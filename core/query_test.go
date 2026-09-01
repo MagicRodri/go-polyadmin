@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -137,5 +138,65 @@ func TestUnlimitedWindowIgnoresThePageNumber(t *testing.T) {
 	offset, limit := ListRequest{Page: 5, PageSize: 10, Unlimited: true}.Window()
 	if offset != 0 || limit != 0 {
 		t.Errorf("got (%d,%d), want (0,0)", offset, limit)
+	}
+}
+
+// -- default ordering -----------------------------------------------------
+
+type orderedAdmin struct {
+	BaseModelAdmin
+	rows []any
+}
+
+func (a *orderedAdmin) GetQueryset(ctx context.Context) (any, error) { return a.rows, nil }
+
+func newOrderedAdmin(ordering string) *orderedAdmin {
+	return &orderedAdmin{
+		BaseModelAdmin: BaseModelAdmin{
+			ModelName:       "Thing",
+			DisplayFields:   []string{"Name"},
+			DeclaredFields:  []Field{NewField("Name", FieldTypeString)},
+			OrderingDefault: ordering,
+		},
+		rows: []any{
+			&struct{ Name string }{"charlie"},
+			&struct{ Name string }{"alpha"},
+			&struct{ Name string }{"bravo"},
+		},
+	}
+}
+
+func names(objects []any) []string {
+	out := make([]string, 0, len(objects))
+	for _, o := range objects {
+		out = append(out, o.(*struct{ Name string }).Name)
+	}
+	return out
+}
+
+func TestDefaultOrderingAppliesWhenTheRequestNamesNone(t *testing.T) {
+	admin := newOrderedAdmin("Name")
+	objects, _, err := ListObjects(context.Background(), admin, ListRequest{Unlimited: true})
+	if err != nil {
+		t.Fatalf("ListObjects: %v", err)
+	}
+	if got := strings.Join(names(objects), ","); got != "alpha,bravo,charlie" {
+		t.Errorf("got %q, want the declared default order", got)
+	}
+}
+
+func TestAnExplicitSortBeatsTheDefault(t *testing.T) {
+	admin := newOrderedAdmin("Name")
+	objects, _, _ := ListObjects(context.Background(), admin, ListRequest{Ordering: "-Name", Unlimited: true})
+	if got := strings.Join(names(objects), ","); got != "charlie,bravo,alpha" {
+		t.Errorf("got %q -- the user's own sort must win", got)
+	}
+}
+
+func TestNoDefaultOrderingLeavesTheSourceOrderAlone(t *testing.T) {
+	admin := newOrderedAdmin("")
+	objects, _, _ := ListObjects(context.Background(), admin, ListRequest{Unlimited: true})
+	if got := strings.Join(names(objects), ","); got != "charlie,alpha,bravo" {
+		t.Errorf("got %q, want the queryset's own order untouched", got)
 	}
 }

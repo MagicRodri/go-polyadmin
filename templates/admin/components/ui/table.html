@@ -55,6 +55,16 @@
       onsubmit="return window.adminConfirmSubmit(event, this, this.dataset.confirm)"
       class="{{ui "toolbar" "item"}}">
   {{template "csrf-field" .CSRFToken}}
+  {{/* The query the list is showing, carried on the form so that
+       "select all matching" can be resolved server-side. A checkbox
+       only ever reaches the rows on this page, so without these the
+       filtered set would be unreachable from a 25-row window. */}}
+  <input type="hidden" name="search" value="{{.Search}}">
+  <input type="hidden" name="sort" value="{{.Ordering}}">
+  {{range $name, $value := .Filters}}
+  <input type="hidden" name="filter[{{$name}}]" value="{{$value}}">
+  {{end}}
+  <input type="hidden" name="_select_all" x-ref="selectAll" value="">
   {{/* w-full on both the positioning wrapper and the trigger: a button
        can only fill a box that is itself full width, and the <form>
        above is what the stacked toolbar actually stretches. */}}
@@ -92,7 +102,49 @@
 {{end}}
 
 {{define "ui/table"}}
-<div class="{{ui "table" "wrapper"}}">
+{{/* selectAll state lives here rather than on the bulk-actions form:
+     the header checkbox is inside this table, the form is a sibling in
+     the toolbar (the two are linked by the HTML form= attribute), and
+     Alpine state cannot span them. The form's hidden flag is written
+     imperatively for the same reason. */}}
+<div class="{{ui "table" "wrapper"}}"
+     x-data="{
+       pageTicked: false,
+       allMatching: false,
+       total: {{$.Page.TotalCount}},
+       onPage: {{len $.Rows}},
+       setFlag() {
+         var input = document.querySelector('#bulk-actions-form [name=\'_select_all\']');
+         if (input) input.value = this.allMatching ? '1' : '';
+       },
+       tickPage(checked) {
+         this.pageTicked = checked;
+         if (!checked) { this.allMatching = false; }
+         this.setFlag();
+         document.querySelectorAll('.row-checkbox').forEach(function (cb) { cb.checked = checked; });
+       },
+     }">
+{{if $.Actions}}
+{{/* Only worth offering when there is more to select than is on screen. */}}
+<div x-show="pageTicked && total > onPage" x-cloak class="{{ui "table" "select-all"}}">
+  <span x-show="!allMatching">
+    All <span x-text="onPage"></span> on this page are selected.
+  </span>
+  <button type="button" x-show="!allMatching"
+          @click="allMatching = true; setFlag()"
+          class="{{ui "table" "select-all-action"}}">
+    Select all <span x-text="total"></span> matching
+  </button>
+  <span x-show="allMatching" x-cloak>
+    All <span x-text="total"></span> matching this filter are selected.
+  </span>
+  <button type="button" x-show="allMatching" x-cloak
+          @click="allMatching = false; setFlag()"
+          class="{{ui "table" "select-all-action"}}">
+    Clear selection
+  </button>
+</div>
+{{end}}
 <div class="overflow-x-auto">
   <table class="min-w-full divide-y divide-border">
     <thead class="{{ui "table" "head"}}">
@@ -101,7 +153,7 @@
         {{if $.Actions}}
         <th scope="col" class="w-10 px-4 py-2.5">
           <input type="checkbox" title="Select all"
-                 onclick="document.querySelectorAll('.row-checkbox').forEach(function(cb){cb.checked = this.checked}, this)"
+                 @change="tickPage($event.target.checked)"
                  class="{{ui "checkbox"}}">
         </th>
         {{end}}
@@ -163,6 +215,7 @@
         {{if $.Actions}}
         <td class="px-4 py-2.5">
           <input type="checkbox" name="pks" value="{{.PK}}" form="bulk-actions-form" title="Select row"
+                 @change="if (!$event.target.checked) { pageTicked = false; allMatching = false; setFlag(); }"
                  class="row-checkbox {{ui "checkbox"}}">
         </td>
         {{end}}

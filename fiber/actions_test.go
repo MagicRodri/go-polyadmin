@@ -354,3 +354,62 @@ func TestActionKeepsAnOnSiteReferer(t *testing.T) {
 		t.Errorf("Location = %q, want the filtered list preserved", got)
 	}
 }
+
+// -- select all matching --------------------------------------------------
+
+// A checkbox can only reach the rows on screen, so before this an action
+// over a filtered set of 60 from a 25-row page was impossible to
+// express: the user ticked "all", got 25, and was told 25 records were
+// affected. The count in that message was honest; the intent was not.
+func TestSelectAllMatchingActsOnEveryFilteredRowNotJustThePage(t *testing.T) {
+	app, userAdmin := makeActionApp(t)
+	for i := 0; i < 60; i++ {
+		userAdmin.createUser("user"+strconv.Itoa(i)+"@example.com", true)
+	}
+
+	form := url.Values{"_select_all": {"1"}}
+	resp := doPostForm(t, app, "/admin/users/actions/deactivate", form, nil)
+	if resp.StatusCode != fiber.StatusSeeOther {
+		t.Fatalf("got %d", resp.StatusCode)
+	}
+	for id, u := range userAdmin.store {
+		if u.IsActive {
+			t.Fatalf("user %d was left untouched -- the action did not reach every row", id)
+		}
+	}
+}
+
+// The posted filters, not the whole table: "all matching" means matching
+// what the user was looking at.
+//
+// The excluded record is *active* and the filter selects *inactive*
+// ones, so acting on everything would flip it and honouring the filter
+// leaves it alone -- the two outcomes differ, which an excluded record
+// that already looked like the action's result could not show.
+func TestSelectAllMatchingHonoursThePostedFilters(t *testing.T) {
+	app, userAdmin := makeActionApp(t)
+	userAdmin.DeclaredFilters = []core.Filter{core.NewBooleanFilter("IsActive")}
+	untouched := userAdmin.createUser("active@example.com", true)
+	for i := 0; i < 5; i++ {
+		userAdmin.createUser("inactive"+strconv.Itoa(i)+"@example.com", false)
+	}
+
+	form := url.Values{"_select_all": {"1"}, "filter[IsActive]": {"false"}}
+	doPostForm(t, app, "/admin/users/actions/deactivate", form, nil)
+
+	if !userAdmin.store[untouched.ID].IsActive {
+		t.Error("the record outside the filter was acted on -- the filters were ignored")
+	}
+}
+
+// Without the flag, nothing changes: an empty tick list is still "no
+// items selected", not "everything".
+func TestNoSelectionWithoutTheFlagStillActsOnNothing(t *testing.T) {
+	app, userAdmin := makeActionApp(t)
+	a := userAdmin.createUser("a@example.com", true)
+
+	doPostForm(t, app, "/admin/users/actions/deactivate", url.Values{}, nil)
+	if !userAdmin.store[a.ID].IsActive {
+		t.Error("an empty selection must not act on everything")
+	}
+}

@@ -40,6 +40,7 @@ type ModelAdmin interface {
 	FormFields() []string
 	Fieldsets() []Fieldset
 	ReadOnlyFields(obj any) []string
+	DefaultOrdering() string
 	IsReadOnly(name string, obj any) bool
 	SearchFields() []string
 	DetailFields() []string
@@ -136,6 +137,12 @@ type BaseModelAdmin struct {
 	// parseFormData. Override ReadOnlyFields to vary by object, which
 	// is how "editable on create, frozen afterwards" is expressed.
 	ReadOnlyFieldNames []string
+	// OrderingDefault is the sort applied when a request names none --
+	// a field name, optionally prefixed with "-" for descending, the
+	// same syntax the ?sort= parameter uses. Without one, rows arrive
+	// in whatever order the data source happened to return, which for a
+	// map-backed store is not even stable between requests.
+	OrderingDefault string
 	// Relation (foreignkey/onetoone) form fields that render as a
 	// lookup-driven search box instead of a <select>
 	// populated from the target's full queryset -- for relations too
@@ -250,6 +257,9 @@ func (b BaseModelAdmin) FormFields() []string {
 // override can distinguish creating from editing -- the declarative
 // default applies to both.
 func (b BaseModelAdmin) ReadOnlyFields(obj any) []string { return b.ReadOnlyFieldNames }
+
+// DefaultOrdering is the sort to use when the request names none.
+func (b BaseModelAdmin) DefaultOrdering() string { return b.OrderingDefault }
 
 // IsReadOnly is the question every call site actually asks.
 func (b BaseModelAdmin) IsReadOnly(name string, obj any) bool {

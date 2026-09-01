@@ -180,6 +180,12 @@ func ExecuteListQuery(modelAdmin ModelAdmin, objects []any, req ListRequest) []a
 // Returns the objects for the requested window and the total matching
 // rows before it, which is what pagination needs.
 func ListObjects(ctx context.Context, modelAdmin ModelAdmin, req ListRequest) ([]any, int, error) {
+	// Resolved here rather than inside the in-memory branch so a
+	// ListQuerier is told about it too -- it is part of the question,
+	// not part of the answer.
+	if req.Ordering == "" {
+		req.Ordering = modelAdmin.DefaultOrdering()
+	}
 	if querier, ok := modelAdmin.(ListQuerier); ok {
 		return querier.ListPage(ctx, req)
 	}

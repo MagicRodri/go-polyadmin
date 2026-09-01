@@ -13,6 +13,28 @@ import (
 
 var filterKeyPattern = regexp.MustCompile(`^filter\[(\w+)\]$`)
 
+// selectAllField is the hidden flag the bulk-actions form sets when the
+// user chose "select all N matching" rather than ticking rows.
+const selectAllField = "_select_all"
+
+// parseListRequestFromForm rebuilds the list query from the *posted*
+// form rather than the URL. A bulk action posts to its own route, so the
+// filters the user was looking at arrive as form fields; reading them
+// from the query string would silently act on the unfiltered set.
+func parseListRequestFromForm(c *fiber.Ctx) core.ListRequest {
+	filters := make(map[string]string)
+	c.Context().PostArgs().VisitAll(func(key, value []byte) {
+		if match := filterKeyPattern.FindStringSubmatch(string(key)); match != nil {
+			filters[match[1]] = string(value)
+		}
+	})
+	return core.ListRequest{
+		Search:   c.FormValue("search"),
+		Filters:  filters,
+		Ordering: c.FormValue("sort"),
+	}
+}
+
 func parseListRequest(c *fiber.Ctx) core.ListRequest {
 	filters := make(map[string]string)
 	c.Context().QueryArgs().VisitAll(func(key, value []byte) {
@@ -454,20 +476,42 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 		// being used as a redirect target -- see core.SafeRedirectPath.
 		redirectTarget := core.SafeRedirectPath(
 			c.Get("Referer"), string(c.Request().Host()), basePath, basePath+"/"+slug)
-		if len(raw) == 0 {
+
+		// "Select all N matching" posts the filters instead of the pks:
+		// a checkbox can only reach the rows on screen, so acting on a
+		// filtered set of 500 from a 25-row page was impossible to
+		// express. The set is resolved server-side from the same query
+		// the list was showing.
+		selectAll := c.FormValue(selectAllField) != ""
+		if !selectAll && len(raw) == 0 {
 			setFlash(c, "warning", "No items selected.")
 			return redirectTo(c, redirectTarget)
 		}
 
-		objects := make([]any, 0, len(raw))
-		for _, pk := range raw {
-			obj, err := modelAdmin.GetObject(c.Context(), string(pk))
+		var objects []any
+		if selectAll {
+			req := parseListRequestFromForm(c)
+			req.Unlimited = true
+			matching, _, err := core.ListObjects(c.Context(), modelAdmin, req)
 			if err != nil {
 				return err
 			}
-			if !core.IsNil(obj) {
-				objects = append(objects, obj)
+			objects = matching
+		} else {
+			objects = make([]any, 0, len(raw))
+			for _, pk := range raw {
+				obj, err := modelAdmin.GetObject(c.Context(), string(pk))
+				if err != nil {
+					return err
+				}
+				if !core.IsNil(obj) {
+					objects = append(objects, obj)
+				}
 			}
+		}
+		if len(objects) == 0 {
+			setFlash(c, "warning", "No items selected.")
+			return redirectTo(c, redirectTarget)
 		}
 		message, err := action.Handler(c.Context(), modelAdmin, objects, principal)
 		if err != nil {
