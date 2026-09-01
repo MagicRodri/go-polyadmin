@@ -36,11 +36,22 @@
        .Errors        []string
        .BasePath      for the combobox's /lookup URL */}}
 {{define "ui/field"}}
-<div class="{{ui "field"}}">
+{{/* A boolean renders as a switch on the same row as its name, the
+     way Django Unfold does it: a toggle reads as a setting, and a
+     setting's name belongs beside it rather than stacked above it.
+     Every other type keeps the label-above-control layout. */}}
+{{$inline := and (eq .Type "boolean") (not .ReadOnlyField)}}
+<div class="{{ui "field"}}{{if $inline}} {{ui "field" "row"}}{{end}}">
+  <span class="{{if $inline}}{{ui "field" "row-text"}}{{else}}contents{{end}}">
   <label for="field-{{.Name}}" class="{{ui "field" "label"}}">
     {{.Label}}{{if .Required}}<span class="{{ui "field" "required"}}" aria-hidden="true">*</span>{{end}}
   </label>
-  <div class="{{ui "field" "control"}}">
+  {{if $inline}}
+  {{if .HelpText}}<p class="{{ui "field" "description"}}">{{.HelpText}}</p>{{end}}
+  {{range .Errors}}<p class="{{ui "field" "message"}}">{{.}}</p>{{end}}
+  {{end}}
+  </span>
+  <div class="{{if $inline}}shrink-0{{else}}{{ui "field" "control"}}{{end}}">
     {{/* Read-only wins over every type branch below: the field renders
          as its value with no control at all, and posts nothing. The
          handler refuses the name too (see parseFormData) -- omitting
@@ -54,8 +65,10 @@
               class="{{ui "textarea"}}">{{.StringValue}}</textarea>
 
     {{else if eq .Type "boolean"}}
-    <input type="checkbox" id="field-{{.Name}}" name="{{.Name}}" value="true" autocomplete="off"
-           {{if .Checked}}checked{{end}} {{if .Disabled}}disabled{{end}} class="{{ui "checkbox"}}">
+    {{/* Rendered inline with the field name by the wrapper above -- see
+         the "boolean" note there. */}}
+    {{template "ui/switch-control" dict
+        "name" .Name "id" (printf "field-%s" .Name) "checked" .Checked "disabled" .Disabled}}
 
     {{else if eq .Type "date"}}
     {{/* DatePicker: a native date input (already posts YYYY-MM-DD with
@@ -159,7 +172,9 @@
            class="{{ui "input"}}">
     {{end}}
   </div>
+  {{if not $inline}}
   {{if .HelpText}}<p class="{{ui "field" "description"}}">{{.HelpText}}</p>{{end}}
   {{range .Errors}}<p class="{{ui "field" "message"}}">{{.}}</p>{{end}}
+  {{end}}
 </div>
 {{end}}

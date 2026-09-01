@@ -604,3 +604,41 @@ func TestReadOnlyFieldRendersAsAValueNotAnInput(t *testing.T) {
 		t.Error("writable fields must still render inputs")
 	}
 }
+
+// -- boolean fields render as an inline switch ---------------------------
+
+// Django Unfold's treatment: a toggle beside its name, not a checkbox
+// stacked under a label.
+func TestBooleanFieldRendersAsASwitchInlineWithItsLabel(t *testing.T) {
+	admin := core.New(core.WithModelAdmins(newActionableUserAdmin()))
+	page := body(t, doGet(t, newTestApp(t, admin), "/admin/users/create", nil))
+
+	row, err := uiClasses("field", "row")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	if !strings.Contains(page, row) {
+		t.Error("expected the boolean field to lay its label and control on one row")
+	}
+	if !strings.Contains(page, `role="switch"`) {
+		t.Error("expected a switch, not a bare checkbox")
+	}
+	// The control is still a native checkbox underneath, which is what
+	// keeps it working with no JavaScript and posting like before.
+	if !strings.Contains(page, `type="checkbox" id="field-IsActive" name="IsActive" value="true"`) {
+		t.Error("the switch must still be a native checkbox posting the field's own name")
+	}
+}
+
+// Every other type keeps the label-above-control layout -- the inline
+// row is specific to booleans.
+func TestNonBooleanFieldsKeepTheStackedLayout(t *testing.T) {
+	page := datedFormPage(t, "/admin/tasks/create")
+	row, err := uiClasses("field", "row")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	if strings.Contains(page, row) {
+		t.Error("a form with no boolean field must not use the inline row layout")
+	}
+}
