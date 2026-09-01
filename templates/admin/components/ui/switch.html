@@ -26,11 +26,11 @@
        .help      optional description under the label */}}
 {{define "ui/switch"}}
 <div class="mb-4 {{ui "field" "row"}}">
+  {{template "ui/switch-control" dict "name" .name "id" (printf "switch-%s" .name) "checked" .checked "disabled" false}}
   <span class="{{ui "field" "row-text"}}">
     <label for="switch-{{.name}}" class="{{ui "label"}}">{{.label}}</label>
     {{if .help}}<p class="{{ui "field" "description"}}">{{.help}}</p>{{end}}
   </span>
-  {{template "ui/switch-control" dict "name" .name "id" (printf "switch-%s" .name) "checked" .checked "disabled" false}}
 </div>
 {{end}}
 

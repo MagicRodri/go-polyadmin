@@ -872,6 +872,9 @@ func (r *Renderer) RenderListFragment(principal *core.Principal, csrfToken strin
 
 // -- detail -------------------------------------------------------------
 
+// A field's HelpText deliberately does not appear here: it explains how
+// to fill a field in, which is a question the form answers and the
+// detail page does not ask. See ui/field.html.
 type detailField struct {
 	Label string
 	Value template.HTML

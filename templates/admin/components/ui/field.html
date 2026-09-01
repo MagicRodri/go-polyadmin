@@ -42,8 +42,14 @@
      Every other type keeps the label-above-control layout. */}}
 {{$inline := and (eq .Type "boolean") (not .ReadOnlyField)}}
 <div class="{{ui "field"}}{{if $inline}} {{ui "field" "row"}}{{end}}">
+  {{/* Inline: the control comes first in source order, so the switch
+       sits to the left of the name it belongs to. */}}
+  {{if $inline}}
+  <div class="shrink-0">{{template "ui/switch-control" dict
+      "name" .Name "id" (printf "field-%s" .Name) "checked" .Checked "disabled" .Disabled}}</div>
+  {{end}}
   <span class="{{if $inline}}{{ui "field" "row-text"}}{{else}}contents{{end}}">
-  <label for="field-{{.Name}}" class="{{ui "field" "label"}}">
+  <label for="field-{{.Name}}" class="{{ui "field" "label"}}{{if $inline}} {{ui "field" "row-label"}}{{end}}">
     {{.Label}}{{if .Required}}<span class="{{ui "field" "required"}}" aria-hidden="true">*</span>{{end}}
   </label>
   {{if $inline}}
@@ -51,7 +57,8 @@
   {{range .Errors}}<p class="{{ui "field" "message"}}">{{.}}</p>{{end}}
   {{end}}
   </span>
-  <div class="{{if $inline}}shrink-0{{else}}{{ui "field" "control"}}{{end}}">
+  {{if not $inline}}
+  <div class="{{ui "field" "control"}}">
     {{/* Read-only wins over every type branch below: the field renders
          as its value with no control at all, and posts nothing. The
          handler refuses the name too (see parseFormData) -- omitting
@@ -64,11 +71,6 @@
               {{if .Required}}required{{end}} {{if .ReadOnly}}readonly{{end}} {{if .Disabled}}disabled{{end}}
               class="{{ui "textarea"}}">{{.StringValue}}</textarea>
 
-    {{else if eq .Type "boolean"}}
-    {{/* Rendered inline with the field name by the wrapper above -- see
-         the "boolean" note there. */}}
-    {{template "ui/switch-control" dict
-        "name" .Name "id" (printf "field-%s" .Name) "checked" .Checked "disabled" .Disabled}}
 
     {{else if eq .Type "date"}}
     {{/* DatePicker: a native date input (already posts YYYY-MM-DD with
@@ -172,6 +174,7 @@
            class="{{ui "input"}}">
     {{end}}
   </div>
+  {{end}}
   {{if not $inline}}
   {{if .HelpText}}<p class="{{ui "field" "description"}}">{{.HelpText}}</p>{{end}}
   {{range .Errors}}<p class="{{ui "field" "message"}}">{{.}}</p>{{end}}

@@ -71,12 +71,18 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 				}, core.WithActionLabel("Deactivate"), core.WithActionConfirm("Deactivate the selected users?")),
 			},
 			DeclaredFields: []core.Field{
-				core.NewField("Email", core.FieldTypeEmail, core.WithRequired()),
-				core.NewField("IsActive", core.FieldTypeBoolean, core.WithDefault(true)),
+				// HelpText is where an ORM/DB column comment lands. It
+				// shows under the control on the form and under the
+				// label on the detail page.
+				core.NewField("Email", core.FieldTypeEmail, core.WithRequired(),
+					core.WithHelpText("Used to sign in, and the address notifications go to.")),
+				core.NewField("IsActive", core.FieldTypeBoolean, core.WithDefault(true),
+					core.WithHelpText("Inactive users keep their data but cannot sign in.")),
 				// Enum + choices renders as ui/select: a hidden input
 				// carries the value, so it posts like a native <select>.
 				core.NewField("Plan", core.FieldTypeEnum,
-					core.WithChoices("Free", "Pro", "Enterprise"), core.WithDefault("Free")),
+					core.WithChoices("Free", "Pro", "Enterprise"), core.WithDefault("Free"),
+					core.WithHelpText("Determines feature limits and billing tier.")),
 				core.NewField("Organization", core.FieldTypeForeignKey, core.WithRelation(organizationRelation)),
 				// Renders as the searchable multi-select
 				// (ui/multi-select.html) -- the whole point of seeding

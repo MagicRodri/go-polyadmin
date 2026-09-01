@@ -628,6 +628,11 @@ func TestBooleanFieldRendersAsASwitchInlineWithItsLabel(t *testing.T) {
 	if !strings.Contains(page, `type="checkbox" id="field-IsActive" name="IsActive" value="true"`) {
 		t.Error("the switch must still be a native checkbox posting the field's own name")
 	}
+	// Order matters and the assertions above would pass either way: the
+	// switch sits to the left of the name it belongs to.
+	if sw, label := strings.Index(page, `id="field-IsActive"`), strings.Index(page, `for="field-IsActive"`); sw > label {
+		t.Error("expected the switch before its label, not after it")
+	}
 }
 
 // Every other type keeps the label-above-control layout -- the inline
@@ -640,5 +645,56 @@ func TestNonBooleanFieldsKeepTheStackedLayout(t *testing.T) {
 	}
 	if strings.Contains(page, row) {
 		t.Error("a form with no boolean field must not use the inline row layout")
+	}
+}
+
+// -- field descriptions ---------------------------------------------------
+
+type describedAdmin struct{ datedAdmin }
+
+func newDescribedAdmin() *describedAdmin {
+	a := &describedAdmin{datedAdmin: *newDatedAdmin()}
+	a.DeclaredFields = []core.Field{
+		core.NewField("Name", core.FieldTypeString, core.WithRequired(),
+			core.WithHelpText("What the task is called.")),
+		core.NewField("DueDate", core.FieldTypeDate),
+		core.NewField("Priority", core.FieldTypeEnum, core.WithChoices("Low", "Medium", "High")),
+	}
+	return a
+}
+
+func describedPage(t *testing.T, path string) string {
+	t.Helper()
+	admin := core.New(core.WithModelAdmins(newDescribedAdmin()))
+	return body(t, doGet(t, newTestApp(t, admin), path, nil))
+}
+
+// A field's help text is where an ORM/DB column comment lands. It
+// belongs to the form, which is where someone is being asked to fill the
+// field in.
+func TestFieldDescriptionShowsOnTheForm(t *testing.T) {
+	if !strings.Contains(describedPage(t, "/admin/tasks/1/edit"), "What the task is called.") {
+		t.Error("expected the field's help text on the form")
+	}
+}
+
+// The detail page asks nothing, so it shows no help text -- it would be
+// instructions next to a value nobody is editing.
+func TestFieldDescriptionDoesNotShowOnTheDetailPage(t *testing.T) {
+	if strings.Contains(describedPage(t, "/admin/tasks/1"), "What the task is called.") {
+		t.Error("the detail page must not render field help text")
+	}
+}
+
+// A field without one must not render an empty description block.
+func TestFieldWithoutADescriptionRendersNone(t *testing.T) {
+	page := describedPage(t, "/admin/tasks/1/edit")
+	desc, err := uiClasses("field", "description")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	// Three fields, one of which has help text.
+	if got := strings.Count(page, desc); got != 1 {
+		t.Errorf("expected exactly one description on the form, got %d", got)
 	}
 }
