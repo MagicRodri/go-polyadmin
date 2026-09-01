@@ -135,7 +135,7 @@ func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 		}
 		perms := computePermissions(admin, principal, modelAdmin, obj)
 		relPerms := computeRelationPermissions(admin, principal, modelAdmin, modelAdmin.DetailFields())
-		html, err := renderer.RenderDetail(principal, csrfToken(c), modelAdmin, obj, perms, relPerms, popFlash(c))
+		html, err := renderer.RenderDetail(c.Context(), principal, csrfToken(c), modelAdmin, obj, perms, relPerms, popFlash(c))
 		if err != nil {
 			return err
 		}
@@ -234,6 +234,9 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *R
 			return c.Status(fiber.StatusUnprocessableEntity).SendString(html)
 		}
 		obj, err := modelAdmin.Create(c.Context(), data)
+		if err == nil {
+			recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditCreate, obj)
+		}
 		if err != nil {
 			return err
 		}
@@ -309,6 +312,7 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Ren
 		if _, err := modelAdmin.Update(c.Context(), obj, data); err != nil {
 			return err
 		}
+		recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditUpdate, obj)
 		setFlash(c, "success", modelAdmin.VerboseName()+" updated.")
 		target := basePath + "/" + slug + "/" + c.Params("pk")
 		if c.FormValue("_continue") != "" {
@@ -362,6 +366,7 @@ func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
 				return err
 			}
+			recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditDelete, obj)
 			setFlash(c, "success", modelAdmin.VerboseName()+" deleted.")
 		}
 		return redirectTo(c, basePath+"/"+slug)
@@ -389,6 +394,7 @@ func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin) fiber.Handl
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
 				return err
 			}
+			recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditDelete, obj)
 		}
 		return c.SendString("")
 	}
@@ -516,6 +522,12 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 		message, err := action.Handler(c.Context(), modelAdmin, objects, principal)
 		if err != nil {
 			return err
+		}
+		// One entry per record, not one per action: the log's question
+		// is "what happened to this record", and a bulk run over 500
+		// rows is 500 answers to it.
+		for _, obj := range objects {
+			recordAudit(c.Context(), admin, principal, modelAdmin, action.Name, obj)
 		}
 		if message == "" {
 			message = fmt.Sprintf("%s applied to %d record(s).", action.Label, len(objects))

@@ -18,6 +18,10 @@ type Admin struct {
 	// opt-in. The token cookie is still minted when this is set, so
 	// templates and custom pages behave identically either way.
 	DisableCSRF bool
+	// AuditLogger, when set, receives an entry for every create,
+	// update, delete and action. Nil means nothing is recorded -- the
+	// framework does not store a log itself.
+	AuditLogger AuditLogger
 
 	registry map[string]ModelAdmin
 	order    []string
@@ -62,6 +66,12 @@ func WithModelAdmins(modelAdmins ...ModelAdmin) Option {
 // headers are not affected: framing is a different attack from forgery.
 func WithCSRFDisabled() Option {
 	return func(a *Admin) { a.DisableCSRF = true }
+}
+
+// WithAuditLogger records every change through the given logger. Where
+// the entries go is the host application's decision -- see AuditLogger.
+func WithAuditLogger(logger AuditLogger) Option {
+	return func(a *Admin) { a.AuditLogger = logger }
 }
 
 func WithDashboard(dashboard *Dashboard) Option {

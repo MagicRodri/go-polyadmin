@@ -277,6 +277,8 @@ func TestUIRegistryMatchesThePythonImplementationKeyForKey(t *testing.T) {
 		"filter-panel": true,
 		// form grouping (Django's fieldsets)
 		"fieldset": true,
+		// audit history panel
+		"history": true,
 	}
 	for component := range uiRegistry {
 		if !expected[component] {

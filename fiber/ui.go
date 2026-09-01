@@ -631,6 +631,19 @@ var uiRegistry = map[string]uiComponent{
 			"icon":        "size-4 shrink-0 text-muted-foreground transition-transform",
 		},
 	},
+	// The detail page's History panel: a compact recent-activity list,
+	// shown only when the configured audit logger can read back.
+	"history": {
+		Base: "mt-6 rounded-lg border border-border bg-card",
+		Parts: map[string]string{
+			"title": "border-b border-border px-4 py-2.5 text-sm font-semibold text-foreground",
+			"row":   "flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-4 py-2 text-sm",
+			"when":  "text-muted-foreground tabular-nums",
+			"who":   "font-medium text-foreground",
+			"what":  "text-muted-foreground",
+			"empty": "px-4 py-3 text-sm text-muted-foreground",
+		},
+	},
 	"panel": {
 		Base: "rounded-lg border border-border bg-card p-4 text-card-foreground",
 		Parts: map[string]string{

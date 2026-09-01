@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log"
 	"os"
 	"path"
 	"sort"
@@ -876,6 +877,13 @@ type detailField struct {
 	Value template.HTML
 }
 
+// historyEntry is one audit entry, formatted for display.
+type historyEntry struct {
+	When string
+	Who  string
+	What string
+}
+
 type detailData struct {
 	pageBase
 	Slug           string
@@ -884,9 +892,54 @@ type detailData struct {
 	Actions        []actionInfo
 	Permissions    permissions
 	InlineSections []inlineSectionData
+	// History is empty unless the configured AuditLogger also reads
+	// back (core.AuditReader). A write-only logger records without
+	// surfacing anything here, which is a fine arrangement when the
+	// log's real consumer is elsewhere.
+	History []historyEntry
 }
 
-func (r *Renderer) RenderDetail(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, perms permissions, relationPermissions map[string]bool, messages []flashMessage) (string, error) {
+// historyFor returns the record's recent audit entries, or nil when no
+// logger is configured or the one configured cannot read back.
+func (r *Renderer) historyFor(ctx context.Context, modelAdmin core.ModelAdmin, obj any) []historyEntry {
+	reader, ok := r.admin.AuditLogger.(core.AuditReader)
+	if !ok {
+		return nil
+	}
+	entries, err := reader.History(ctx, modelAdmin.Slug(), modelAdmin.GetPK(obj), historyLimit)
+	if err != nil {
+		// A history panel is not worth failing a page render over.
+		log.Printf("polyadmin: audit history unavailable for %s: %v", modelAdmin.Slug(), err)
+		return nil
+	}
+	out := make([]historyEntry, 0, len(entries))
+	for _, entry := range entries {
+		who := "system"
+		if entry.Principal != nil {
+			if entry.Principal.DisplayName != "" {
+				who = entry.Principal.DisplayName
+			} else if entry.Principal.ID != nil {
+				who = fmt.Sprint(entry.Principal.ID)
+			}
+		}
+		out = append(out, historyEntry{
+			When: entry.At.Format("2006-01-02 15:04"),
+			Who:  who,
+			What: entry.Action,
+		})
+	}
+	return out
+}
+
+// historyLimit caps the detail page's History panel. It is a summary of
+// recent activity, not an audit browser -- a logger that wants the full
+// trail exposed can surface it wherever it already lives.
+const historyLimit = 10
+
+// ctx is threaded through for the audit history lookup, which is a
+// real read against the host's log rather than page data already in
+// hand -- it deserves the request's cancellation like any other.
+func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, perms permissions, relationPermissions map[string]bool, messages []flashMessage) (string, error) {
 	fields := make([]detailField, 0, len(modelAdmin.DetailFields()))
 	for _, name := range modelAdmin.DetailFields() {
 		field, _ := modelAdmin.Field(name)
@@ -905,6 +958,7 @@ func (r *Renderer) RenderDetail(principal *core.Principal, csrfToken string, mod
 		PK:             modelAdmin.GetPK(obj),
 		Fields:         fields,
 		Actions:        actionInfos(modelAdmin),
+		History:        r.historyFor(ctx, modelAdmin, obj),
 		Permissions:    perms,
 		InlineSections: inlineSections,
 	}

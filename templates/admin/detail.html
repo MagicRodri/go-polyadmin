@@ -20,6 +20,22 @@
       {{end}}
     </dl>
     {{range .InlineSections}}{{template "inlineSection" .}}{{end}}
+    {{/* Only rendered when the configured audit logger can read back
+         (core.AuditReader) -- a write-only logger records silently. */}}
+    {{if .History}}
+    <div class="{{ui "history"}}">
+      <h2 class="{{ui "history" "title"}}">History</h2>
+      <ul class="divide-y divide-border">
+        {{range .History}}
+        <li class="{{ui "history" "row"}}">
+          <span><span class="{{ui "history" "who"}}">{{.Who}}</span>
+            <span class="{{ui "history" "what"}}">{{.What}}</span></span>
+          <span class="{{ui "history" "when"}}">{{.When}}</span>
+        </li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
   </div>
   {{/* No Delete here -- it lives on the edit form, so destroying a
        record is something you opt into by entering edit mode rather
