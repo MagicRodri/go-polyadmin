@@ -64,10 +64,23 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		return err
 	}
 
+	// The login routes go on before anything else, and only when the
+	// application supplied a backend to make them work. They are the two
+	// routes that do not authenticate -- requiring a session to reach
+	// the page that creates one is a loop -- so they are also the two
+	// that must not be shadowed by a ModelAdmin whose slug happens to be
+	// "login". Registering them first is what makes that collision
+	// Fiber's problem rather than a silently unreachable login page.
+	if admin.LoginBackend != nil {
+		router.Get(core.LoginPath, handleLoginGet(admin, renderer, basePath))
+		router.Post(core.LoginPath, handleLoginPost(admin, renderer, basePath))
+		router.Post(core.LogoutPath, handleLogout(admin, basePath))
+	}
+
 	router.Get("/", func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.DashboardView, nil)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		if admin.Dashboard != nil {
 			widgets := admin.Dashboard.VisibleWidgets(principal, admin.Authorizer)
@@ -101,7 +114,7 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 			router.Get(prefix+"/export/xlsx", handleExportXLSX(admin, modelAdmin, basePath))
 		}
 		if modelAdmin.CanView() {
-			router.Get(prefix+"/lookup", handleLookup(admin, modelAdmin, renderer))
+			router.Get(prefix+"/lookup", handleLookup(admin, modelAdmin, renderer, basePath))
 			if len(modelAdmin.Actions()) > 0 {
 				router.Post(prefix+"/actions/:name", handleAction(admin, modelAdmin, basePath))
 			}
@@ -114,7 +127,7 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		if modelAdmin.CanDelete() {
 			router.Get(prefix+"/:pk/delete", handleDeleteGet(admin, modelAdmin, renderer, basePath))
 			router.Post(prefix+"/:pk/delete", handleDeletePost(admin, modelAdmin, basePath))
-			router.Delete(prefix+"/:pk/delete", handleDeleteHTMX(admin, modelAdmin))
+			router.Delete(prefix+"/:pk/delete", handleDeleteHTMX(admin, modelAdmin, basePath))
 		}
 
 		if len(modelAdmin.Inlines()) > 0 {

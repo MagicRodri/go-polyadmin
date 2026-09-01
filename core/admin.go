@@ -22,6 +22,10 @@ type Admin struct {
 	// update, delete and action. Nil means nothing is recorded -- the
 	// framework does not store a log itself.
 	AuditLogger AuditLogger
+	// LoginBackend, when set, mounts the built-in login page and makes
+	// an unauthenticated request redirect there instead of returning
+	// 401. Nil leaves both behaviours off -- see login.go.
+	LoginBackend LoginBackend
 
 	registry map[string]ModelAdmin
 	order    []string
@@ -84,6 +88,14 @@ func WithAuthenticator(authenticator Authenticator) Option {
 
 func WithAuthorizer(authorizer Authorizer) Option {
 	return func(a *Admin) { a.Authorizer = authorizer }
+}
+
+// WithLoginBackend turns on the admin's built-in login page, backed by
+// the application's own credential check and session handling. Pair it
+// with the Authenticator that reads back whatever BeginSession wrote --
+// the two are two halves of one arrangement. See LoginBackend.
+func WithLoginBackend(backend LoginBackend) Option {
+	return func(a *Admin) { a.LoginBackend = backend }
 }
 
 // Register adds a ModelAdmin to the registry, keyed by its Slug().

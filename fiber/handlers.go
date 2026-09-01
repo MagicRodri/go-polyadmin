@@ -63,10 +63,33 @@ func isHTMXRequest(c *fiber.Ctx) bool {
 	return c.Get("HX-Request") == "true"
 }
 
-func writeAuthError(c *fiber.Ctx, result authResult) error {
-	if result == authUnauthenticated {
+// writeAuthError turns a rejected authorize() into a response.
+//
+// The unauthenticated case has two answers, and which one is right
+// depends entirely on whether the admin has a login page to offer. With
+// a core.LoginBackend configured, a browser is redirected there,
+// carrying where it was going; without one there is nowhere to send
+// anybody and 401 is the whole story. This is the only behavioural
+// change WithLoginBackend makes to existing routes.
+//
+// Forbidden never redirects: the visitor is signed in and simply may
+// not do this, so bouncing them to a login form would invite them to
+// re-authenticate as the same person to the same refusal.
+func writeAuthError(c *fiber.Ctx, admin *core.Admin, basePath string, result authResult) error {
+	if result != authUnauthenticated {
+		return writeForbidden(c)
+	}
+	if admin.LoginBackend == nil {
 		return c.Status(fiber.StatusUnauthorized).SendString("Authentication required.")
 	}
+	// redirectTo, not c.Redirect: an expired session most often shows up
+	// mid-page on an htmx request, where a 303 would be swapped into the
+	// page as content. redirectTo sends HX-Redirect for those, which
+	// navigates the whole window instead.
+	return redirectTo(c, loginURL(basePath, requestedURL(c)))
+}
+
+func writeForbidden(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusForbidden).SendString("Permission denied.")
 }
 
@@ -84,7 +107,7 @@ func handleList(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rendere
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "list"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		// nil: a list page is about the model, not one record.
 		perms := computePermissions(admin, principal, modelAdmin, nil)
@@ -119,7 +142,7 @@ func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "view"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
 		if err != nil {
@@ -131,7 +154,7 @@ func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 		// The record's own page: per-object rules decide whether it
 		// offers Edit/Delete at all.
 		if !authorizeObject(admin, principal, core.ResourcePermission(slug, "view"), obj) {
-			return writeAuthError(c, authForbidden)
+			return writeForbidden(c)
 		}
 		perms := computePermissions(admin, principal, modelAdmin, obj)
 		relPerms := computeRelationPermissions(admin, principal, modelAdmin, modelAdmin.DetailFields())
@@ -197,7 +220,7 @@ func handleCreateGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Re
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "create"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		relOptions := computeRelationOptions(admin, modelAdmin, nil)
 		html, err := renderer.RenderForm(principal, csrfToken(c), modelAdmin, nil, nil, nil, relOptions)
@@ -214,7 +237,7 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *R
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "create"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		data := parseFormData(c, modelAdmin, nil)
 		errs := validateWritable(modelAdmin, data, nil)
@@ -254,7 +277,7 @@ func handleEditGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rend
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "update"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
 		if err != nil {
@@ -264,7 +287,7 @@ func handleEditGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rend
 			return c.Status(fiber.StatusNotFound).SendString("Not found")
 		}
 		if !authorizeObject(admin, principal, core.ResourcePermission(slug, "update"), obj) {
-			return writeAuthError(c, authForbidden)
+			return writeForbidden(c)
 		}
 		relOptions := computeRelationOptions(admin, modelAdmin, obj)
 		html, err := renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, nil, nil, relOptions)
@@ -281,7 +304,7 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Ren
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "update"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
 		if err != nil {
@@ -291,7 +314,7 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Ren
 			return c.Status(fiber.StatusNotFound).SendString("Not found")
 		}
 		if !authorizeObject(admin, principal, core.ResourcePermission(slug, "update"), obj) {
-			return writeAuthError(c, authForbidden)
+			return writeForbidden(c)
 		}
 		data := parseFormData(c, modelAdmin, obj)
 		errs := validateWritable(modelAdmin, data, obj)
@@ -327,7 +350,7 @@ func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Re
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "delete"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
 		if err != nil {
@@ -337,7 +360,7 @@ func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Re
 			return c.Status(fiber.StatusNotFound).SendString("Not found")
 		}
 		if !authorizeObject(admin, principal, core.ResourcePermission(slug, "delete"), obj) {
-			return writeAuthError(c, authForbidden)
+			return writeForbidden(c)
 		}
 		html, err := renderer.RenderDelete(principal, csrfToken(c), modelAdmin, obj)
 		if err != nil {
@@ -353,7 +376,7 @@ func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "delete"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
 		if err != nil {
@@ -361,7 +384,7 @@ func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 		}
 		if !core.IsNil(obj) {
 			if !authorizeObject(admin, principal, core.ResourcePermission(slug, "delete"), obj) {
-				return writeAuthError(c, authForbidden)
+				return writeForbidden(c)
 			}
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
 				return err
@@ -376,12 +399,12 @@ func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 // handleDeleteHTMX is the list view's row-level Delete button: removes
 // just that row (empty response; hx-swap="outerHTML" on the <tr> makes
 // it vanish) instead of redirecting anywhere.
-func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin) fiber.Handler {
+func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "delete"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
 		if err != nil {
@@ -389,7 +412,7 @@ func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin) fiber.Handl
 		}
 		if !core.IsNil(obj) {
 			if !authorizeObject(admin, principal, core.ResourcePermission(slug, "delete"), obj) {
-				return writeAuthError(c, authForbidden)
+				return writeForbidden(c)
 			}
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
 				return err
@@ -411,11 +434,11 @@ func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin) fiber.Handl
 // more", not "scroll".
 const lookupLimit = 20
 
-func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer) fiber.Handler {
+func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
 		if _, result := authorize(admin, c, core.ResourcePermission(slug, "view"), modelAdmin); result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		query := c.Query("q")
 		displayName := c.Query("display")
@@ -465,7 +488,7 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "view"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		action, ok := core.GetAction(modelAdmin, c.Params("name"))
 		if !ok {
@@ -552,7 +575,7 @@ func handleInlineCreate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 		}
 		principal, result := authorize(admin, c, core.ResourcePermission(parentSlug, "update"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		parentObj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
 		if err != nil {
@@ -563,7 +586,7 @@ func handleInlineCreate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 		}
 		childAdmin, _ := admin.GetModelAdmin(inline.Child)
 		if _, result := authorize(admin, c, core.ResourcePermission(inline.Child, "create"), childAdmin); result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 
 		data := parseFormData(c, childAdmin, nil)
@@ -601,7 +624,7 @@ func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 		}
 		principal, result := authorize(admin, c, core.ResourcePermission(parentSlug, "update"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		parentObj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
 		if err != nil {
@@ -612,7 +635,7 @@ func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 		}
 		childAdmin, _ := admin.GetModelAdmin(inline.Child)
 		if _, result := authorize(admin, c, core.ResourcePermission(inline.Child, "update"), childAdmin); result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		childPK := c.Params("childPK")
 		childObj, err := childAdmin.GetObject(c.Context(), childPK)
@@ -658,7 +681,7 @@ func handleInlineDelete(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 		}
 		principal, result := authorize(admin, c, core.ResourcePermission(parentSlug, "update"), modelAdmin)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		parentObj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
 		if err != nil {
@@ -669,7 +692,7 @@ func handleInlineDelete(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 		}
 		childAdmin, _ := admin.GetModelAdmin(inline.Child)
 		if _, result := authorize(admin, c, core.ResourcePermission(inline.Child, "delete"), childAdmin); result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		childObj, err := childAdmin.GetObject(c.Context(), c.Params("childPK"))
 		if err != nil {

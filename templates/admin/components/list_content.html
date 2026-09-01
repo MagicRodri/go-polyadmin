@@ -1,24 +1,25 @@
 {{/* The interactive region of a list page: toolbar + table + footer.
-     Rendered both inside the full page and directly as an HTMX
-     fragment (Renderer.RenderListFragment) -- same markup either way,
-     so search/filter/sort/pagination never disagree between a fresh
-     load and a partial swap.
+     Rendered both inside the full page (resource/list.html) and
+     directly as an HTMX fragment (Renderer.RenderListFragment) -- same
+     markup either way, so search/filter/sort/pagination never disagree
+     between a fresh load and a partial swap.
 
      One full-width column, no side panel. The toolbar holds search,
      the Filters trigger and bulk actions on the left, the page's own
      actions on the right; then the table, then DataTablePagination.
-     Filtering lives in a right-hand drawer (ui/filter-panel), so a
-     ModelAdmin with six filters costs the toolbar one trigger rather
-     than six.
+     Filtering lives in a right-hand drawer (components/ui/filter-panel.html),
+     so a ModelAdmin with six filters costs the toolbar one trigger
+     rather than six.
 
      Button placement: everything that *narrows* the table is on the
      left, everything that *acts on* it is on the right, so the two
      never interleave. Below sm the whole toolbar becomes one stacked
      full-width column -- search, Filters, the action select, Export,
      New, one per line -- which is what "toolbar item" is for on each
-     control. Mirrors the Python adapter's
-     components/list_content.html. */}}
-{{define "content"}}
+     control.
+
+     Mirrors python-polyadmin/.../components/list_content.html. */}}
+{{define "listContent"}}
 <div id="resource-list" class="space-y-4">
 
   <div class="{{ui "toolbar"}}">
@@ -53,18 +54,4 @@
   {{template "ui/table" .}}
   {{template "ui/pagination" .}}
 </div>
-{{end}}
-
-{{define "search"}}
-<form class="{{ui "toolbar" "item"}}"
-  hx-get="{{.BasePath}}/{{.Slug}}" hx-target="#resource-list" hx-select="#resource-list"
-  hx-swap="outerHTML" hx-push-url="true"
-  hx-trigger="keyup changed delay:400ms from:input[name='search'], change">
-  <input type="hidden" name="sort" value="{{.Ordering}}">
-  {{range $name, $value := .Filters}}
-  <input type="hidden" name="filter[{{$name}}]" value="{{$value}}">
-  {{end}}
-  <input type="search" id="search" name="search" value="{{.Search}}" placeholder="Search..."
-         class="{{ui "input"}} lg:w-64">
-</form>
 {{end}}

@@ -1,0 +1,21 @@
+{{/* Search bar. Auto-submits via HTMX, swapping just #resource-list --
+     carries the current filters/sort along as hidden fields so
+     searching never clears them. Filters live in their own component
+     (components/ui/filter-panel.html), a right-hand drawer behind a
+     single toolbar trigger, rather than <select> options in this same
+     form.
+
+     Mirrors python-polyadmin/.../components/search.html. */}}
+{{define "search"}}
+<form class="{{ui "toolbar" "item"}}"
+  hx-get="{{.BasePath}}/{{.Slug}}" hx-target="#resource-list" hx-select="#resource-list"
+  hx-swap="outerHTML" hx-push-url="true"
+  hx-trigger="keyup changed delay:400ms from:input[name='search'], change">
+  <input type="hidden" name="sort" value="{{.Ordering}}">
+  {{range $name, $value := .Filters}}
+  <input type="hidden" name="filter[{{$name}}]" value="{{$value}}">
+  {{end}}
+  <input type="search" id="search" name="search" value="{{.Search}}" placeholder="Search..."
+         class="{{ui "input"}} lg:w-64">
+</form>
+{{end}}

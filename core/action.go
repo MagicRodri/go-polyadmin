@@ -19,7 +19,7 @@ type Action struct {
 	Label   string
 	Handler ActionHandler
 	// Confirm is a confirmation prompt shown before running (the
-	// PinesUI modal in templates/admin/action_confirm_modal.html) --
+	// PinesUI modal in templates/admin/components/action_confirm_modal.html) --
 	// "" means no confirmation.
 	Confirm string
 	// Permission is an extra permission suffix checked via

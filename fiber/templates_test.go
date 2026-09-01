@@ -44,7 +44,10 @@ func newAppWithTemplateDirs(t *testing.T, userAdmin *testUserAdmin, dirs ...stri
 
 func TestApplicationTemplateDirOverridesFrameworkDefault(t *testing.T) {
 	dir := t.TempDir()
-	writeOverrideTemplate(t, dir, "admin/list.html", "CUSTOM LIST TEMPLATE")
+	// admin/resource/list.html, not admin/list.html: the framework
+	// default lives in the same namespace a resource's own override does
+	// (admin/resource/{slug}/list.html), matching the Python adapter.
+	writeOverrideTemplate(t, dir, "admin/resource/list.html", "CUSTOM LIST TEMPLATE")
 
 	app := newAppWithTemplateDirs(t, newTestUserAdmin(), dir)
 	resp := doGet(t, app, "/admin/users", nil)

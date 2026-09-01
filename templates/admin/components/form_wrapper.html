@@ -14,8 +14,8 @@
      centered column and Save/Cancel stay pinned to the bottom of the
      viewport, so a long form never buries its own submit button. See
      fiber/ui.go's "page" entry for why sticky beats fixed here.
-     Mirrors the Python adapter's components/form_wrapper.html. */}}
-{{define "content"}}
+     Mirrors python-polyadmin/.../components/form_wrapper.html. */}}
+{{define "formWrapper"}}
 <div id="resource-form-wrapper" class="{{ui "page"}}">
   <div class="{{ui "page" "body"}}">
     <form id="resource-form" method="post" action="{{.FormAction}}"

@@ -279,6 +279,8 @@ func TestUIRegistryMatchesThePythonImplementationKeyForKey(t *testing.T) {
 		"fieldset": true,
 		// audit history panel
 		"history": true,
+		// login page (shadcn's login-04 block)
+		"login": true,
 	}
 	for component := range uiRegistry {
 		if !expected[component] {

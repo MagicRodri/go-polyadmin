@@ -115,6 +115,10 @@ type pageBase struct {
 	SiteLogoURL   string
 	Breadcrumbs   []breadcrumb
 	Messages      []flashMessage
+	// CanSignOut is whether a core.LoginBackend is configured -- i.e.
+	// whether there is a session to end. Without one the admin has no
+	// logout route, so offering the control would be a dead button.
+	CanSignOut bool
 }
 
 // buildNav returns ordered sidebar entries: flat links and
@@ -183,6 +187,7 @@ func (r *Renderer) pageBase(principal *core.Principal, csrfToken, title, header,
 		Title: title, Header: header, BasePath: r.basePath,
 		CurrentSlug: currentSlug, CurrentNavKey: navKey, NavItems: r.buildNav(navKey),
 		SiteTitle: siteTitle, SiteLogoURL: r.admin.SiteLogoURL, Breadcrumbs: breadcrumbs, Messages: messages,
+		CanSignOut: r.admin.LoginBackend != nil,
 	}
 }
 
@@ -245,11 +250,14 @@ type Renderer struct {
 	admin    *core.Admin
 	basePath string
 
-	list           *template.Template
-	detail         *template.Template
-	form           *template.Template
-	deleteTpl      *template.Template
-	dashboard      *template.Template
+	list      *template.Template
+	detail    *template.Template
+	form      *template.Template
+	deleteTpl *template.Template
+	dashboard *template.Template
+	// login renders without layoutFiles: it is the one full page that
+	// is not framed by the admin shell -- see admin/login.html.
+	login          *template.Template
 	widgets        *template.Template
 	lookup         *template.Template
 	inlineFragment *template.Template
@@ -285,8 +293,8 @@ type Renderer struct {
 var layoutFiles = []string{
 	"admin/base.html",
 	"admin/theme.html",
-	"admin/toasts.html",
-	"admin/action_confirm_modal.html",
+	"admin/components/toasts.html",
+	"admin/components/action_confirm_modal.html",
 }
 
 // uiComponentsGlob matches the shadcn-derived component partials (see
@@ -304,6 +312,17 @@ const uiComponentsGlob = "admin/components/ui/*.html"
 // dependencies fails only when that page is actually rendered.
 var sharedPartials = []string{
 	"admin/components/csrf-field.html",
+}
+
+// listPartials is the list view's file set. The page template is a shim
+// over components/list_content.html -- the swappable #resource-list
+// region, which the fragment route renders on its own -- exactly as the
+// Python adapter splits it, so the same three filenames mean the same
+// three things in both repositories.
+var listPartials = []string{
+	"admin/components/search.html",
+	"admin/components/list_content.html",
+	"admin/resource/list.html",
 }
 
 // parseComponents parses the shadcn ui partials plus sharedPartials
@@ -341,28 +360,34 @@ func NewRenderer(admin *core.Admin, basePath string, templateDirs ...string) (*R
 		return parseComponents(tmpl)
 	}
 	var err error
-	if r.list, err = buildTemplate("admin/list.html"); err != nil {
+	if r.list, err = buildTemplate(listPartials...); err != nil {
 		return nil, err
 	}
-	if r.detail, err = buildTemplate("admin/inline.html", "admin/detail.html"); err != nil {
+	if r.detail, err = buildTemplate("admin/components/inline.html", "admin/resource/detail.html"); err != nil {
 		return nil, err
 	}
-	if r.form, err = buildTemplate("admin/inline.html", "admin/form.html"); err != nil {
+	if r.form, err = buildTemplate("admin/components/inline.html", "admin/components/form_wrapper.html", "admin/resource/form.html"); err != nil {
 		return nil, err
 	}
-	if r.deleteTpl, err = buildTemplate("admin/delete.html"); err != nil {
+	if r.deleteTpl, err = buildTemplate("admin/resource/delete.html"); err != nil {
 		return nil, err
 	}
 	if r.dashboard, err = buildTemplate("admin/dashboard.html"); err != nil {
 		return nil, err
 	}
+	// Not a fragment, but not a base.html page either: it needs the
+	// theme block (tokens, dark mode) and the ui partials, and nothing
+	// else the layout would bring.
+	if r.login, err = buildFragment("admin/theme.html", "admin/login.html"); err != nil {
+		return nil, err
+	}
 	if r.widgets, err = buildFragment("admin/widgets/*.html"); err != nil {
 		return nil, err
 	}
-	if r.lookup, err = buildFragment("admin/lookup.html"); err != nil {
+	if r.lookup, err = buildFragment("admin/components/lookup_results.html"); err != nil {
 		return nil, err
 	}
-	if r.inlineFragment, err = buildFragment("admin/inline.html", "admin/inline_fragment.html"); err != nil {
+	if r.inlineFragment, err = buildFragment("admin/components/inline.html", "admin/components/inline_fragment.html"); err != nil {
 		return nil, err
 	}
 	if r.uiSet, err = parseComponents(template.New("ui").Funcs(templateFuncs)); err != nil {
@@ -387,6 +412,16 @@ func (r *Renderer) uiHTML(name string, data any) (template.HTML, error) {
 // ModelAdmin.get_template_candidates(view): an explicit override,
 // then a resource-specific template, then the framework default, in
 // that priority order.
+// frameworkViewTemplate is the built-in template for a resource view.
+// It sits under admin/resource/ -- the same namespace a resource's own
+// override lives in (admin/resource/{slug}/{view}.html) -- so the
+// default and its overrides are neighbours rather than the default
+// sitting a directory above. Matches the Python adapter's layout
+// file-for-file.
+func frameworkViewTemplate(view string) string {
+	return "admin/resource/" + view + ".html"
+}
+
 func templateCandidates(modelAdmin core.ModelAdmin, view string) []string {
 	candidates := make([]string, 0, 3)
 	if override := modelAdmin.TemplateOverride(view); override != "" {
@@ -394,7 +429,7 @@ func templateCandidates(modelAdmin core.ModelAdmin, view string) []string {
 	}
 	candidates = append(candidates,
 		"admin/resource/"+modelAdmin.Slug()+"/"+view+".html",
-		"admin/"+view+".html",
+		frameworkViewTemplate(view),
 	)
 	return candidates
 }
@@ -435,7 +470,7 @@ func (r *Renderer) contentTemplate(modelAdmin core.ModelAdmin, view string, fall
 	if err != nil {
 		return nil, err
 	}
-	if source == fs.FS(coretemplates.FS) && name == "admin/"+view+".html" {
+	if source == fs.FS(coretemplates.FS) && name == frameworkViewTemplate(view) {
 		// Resolved straight to the plain framework default -- no
 		// override actually applies, so reuse the pre-built set.
 		return fallback, nil
@@ -452,8 +487,18 @@ func (r *Renderer) contentTemplate(modelAdmin core.ModelAdmin, view string, fall
 	baseFiles := append([]string{}, layoutFiles...)
 	if view == "form" || view == "detail" {
 		// form/detail content may render inline sections via
-		// {{template "inlineSection" .}} -- see admin/inline.html.
-		baseFiles = append(baseFiles, "admin/inline.html")
+		// {{template "inlineSection" .}} -- see components/inline.html.
+		baseFiles = append(baseFiles, "admin/components/inline.html")
+	}
+	// The partials the framework's own page templates are shims over, so
+	// an override that keeps most of a page can invoke them by name --
+	// {{template "listContent" .}}, {{template "search" .}},
+	// {{template "formWrapper" .}} -- instead of copying their markup.
+	switch view {
+	case "list":
+		baseFiles = append(baseFiles, "admin/components/search.html", "admin/components/list_content.html")
+	case "form":
+		baseFiles = append(baseFiles, "admin/components/form_wrapper.html")
 	}
 	tmpl, err := template.New(path.Base(name)).Funcs(templateFuncs).ParseFS(coretemplates.FS, baseFiles...)
 	if err != nil {
@@ -1116,7 +1161,7 @@ func (r *Renderer) executeForm(
 // "pre-render in Go, template just prints" convention as
 // formData.Inputs/detailData.Fields. Which cell-building function
 // runs is decided here in Go by inline.Layout, not deferred to the
-// template, so admin/inline.html's stacked/tabular defines can stay a
+// template, so admin/components/inline.html's stacked/tabular defines can stay a
 // uniform `{{range .Cells}}{{.}}{{end}}` either way.
 
 type inlineColumn struct {
@@ -1544,6 +1589,40 @@ func (r *Renderer) RenderPage(principal *core.Principal, csrfToken string, page 
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "base", pd); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// -- login ---------------------------------------------------------------
+
+// loginData is deliberately not a pageBase: nothing on this page comes
+// from the admin shell. There is no principal (that is the point), no
+// nav to build, and no breadcrumb trail to sit in.
+type loginData struct {
+	CSRFToken   string
+	SiteTitle   string
+	SiteLogoURL string
+	// Identifier is echoed back after a failed attempt so a mistyped
+	// password does not cost the email as well.
+	Identifier string
+	// Error is shown as a destructive alert, Notice as a plain one --
+	// "those credentials are wrong" versus "you have been signed out".
+	Error  string
+	Notice string
+}
+
+func (r *Renderer) RenderLogin(csrfToken, identifier, errorMessage, notice string) (string, error) {
+	var buf bytes.Buffer
+	data := loginData{
+		CSRFToken:   csrfToken,
+		SiteTitle:   r.admin.SiteTitle,
+		SiteLogoURL: r.admin.SiteLogoURL,
+		Identifier:  identifier,
+		Error:       errorMessage,
+		Notice:      notice,
+	}
+	if err := r.login.ExecuteTemplate(&buf, "login", data); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

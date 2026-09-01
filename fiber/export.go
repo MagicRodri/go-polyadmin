@@ -18,7 +18,7 @@ func handleExportCSV(admin *core.Admin, modelAdmin core.ModelAdmin, basePath str
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
 		if _, result := authorize(admin, c, core.ResourcePermission(slug, "export"), modelAdmin); result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		// Unlimited: an export of a filtered set is the whole set, not
 		// whichever page the user happened to be looking at.
@@ -60,7 +60,7 @@ func handleExportXLSX(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
 		if _, result := authorize(admin, c, core.ResourcePermission(slug, "export"), modelAdmin); result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		// Unlimited: an export of a filtered set is the whole set, not
 		// whichever page the user happened to be looking at.

@@ -1,0 +1,58 @@
+{{/* Bulk-actions listbox, in its own file (not ui/table.html) so
+     components/list_content.html can put it beside the search bar
+     instead of stacked above the table -- row checkboxes still
+     reference the form it renders via the HTML form= attribute (see
+     ui/table.html), so the form itself never has to wrap the table.
+
+     Mirrors python-polyadmin/.../components/ui/bulk-actions.html. */}}
+{{define "ui/bulk-actions"}}
+{{if .Actions}}
+<form id="bulk-actions-form" method="post" action="{{.BasePath}}/{{.Slug}}/actions/"
+      onsubmit="return window.adminConfirmSubmit(event, this, this.dataset.confirm)"
+      class="{{ui "toolbar" "item"}}">
+  {{template "csrf-field" .CSRFToken}}
+  {{/* The query the list is showing, carried on the form so that
+       "select all matching" can be resolved server-side. A checkbox
+       only ever reaches the rows on this page, so without these the
+       filtered set would be unreachable from a 25-row window. */}}
+  <input type="hidden" name="search" value="{{.Search}}">
+  <input type="hidden" name="sort" value="{{.Ordering}}">
+  {{range $name, $value := .Filters}}
+  <input type="hidden" name="filter[{{$name}}]" value="{{$value}}">
+  {{end}}
+  <input type="hidden" name="_select_all" x-ref="selectAll" value="">
+  {{/* w-full on both the positioning wrapper and the trigger: a button
+       can only fill a box that is itself full width, and the <form>
+       above is what the stacked toolbar actually stretches. */}}
+  <div class="relative flex w-full lg:inline-flex lg:w-auto" x-data="{ open: false, label: 'Action…' }"
+       @keydown.escape="open = false" @click.outside="open = false">
+    <button type="button" x-ref="trigger" @click="open = !open"
+            :aria-expanded="open ? 'true' : 'false'" aria-haspopup="listbox"
+            class="{{ui "button" "outline" "size-sm"}} {{ui "toolbar" "item"}}">
+      <span x-text="label" class="{{ui "toolbar" "item-label"}}"></span>
+      {{icon "chevron-down" "w-3.5 h-3.5"}}
+    </button>
+    <div x-show="open" x-cloak role="listbox"
+         x-anchor.bottom-start.offset.6="$refs.trigger"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         class="{{ui "combobox" "content"}} w-48">
+      {{range .Actions}}
+      <div role="option" tabindex="0"
+           data-url="{{$.BasePath}}/{{$.Slug}}/actions/{{.Name}}" {{if .Confirm}}data-confirm="{{.Confirm}}"{{end}}
+           @click="label = $el.textContent.trim(); open = false;
+                   let form = $el.closest('form');
+                   form.action = $el.dataset.url;
+                   form.dataset.confirm = $el.dataset.confirm || '';
+                   form.requestSubmit()"
+           class="{{ui "combobox" "item"}}">{{.Label}}</div>
+      {{end}}
+    </div>
+  </div>
+</form>
+{{end}}
+{{end}}

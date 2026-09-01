@@ -23,18 +23,6 @@ func (a auditToDB) Record(ctx context.Context, e core.AuditEntry) error {
 
 admin := core.New(core.WithModelAdmins(...), core.WithAuditLogger(auditToDB{db}))
 ```
-```python
-class AuditToDB:
-    def record(self, entry):
-        db.execute(
-            "INSERT INTO admin_log (at, who, action, resource, pk, label)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (entry.at, principal_id(entry.principal), entry.action,
-             entry.resource, entry.object_pk, entry.object_label),
-        )
-
-admin = Admin(model_admins=[...], audit_logger=AuditToDB())
-```
 
 An entry is written for every **create**, **update** and **delete**, and
 for every record a bulk or record **action** touched — one entry per
@@ -49,24 +37,21 @@ Two deliberate properties:
   happened; showing the user an error beside it would be a lie. The
   error is logged and dropped.
 
-`ObjectLabel`/`object_label` is captured at write time rather than
+`ObjectLabel` is captured at write time rather than
 resolved on read, because the record may not exist by the time anyone
 reads the entry — which is precisely the case for a delete.
 
 ## Showing history
 
-If your logger *also* implements the read side, each record's detail
+If your logger *also* implements `core.AuditReader`, each record's detail
 page grows a **History** panel listing recent activity:
 
 ```go
 func (a auditToDB) History(ctx context.Context, resource string, pk any, limit int) ([]core.AuditEntry, error)
 ```
-```python
-def history(self, resource, pk, limit): ...
-```
 
 This is a separate, optional capability — the same shape as
-`ListPage`/`list_page`. A write-only logger records silently and shows
+`core.ListQuerier`. A write-only logger records silently and shows
 nothing, which is the right arrangement when the log's real consumer is
 a SIEM or a data warehouse rather than the admin UI.
 

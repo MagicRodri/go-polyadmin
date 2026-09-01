@@ -1,0 +1,7 @@
+{{/* List page. A shim over components/list_content.html, which holds
+     the actual toolbar + table + pagination -- the same region the
+     HTMX fragment route renders on its own.
+
+     Mirrors python-polyadmin/.../resource/list.html, which is the same
+     four lines of {% extends %}/{% include %}. */}}
+{{define "content"}}{{template "listContent" .}}{{end}}

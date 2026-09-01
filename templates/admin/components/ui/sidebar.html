@@ -104,6 +104,9 @@
   </div>
 
   {{/* -- SidebarFooter: the block's NavUser -- */}}
+  {{/* Captured before the `with`, which rebinds the dot to the
+       Principal. */}}
+  {{$canSignOut := .CanSignOut}}{{$logoutURL := printf "%s/logout" .BasePath}}{{$csrf := .CSRFToken}}
   {{with .Principal}}
   {{$name := .DisplayName}}{{if not $name}}{{$name = .ID}}{{end}}
   <div class="{{ui "sidebar" "footer"}}">
@@ -144,6 +147,19 @@
           </span>
         </div>
         <div class="{{ui "dropdown" "separator"}}"></div>
+        {{/* Only when there is a session to end -- see pageBase's
+             CanSignOut. A form, not a link: a logout reachable by GET
+             is one any <img src> on the internet can fire at a
+             signed-in admin, so it posts and carries the CSRF token. */}}
+        {{if $canSignOut}}
+        <form method="post" action="{{$logoutURL}}">
+          {{template "csrf-field" $csrf}}
+          <button type="submit" role="menuitem" class="{{ui "dropdown" "item"}} w-full">
+            {{icon "logout" "size-4"}}
+            <span>Sign out</span>
+          </button>
+        </form>
+        {{end}}
       </div>
     </div>
   </div>

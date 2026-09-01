@@ -115,13 +115,25 @@ func main() {
 		},
 	}
 
-	// Stand-ins for a real app's own session/IAM integration:
-	// swap these for something that reads your actual auth state.
+	// Cookie sessions over an in-memory user table (session.go). One
+	// object serves as both halves: WithLoginBackend is what mounts the
+	// admin's login page and makes an unauthenticated request redirect
+	// to it, and WithAuthenticator is what reads the session back on
+	// every subsequent request.
+	//
+	// This replaced an AllowAllAuthenticator hardcoded to a superuser,
+	// which meant nothing below -- SuperuserAuthorizer, per-object
+	// permissions, the audit log's principal -- was ever exercised
+	// against an identity anyone actually proved.
+	sessions := NewCookieSessionBackend()
 	admin := core.New(
 		core.WithModelAdmins(NewUserAdmin(users, organizations, roles), NewOrganizationAdmin(organizations), NewRoleAdmin(roles)),
 		core.WithDashboard(dashboard),
-		core.WithAuthenticator(core.NewAllowAllAuthenticator(&core.Principal{ID: "demo", DisplayName: "Demo Admin", IsSuperuser: true})),
-		core.WithAuthorizer(core.SuperuserAuthorizer{}),
+		core.WithAuthenticator(sessions),
+		core.WithLoginBackend(sessions),
+		// Not core.SuperuserAuthorizer: that would deny the viewer
+		// account every permission, dashboard included. See session.go.
+		core.WithAuthorizer(ReadOnlyForNonSuperusers{}),
 	)
 	registerPages(admin, users)
 

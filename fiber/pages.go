@@ -62,7 +62,7 @@ func buildPageHandler(admin *core.Admin, page core.AdminPage, renderer *Renderer
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, page.Permission, page)
 		if result != authOK {
-			return writeAuthError(c, result)
+			return writeAuthError(c, admin, basePath, result)
 		}
 		pc := &PageContext{
 			C: c, Admin: admin, Page: page, Principal: principal, BasePath: basePath,

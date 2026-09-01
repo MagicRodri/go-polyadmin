@@ -9,8 +9,7 @@ Nothing here is an npm dependency. shadcn distributes component markup
 as code you copy into your own project rather than a package you
 install, which is what makes it usable from `html/template` at all — the
 parts that don't come across (React, Radix UI, `cva`,
-`tailwind-merge`) are reimplemented, not vendored. See
-`plan/shadcnui-usage.md` for the full plan.
+`tailwind-merge`) are reimplemented, not vendored.
 
 ## The two things a template needs
 
@@ -136,11 +135,11 @@ says otherwise.
 
 | Component | Radix → Alpine | Where it's used |
 | --- | --- | --- |
-| `dialog` | Dialog → `x-teleport` + `x-trap.inert.noscroll` + `x-show`/`x-transition` | `admin/action_confirm_modal.html`, behind both bulk/record action confirmations and the row-delete `hx-confirm`. |
+| `dialog` | Dialog → `x-teleport` + `x-trap.inert.noscroll` + `x-show`/`x-transition` | `admin/components/action_confirm_modal.html`, behind both bulk/record action confirmations and the row-delete `hx-confirm`. |
 | `dropdown` | DropdownMenu; Floating UI → `x-anchor` | `ui/dropdown-menu`, used for the list view's Export menu. |
 | `popover` | Popover; Floating UI → `x-anchor` | The date picker's calendar. |
 | `tooltip` | Tooltip → CSS only (`peer-hover:`, `peer-focus-visible:`), so it works before Alpine loads | The theme toggle. |
-| `toast` | Sonner | `admin/toasts.html` — a PinesUI-derived queue restyled onto the tokens. |
+| `toast` | Sonner | `admin/components/toasts.html` — a PinesUI-derived queue restyled onto the tokens. |
 | `sheet` | Dialog + slide transition | The sidebar below `md`. |
 
 ### Navigation and data
@@ -204,9 +203,6 @@ with `pc.C.FormValue` — no JSON body, no client-side state.
    class list), not its `.tsx` source.
 2. Add its class lists to `uiRegistry` in [`fiber/ui.go`](../fiber/ui.go),
    splitting variants/sizes from parts, and keeping colors on tokens.
-   Mirror the same keys into `python-polyadmin/polyadmin/ui.py` — a
-   test in each language fails if one side gains a component the other
-   lacks.
 3. If it needs markup, add a `{{define "ui/<name>"}}` partial under
    `templates/admin/components/ui/`. It's picked up automatically by the
    `admin/components/ui/*.html` glob.

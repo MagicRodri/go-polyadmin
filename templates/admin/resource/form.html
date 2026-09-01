@@ -1,0 +1,8 @@
+{{/* Form (create/edit) page. A shim over
+     components/form_wrapper.html, which holds the form itself, its
+     inline sections and the sticky action bar -- the same region the
+     HTMX redisplay-on-validation-error swaps.
+
+     Mirrors python-polyadmin/.../resource/form.html, which is the same
+     four lines of {% extends %}/{% include %}. */}}
+{{define "content"}}{{template "formWrapper" .}}{{end}}

@@ -1,13 +1,8 @@
-# PolyAdmin (Go)
+# go-polyadmin
 
-Go implementation of PolyAdmin, the cross-language server-rendered
-admin framework. See [`docs/`](docs/) for reference documentation.
-
-The Python/FastAPI implementation is a separate repository:
-[MagicRodri/polyadmin](https://github.com/MagicRodri/polyadmin). The
-two share no runtime code — they're the same design implemented twice,
-at feature parity. The `docs/` here cover both, so most pages show
-Python and Go side by side.
+A Django-admin-style, server-rendered admin framework for
+[Fiber](https://gofiber.io). See [`docs/`](docs/) for reference
+documentation.
 
 ## What you get from declaring a `ModelAdmin`
 
@@ -196,16 +191,15 @@ to opt out.
 
 ## Status
 
-Feature-complete alongside the Python/FastAPI adapter — CRUD, search/
-filter/sort/pagination, relations + autocomplete, record/bulk Actions,
-a dashboard, CSV and XLSX export, flash-message toasts, and
-per-resource/per-widget template overrides all exist in both
-languages today. The API is idiomatic Go rather than a literal port of
-the Python one — see the package doc comments in `core/*.go` and
-`fiber/*.go` for specifics (functional options, `BaseModelAdmin`
-embedding instead of inheritance, comma-ok lookups, `Disable*` flags
-instead of `can_*`, field/form HTML built in Go functions rather than
-inside `html/template` files for tighter control over escaping).
+Feature-complete: CRUD, search/filter/sort/pagination, relations +
+autocomplete, record/bulk Actions, a dashboard, CSV and XLSX export,
+an optional login page, an optional audit log, flash-message toasts,
+and per-resource/per-widget template overrides. The API is idiomatic Go
+— see the package doc comments in `core/*.go` and `fiber/*.go` for
+specifics (functional options, `BaseModelAdmin` embedding instead of
+inheritance, comma-ok lookups, `Disable*` flags, field/form HTML built
+in Go functions rather than inside `html/template` files for tighter
+control over escaping).
 
 ```
 .
@@ -232,33 +226,25 @@ go run .
 # open http://127.0.0.1:3000/admin
 ```
 
-## Differences from the Python/FastAPI adapter
-
-Not gaps — deliberate, idiomatic-Go choices where the two languages'
-tooling or type systems don't map onto each other 1:1:
+## Things worth knowing up front
 
 - **XLSX cells are all strings.** `core.CellValue` already stringifies
-  everything for CSV; `XLSXExporter` reuses it rather than re-deriving
-  typed (int/float/bool) cells the way Python's `openpyxl`-backed
-  exporter does. XLSX is also a normal (non-optional) dependency of
-  `core` here — Go doesn't have Python's notion of an installable
-  extra (`polyadmin[export-xlsx]`).
+  everything for CSV, and `XLSXExporter` reuses it rather than
+  re-deriving typed cells. XLSX support (via excelize) is a normal
+  dependency of `core`, not an opt-in extra.
 - **Template overrides require a `{{define "content"}}` block.**
-  Python's Jinja templates use `{% extends %}` inheritance, so an
-  override can be any standalone template. Go's `html/template` needs
-  named blocks to layer content into `base.html`, so an override file
-  must define a `"content"` block (and a custom widget's own template
-  must define a block named after its own `Template()` value) — see
-  [`docs/templates.md`](docs/templates.md).
+  `html/template` needs named blocks to layer content into `base.html`,
+  so an override file must define a `"content"` block — and a custom
+  widget's own template must define a block named after its own
+  `Template()` value. See [`docs/templates.md`](docs/templates.md).
 - **`NavCategory` field, `Category()` method.** A Go struct can't have
   a field and a method share a name, so `BaseModelAdmin`'s sidebar
   grouping lives in a `NavCategory` field backing a `Category()`
-  method — the same split as `SlugOverride`/`Slug()`. Python's
-  `ModelAdmin.category` is just one attribute.
+  method — the same split as `SlugOverride`/`Slug()`.
 
 ## Adapter contract for `ModelAdmin` implementations
 
-`GetQueryset` must return `[]any` (not a concrete `[]T`) for the Fiber
+`GetQueryset` must return `[]any` (not a concrete `[]T`) for the
 adapter's list/detail/relation-option code to work — Go doesn't
 implicitly convert between slice types. See `examples/fiber/user_admin.go`
 for the pattern.
