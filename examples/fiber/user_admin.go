@@ -39,13 +39,13 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 			// Shares a sidebar accordion with OrganizationAdmin -- see
 			// docs/routing.md's "Sidebar categories" section.
 			NavCategory:      "Directory",
-			DisplayFields:    []string{"ID", "Email", "IsActive", "Organization"},
-			DetailFieldNames: []string{"ID", "Email", "IsActive", "Organization", "Roles"},
+			DisplayFields:    []string{"ID", "Email", "IsActive", "Plan", "Organization"},
+			DetailFieldNames: []string{"ID", "Email", "IsActive", "Plan", "Organization", "Roles"},
 			// Roles is on the form but not in DisplayFields: a
 			// many-to-many column costs a lookup per row and reads as
 			// noise in a table, which is why Django keeps it off
 			// list_display too.
-			FormFieldNames:   []string{"Email", "IsActive", "Organization", "Roles"},
+			FormFieldNames:   []string{"Email", "IsActive", "Plan", "Organization", "Roles"},
 			SearchFieldNames: []string{"Email"},
 			DeclaredFilters:  []core.Filter{core.NewBooleanFilter("IsActive")},
 			// Routes the "Organization" relation through the /lookup
@@ -65,6 +65,10 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 			DeclaredFields: []core.Field{
 				core.NewField("Email", core.FieldTypeEmail, core.WithRequired()),
 				core.NewField("IsActive", core.FieldTypeBoolean, core.WithDefault(true)),
+				// Enum + choices renders as ui/select: a hidden input
+				// carries the value, so it posts like a native <select>.
+				core.NewField("Plan", core.FieldTypeEnum,
+					core.WithChoices("Free", "Pro", "Enterprise"), core.WithDefault("Free")),
 				core.NewField("Organization", core.FieldTypeForeignKey, core.WithRelation(organizationRelation)),
 				// Renders as the searchable multi-select
 				// (ui/multi-select.html) -- the whole point of seeding
@@ -132,14 +136,16 @@ func (a *UserAdmin) resolveRoles(data map[string]any) []any {
 func (a *UserAdmin) Create(ctx context.Context, data map[string]any) (any, error) {
 	email, _ := data["Email"].(string)
 	isActive, _ := data["IsActive"].(bool)
-	return a.repository.Create(email, isActive, a.resolveOrganization(data), a.resolveRoles(data)), nil
+	plan, _ := data["Plan"].(string)
+	return a.repository.Create(email, isActive, plan, a.resolveOrganization(data), a.resolveRoles(data)), nil
 }
 
 func (a *UserAdmin) Update(ctx context.Context, obj any, data map[string]any) (any, error) {
 	user := obj.(*User)
 	email, _ := data["Email"].(string)
 	isActive, _ := data["IsActive"].(bool)
-	return a.repository.Update(user, email, isActive, a.resolveOrganization(data), a.resolveRoles(data)), nil
+	plan, _ := data["Plan"].(string)
+	return a.repository.Update(user, email, isActive, plan, a.resolveOrganization(data), a.resolveRoles(data)), nil
 }
 
 func (a *UserAdmin) Delete(ctx context.Context, obj any) error {

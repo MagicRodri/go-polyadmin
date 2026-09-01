@@ -82,9 +82,14 @@ func (r *RoleRepository) Create(name string) *Role {
 }
 
 type User struct {
-	ID           int
-	Email        string
-	IsActive     bool
+	ID       int
+	Email    string
+	IsActive bool
+	// A plain choice field, so the reference app exercises ui/select
+	// (the shadcn Select port). Every other choice-shaped field here is
+	// a relation, which renders one of the two combobox widgets
+	// instead -- without this, ui/select appeared nowhere in the app.
+	Plan         string
 	Organization *Organization
 	// []any, not []*Role: the Fiber adapter reads a many-to-many's
 	// current value with a `.([]any)` assertion, the same "collections
@@ -115,16 +120,17 @@ func (r *UserRepository) Get(pk int) *User {
 	return r.users[pk]
 }
 
-func (r *UserRepository) Create(email string, isActive bool, organization *Organization, roles []any) *User {
-	u := &User{ID: r.nextID, Email: email, IsActive: isActive, Organization: organization, Roles: roles}
+func (r *UserRepository) Create(email string, isActive bool, plan string, organization *Organization, roles []any) *User {
+	u := &User{ID: r.nextID, Email: email, IsActive: isActive, Plan: plan, Organization: organization, Roles: roles}
 	r.users[u.ID] = u
 	r.nextID++
 	return u
 }
 
-func (r *UserRepository) Update(u *User, email string, isActive bool, organization *Organization, roles []any) *User {
+func (r *UserRepository) Update(u *User, email string, isActive bool, plan string, organization *Organization, roles []any) *User {
 	u.Email = email
 	u.IsActive = isActive
+	u.Plan = plan
 	u.Organization = organization
 	u.Roles = roles
 	return u
@@ -152,11 +158,11 @@ func seed(users *UserRepository, organizations *OrganizationRepository, roles *R
 	roles.Create("Read Only")
 	security := roles.Create("Security Officer")
 
-	users.Create("admin@example.com", true, acme, []any{admin, security})
-	users.Create("jane@example.com", true, acme, []any{billing})
-	users.Create("john@example.com", false, widgets, nil)
-	users.Create("mary@example.com", true, widgets, []any{support, billing})
-	users.Create("peter@example.com", true, globex, []any{support})
-	users.Create("samir@example.com", true, initech, nil)
-	users.Create("milton@example.com", false, nil, nil)
+	users.Create("admin@example.com", true, "Enterprise", acme, []any{admin, security})
+	users.Create("jane@example.com", true, "Pro", acme, []any{billing})
+	users.Create("john@example.com", false, "Free", widgets, nil)
+	users.Create("mary@example.com", true, "Pro", widgets, []any{support, billing})
+	users.Create("peter@example.com", true, "Enterprise", globex, []any{support})
+	users.Create("samir@example.com", true, "Free", initech, nil)
+	users.Create("milton@example.com", false, "Free", nil, nil)
 }

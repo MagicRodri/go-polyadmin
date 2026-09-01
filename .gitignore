@@ -3,8 +3,6 @@
 *.test
 *.out
 
-# Compiled example binary -- `go build` in examples/fiber drops this
-# next to the source; it's a 20MB+ artifact, never a source file.
 examples/fiber/admin-example-fiber
 
 # Editors / OS
