@@ -20,12 +20,14 @@ func handleExportCSV(admin *core.Admin, modelAdmin core.ModelAdmin, basePath str
 		if _, result := authorize(admin, c, core.ResourcePermission(slug, "export"), modelAdmin); result != authOK {
 			return writeAuthError(c, result)
 		}
+		// Unlimited: an export of a filtered set is the whole set, not
+		// whichever page the user happened to be looking at.
 		req := parseListRequest(c)
-		objects, err := queryset(c.Context(), modelAdmin)
+		req.Unlimited = true
+		objects, _, err := core.ListObjects(c.Context(), modelAdmin, req)
 		if err != nil {
 			return err
 		}
-		objects = core.ExecuteListQuery(modelAdmin, objects, req)
 
 		c.Set(fiber.HeaderContentType, "text/csv")
 		c.Set(fiber.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s.csv"`, slug))
@@ -60,12 +62,14 @@ func handleExportXLSX(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 		if _, result := authorize(admin, c, core.ResourcePermission(slug, "export"), modelAdmin); result != authOK {
 			return writeAuthError(c, result)
 		}
+		// Unlimited: an export of a filtered set is the whole set, not
+		// whichever page the user happened to be looking at.
 		req := parseListRequest(c)
-		objects, err := queryset(c.Context(), modelAdmin)
+		req.Unlimited = true
+		objects, _, err := core.ListObjects(c.Context(), modelAdmin, req)
 		if err != nil {
 			return err
 		}
-		objects = core.ExecuteListQuery(modelAdmin, objects, req)
 
 		writer := core.NewXLSXRowWriter(modelAdmin.VerboseName())
 		if err := (core.XLSXExporter{}).Write(writer, admin, modelAdmin, objects, modelAdmin.ListDisplay()); err != nil {

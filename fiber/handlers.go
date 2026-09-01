@@ -69,12 +69,11 @@ func handleList(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rendere
 		relPerms := computeRelationPermissions(admin, principal, modelAdmin, modelAdmin.ListDisplay())
 
 		req := parseListRequest(c)
-		objects, err := queryset(c.Context(), modelAdmin)
+		objects, total, err := core.ListObjects(c.Context(), modelAdmin, req)
 		if err != nil {
 			return err
 		}
-		objects = core.ExecuteListQuery(modelAdmin, objects, req)
-		page := core.Paginate(objects, req.Page, req.PageSize)
+		page := core.PageOf(objects, total, req)
 
 		var html string
 		if isHTMXRequest(c) {
@@ -379,6 +378,11 @@ func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin) fiber.Handl
 // template's combobox branch, see render_helpers.go's formInputHTML).
 // Gated on *this* resource's own "view" permission, since that's what's
 // actually being browsed.
+// lookupLimit caps the autocomplete's suggestions. The control is a
+// search box, not a browser -- past a screenful the answer is "type
+// more", not "scroll".
+const lookupLimit = 20
+
 func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
@@ -396,14 +400,13 @@ func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 			displayField, hasDisplayField = modelAdmin.Field(displayName)
 		}
 
-		req := core.ListRequest{Search: query}
-		objects, err := queryset(c.Context(), modelAdmin)
+		// The cap rides in as the page window rather than a slice
+		// afterwards, so a ListQuerier applies it in its own query
+		// instead of returning the whole table for us to trim.
+		req := core.ListRequest{Search: query, Page: 1, PageSize: lookupLimit}
+		objects, _, err := core.ListObjects(c.Context(), modelAdmin, req)
 		if err != nil {
 			return err
-		}
-		objects = core.ExecuteListQuery(modelAdmin, objects, req)
-		if len(objects) > 20 {
-			objects = objects[:20]
 		}
 		options := make([]lookupOption, 0, len(objects))
 		for _, obj := range objects {

@@ -38,6 +38,25 @@ func (p Page) NextPage() int {
 	return 0
 }
 
+// PageOf builds the result shape around an already-windowed slice --
+// for a data source that did its own LIMIT/OFFSET and reported the
+// total separately. Paginate is the in-memory equivalent, which slices
+// and counts for you.
+func PageOf(items []any, total int, req ListRequest) Page {
+	page, pageSize := req.Page, req.PageSize
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = DefaultPageSize
+	}
+	if req.Unlimited {
+		// One page holding everything, so NumPages/HasNext stay honest.
+		page, pageSize = 1, max(total, 1)
+	}
+	return Page{Items: items, Number: page, PageSize: pageSize, TotalCount: total}
+}
+
 func Paginate(items []any, page, pageSize int) Page {
 	if page < 1 {
 		page = 1

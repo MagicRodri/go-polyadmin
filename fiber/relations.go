@@ -77,11 +77,15 @@ func computeRelationOptions(admin *core.Admin, modelAdmin core.ModelAdmin, obj a
 			continue
 		}
 
-		queryset, _ := targetAdmin.GetQueryset(context.Background())
-		// The Fiber adapter expects GetQueryset to return []any --
+		// Unlimited: a non-autocomplete relation renders every choice
+		// inline, which is exactly what this widget is for. Going
+		// through listObjects means a ListQuerier target answers this
+		// from its own data source like every other list query.
+		//
+		// (The Fiber adapter expects GetQueryset to return []any --
 		// ModelAdmins used with it should return that, not a concrete
-		// []T (Go doesn't implicitly convert between the two).
-		items, _ := queryset.([]any)
+		// []T; Go doesn't implicitly convert between the two.)
+		items, _, _ := core.ListObjects(context.Background(), targetAdmin, core.ListRequest{Unlimited: true})
 		options := make([]relationOption, 0, len(items))
 		for _, related := range items {
 			options = append(options, relationOption{PK: targetAdmin.GetPK(related), Label: fmtValue(displayField.GetValue(related))})

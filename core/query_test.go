@@ -105,3 +105,37 @@ func TestExecuteListQueryComposesSearchFilterOrdering(t *testing.T) {
 		t.Fatalf("got %v", result)
 	}
 }
+
+// -- the ListQuerier capability ------------------------------------------
+
+func TestListWindowDerivesOffsetAndLimitFromThePage(t *testing.T) {
+	cases := []struct {
+		req           ListRequest
+		offset, limit int
+	}{
+		{ListRequest{Page: 1, PageSize: 25}, 0, 25},
+		{ListRequest{Page: 3, PageSize: 10}, 20, 10},
+		// Page/PageSize unset is "the first page of the default size",
+		// matching what the handlers already do with a bare request.
+		{ListRequest{}, 0, DefaultPageSize},
+		// PageSize 0 with an explicit Unlimited is how export asks for
+		// every matching row rather than a page of them.
+		{ListRequest{Unlimited: true}, 0, 0},
+	}
+	for _, c := range cases {
+		offset, limit := c.req.Window()
+		if offset != c.offset || limit != c.limit {
+			t.Errorf("%+v: got (%d,%d), want (%d,%d)", c.req, offset, limit, c.offset, c.limit)
+		}
+	}
+}
+
+func TestUnlimitedWindowIgnoresThePageNumber(t *testing.T) {
+	// "Every matching row" cannot also be "starting from row 40" -- an
+	// export of a filtered set is the whole set, whichever page the user
+	// happened to be looking at when they clicked Export.
+	offset, limit := ListRequest{Page: 5, PageSize: 10, Unlimited: true}.Window()
+	if offset != 0 || limit != 0 {
+		t.Errorf("got (%d,%d), want (0,0)", offset, limit)
+	}
+}
