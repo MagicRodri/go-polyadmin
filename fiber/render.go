@@ -1035,7 +1035,7 @@ func (r *Renderer) executeForm(
 		// same permission map the detail page gets -- otherwise the
 		// button would render for a principal the authorizer would then
 		// reject at the route.
-		Permissions:    computePermissions(r.admin, principal, modelAdmin),
+		Permissions:    computePermissions(r.admin, principal, modelAdmin, obj),
 		Fieldsets:      fieldsets,
 		InlineSections: inlineSections,
 	}
@@ -1122,7 +1122,7 @@ func (r *Renderer) buildInlineSections(
 		if r.admin.Authorizer != nil && !r.admin.Authorizer.Can(principal, core.ResourcePermission(inline.Child, "view"), childAdmin) {
 			continue
 		}
-		childPerms := computePermissions(r.admin, principal, childAdmin)
+		childPerms := computePermissions(r.admin, principal, childAdmin, nil)
 
 		section := inlineSectionData{
 			Slug: inline.Child, Label: inlineLabel(r.admin, inline), Layout: inline.Layout, Mode: mode,

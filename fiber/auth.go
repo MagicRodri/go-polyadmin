@@ -22,6 +22,21 @@ func authorize(admin *core.Admin, request any, permission string, resource any) 
 	return principal, authOK
 }
 
+// authorizeObject re-runs a permission check with the loaded record as
+// the resource, so an Authorizer can answer "may this principal touch
+// *this* record" and not only "may they touch this model at all".
+//
+// It is the second, narrower gate: the coarse check has already run
+// (before the record was fetched, so an unauthorized principal never
+// costs a lookup), and this one runs once there is an object to judge.
+// With no Authorizer configured it permits, like every other check here.
+func authorizeObject(admin *core.Admin, principal *core.Principal, permission string, obj any) bool {
+	if admin.Authorizer == nil {
+		return true
+	}
+	return admin.Authorizer.Can(principal, permission, obj)
+}
+
 type authResult int
 
 const (
@@ -35,7 +50,10 @@ const (
 // decide which controls the templates show. The routes enforce this
 // independently, so hiding a control here is a UX nicety, not the
 // security boundary.
-func computePermissions(admin *core.Admin, principal *core.Principal, modelAdmin core.ModelAdmin) permissions {
+// obj is the record in view, or nil on a list/create page. When present
+// it is what the Authorizer is asked about, so per-object rules decide
+// which controls a record's own pages show.
+func computePermissions(admin *core.Admin, principal *core.Principal, modelAdmin core.ModelAdmin, obj any) permissions {
 	slug := modelAdmin.Slug()
 	allowed := func(capability bool, action string) bool {
 		if !capability {
@@ -44,7 +62,11 @@ func computePermissions(admin *core.Admin, principal *core.Principal, modelAdmin
 		if admin.Authorizer == nil {
 			return true
 		}
-		return admin.Authorizer.Can(principal, core.ResourcePermission(slug, action), modelAdmin)
+		resource := any(modelAdmin)
+		if obj != nil {
+			resource = obj
+		}
+		return admin.Authorizer.Can(principal, core.ResourcePermission(slug, action), resource)
 	}
 	return permissions{
 		CanView:   allowed(modelAdmin.CanView(), "view"),
