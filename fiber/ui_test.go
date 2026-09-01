@@ -275,6 +275,8 @@ func TestUIRegistryMatchesThePythonImplementationKeyForKey(t *testing.T) {
 		// dashboard / misc
 		"widget": true, "panel": true, "page": true, "toolbar": true,
 		"filter-panel": true,
+		// form grouping (Django's fieldsets)
+		"fieldset": true,
 	}
 	for component := range uiRegistry {
 		if !expected[component] {

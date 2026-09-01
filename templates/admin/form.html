@@ -34,7 +34,30 @@
         </div>
       </div>
       {{end}}
+      {{/* Fieldsets (Django's `fieldsets`). An untitled group renders
+           bare -- no header, no border -- so a form that declares none
+           is visually identical to the flat form this replaced. A
+           titled group is always collapsible; Collapsed only decides
+           whether it starts closed. */}}
+      {{range .Fieldsets}}
+      {{if .Title}}
+      <div class="{{ui "fieldset"}}" x-data="{ open: {{if .Collapsed}}false{{else}}true{{end}} }"
+           x-id="['fieldset-body']">
+        <button type="button" @click="open = !open"
+                :aria-expanded="open ? 'true' : 'false'" :aria-controls="$id('fieldset-body')"
+                class="{{ui "fieldset" "trigger"}}">
+          <span class="{{ui "fieldset" "title"}}">{{.Title}}</span>
+          {{icon "chevron-down" (printf "%s" (ui "fieldset" "icon"))}}
+        </button>
+        {{if .Description}}<p class="{{ui "fieldset" "description"}}">{{.Description}}</p>{{end}}
+        <div x-show="open" x-collapse :id="$id('fieldset-body')" class="{{ui "fieldset" "body"}}">
+          {{range .Inputs}}{{.}}{{end}}
+        </div>
+      </div>
+      {{else}}
       {{range .Inputs}}{{.}}{{end}}
+      {{end}}
+      {{end}}
     </form>
     {{/* Inline sections carry their own <form> elements, so they have to
          stay siblings of the record form -- HTML forbids nesting one

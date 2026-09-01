@@ -45,7 +45,15 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 			// many-to-many column costs a lookup per row and reads as
 			// noise in a table, which is why Django keeps it off
 			// list_display too.
-			FormFieldNames:   []string{"Email", "IsActive", "Plan", "Organization", "Roles"},
+			// Grouped rather than flat, to exercise fieldsets -- the
+			// other admins in this app stay flat, so both paths have
+			// example coverage. Declaring these replaces FormFieldNames:
+			// the groups are the form's field list.
+			DeclaredFieldsets: []core.Fieldset{
+				{Fields: []string{"Email", "IsActive"}},
+				{Title: "Membership", Description: "Where this user belongs and what they may do.",
+					Fields: []string{"Plan", "Organization", "Roles"}},
+			},
 			SearchFieldNames: []string{"Email"},
 			DeclaredFilters:  []core.Filter{core.NewBooleanFilter("IsActive")},
 			// Routes the "Organization" relation through the /lookup

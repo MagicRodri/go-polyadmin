@@ -471,3 +471,64 @@ func TestSelectIsKeyboardOperable(t *testing.T) {
 		t.Error("options must not be individually tabbable")
 	}
 }
+
+// -- fieldsets ------------------------------------------------------------
+
+type fieldsetAdmin struct{ datedAdmin }
+
+func newFieldsetAdmin() *fieldsetAdmin {
+	a := &fieldsetAdmin{datedAdmin: *newDatedAdmin()}
+	a.DeclaredFieldsets = []core.Fieldset{
+		{Fields: []string{"Name"}},
+		{Title: "Scheduling", Description: "When it is due.", Fields: []string{"DueDate"}},
+		{Title: "Advanced", Fields: []string{"Priority"}, Collapsed: true},
+	}
+	return a
+}
+
+func fieldsetFormPage(t *testing.T) string {
+	t.Helper()
+	admin := core.New(core.WithModelAdmins(newFieldsetAdmin()))
+	return body(t, doGet(t, newTestApp(t, admin), "/admin/tasks/1/edit", nil))
+}
+
+func TestDeclaredFieldsetsRenderAsTitledGroups(t *testing.T) {
+	page := fieldsetFormPage(t)
+	for _, want := range []string{"Scheduling", "When it is due.", "Advanced"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("expected %q in the form", want)
+		}
+	}
+	// Every field still renders -- grouping must not drop any.
+	for _, name := range []string{`name="Name"`, `name="DueDate"`, `name="Priority"`} {
+		if !strings.Contains(page, name) {
+			t.Errorf("field %s went missing when grouped", name)
+		}
+	}
+}
+
+func TestCollapsedFieldsetStartsClosedAndOthersOpen(t *testing.T) {
+	page := fieldsetFormPage(t)
+	if !strings.Contains(page, `x-data="{ open: false }"`) {
+		t.Error("expected the Collapsed group to start closed")
+	}
+	if !strings.Contains(page, `x-data="{ open: true }"`) {
+		t.Error("expected the uncollapsed titled group to start open")
+	}
+}
+
+// The default case must not gain a wrapper: an admin that declares no
+// fieldsets should render exactly the flat form it always did.
+func TestUndeclaredFieldsetsRenderNoGroupChrome(t *testing.T) {
+	page := datedFormPage(t, "/admin/tasks/1/edit")
+	base, err := uiClasses("fieldset")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	if strings.Contains(page, base) {
+		t.Error("a form with no declared fieldsets must render no fieldset chrome")
+	}
+	if !strings.Contains(page, `name="Name"`) {
+		t.Error("the flat form still has to render its fields")
+	}
+}

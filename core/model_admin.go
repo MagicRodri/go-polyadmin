@@ -37,6 +37,7 @@ type ModelAdmin interface {
 	Field(name string) (Field, bool)
 	ListDisplay() []string
 	FormFields() []string
+	Fieldsets() []Fieldset
 	SearchFields() []string
 	DetailFields() []string
 	Filters() []Filter
@@ -90,6 +91,21 @@ type ModelAdmin interface {
 //	}
 //
 //	func (a UserAdmin) GetQueryset(ctx context.Context) (any, error) { ... }
+//
+// Fieldset is one titled group of form fields -- Django's `fieldsets`.
+// A Title of "" renders the group with no header, which is how the
+// default (undeclared) case renders as a plain flat form.
+//
+// Collapsed only seeds the initial state; the group can always be
+// opened. It is for the sections a form has to carry but rarely needs,
+// which is exactly when a flat form starts to hurt.
+type Fieldset struct {
+	Title       string
+	Description string
+	Collapsed   bool
+	Fields      []string
+}
+
 type BaseModelAdmin struct {
 	ModelName    string
 	SlugOverride string
@@ -107,6 +123,11 @@ type BaseModelAdmin struct {
 	DeclaredFilters  []Filter
 	DeclaredActions  []Action
 	DeclaredInlines  []Inline
+	// DeclaredFieldsets, when set, defines both the grouping and the
+	// form's field list -- FormFields() reports the flattened result, so
+	// there is one source of truth for what the form renders and what
+	// the handler parses. FormFieldNames is then unused.
+	DeclaredFieldsets []Fieldset
 	// Relation (foreignkey/onetoone) form fields that render as a
 	// lookup-driven search box instead of a <select>
 	// populated from the target's full queryset -- for relations too
@@ -204,8 +225,27 @@ func (b BaseModelAdmin) Field(name string) (Field, bool) {
 	return f, ok
 }
 
-func (b BaseModelAdmin) ListDisplay() []string  { return b.DisplayFields }
-func (b BaseModelAdmin) FormFields() []string   { return b.FormFieldNames }
+func (b BaseModelAdmin) ListDisplay() []string { return b.DisplayFields }
+func (b BaseModelAdmin) FormFields() []string {
+	if len(b.DeclaredFieldsets) == 0 {
+		return b.FormFieldNames
+	}
+	var names []string
+	for _, set := range b.DeclaredFieldsets {
+		names = append(names, set.Fields...)
+	}
+	return names
+}
+
+// Fieldsets always returns at least one group: the form template renders
+// groups unconditionally, so "none declared" means one unnamed group
+// holding every form field, not zero groups holding nothing.
+func (b BaseModelAdmin) Fieldsets() []Fieldset {
+	if len(b.DeclaredFieldsets) == 0 {
+		return []Fieldset{{Fields: b.FormFieldNames}}
+	}
+	return b.DeclaredFieldsets
+}
 func (b BaseModelAdmin) SearchFields() []string { return b.SearchFieldNames }
 
 func (b BaseModelAdmin) DetailFields() []string {

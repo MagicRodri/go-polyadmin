@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -215,5 +216,58 @@ func TestValidateRequiredField(t *testing.T) {
 	errs := admin.Validate(map[string]any{"Email": ""})
 	if _, ok := errs["Email"]; !ok {
 		t.Fatalf("got %v, want an Email error", errs)
+	}
+}
+
+// -- fieldsets -----------------------------------------------------------
+
+func TestFieldsetsDefaultToOneUnnamedGroupOverFormFields(t *testing.T) {
+	// Undeclared is the common case, and the form template renders
+	// fieldsets unconditionally -- so "no fieldsets" has to mean one
+	// group holding everything, not zero groups holding nothing.
+	admin := BaseModelAdmin{FormFieldNames: []string{"Email", "IsActive"}}
+	sets := admin.Fieldsets()
+	if len(sets) != 1 {
+		t.Fatalf("expected one default fieldset, got %d", len(sets))
+	}
+	if sets[0].Title != "" {
+		t.Errorf("the default group must be unnamed, got %q", sets[0].Title)
+	}
+	if got := strings.Join(sets[0].Fields, ","); got != "Email,IsActive" {
+		t.Errorf("expected the form fields in order, got %q", got)
+	}
+}
+
+func TestDeclaredFieldsetsBecomeTheFormsFieldList(t *testing.T) {
+	// One source of truth: with fieldsets declared they define which
+	// fields the form has and in what order, so FormFields() reports the
+	// flattened list and handlers keep parsing exactly what is rendered.
+	admin := BaseModelAdmin{
+		FormFieldNames: []string{"Ignored"},
+		DeclaredFieldsets: []Fieldset{
+			{Fields: []string{"Email"}},
+			{Title: "Access", Description: "Who they are inside the app.", Fields: []string{"IsActive", "Plan"}},
+		},
+	}
+	if got := strings.Join(admin.FormFields(), ","); got != "Email,IsActive,Plan" {
+		t.Errorf("FormFields should flatten the fieldsets, got %q", got)
+	}
+	sets := admin.Fieldsets()
+	if len(sets) != 2 || sets[1].Title != "Access" {
+		t.Fatalf("expected the declared groups, got %+v", sets)
+	}
+	if sets[1].Description == "" {
+		t.Error("expected the description to survive")
+	}
+}
+
+func TestCollapsedFieldsetIsOptIn(t *testing.T) {
+	admin := BaseModelAdmin{DeclaredFieldsets: []Fieldset{
+		{Title: "Advanced", Fields: []string{"X"}, Collapsed: true},
+		{Title: "Basic", Fields: []string{"Y"}},
+	}}
+	sets := admin.Fieldsets()
+	if !sets[0].Collapsed || sets[1].Collapsed {
+		t.Error("Collapsed must be per-group and default false")
 	}
 }

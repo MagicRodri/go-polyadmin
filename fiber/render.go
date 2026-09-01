@@ -932,8 +932,18 @@ type formData struct {
 	PK             any
 	Permissions    permissions
 	NonFieldErrors []string
-	Inputs         []template.HTML
+	Fieldsets      []fieldsetData
 	InlineSections []inlineSectionData
+}
+
+// fieldsetData is one rendered group of form inputs. A group with an
+// empty Title renders bare -- see form.html -- which is what keeps the
+// default (undeclared) single-group case looking like a flat form.
+type fieldsetData struct {
+	Title       string
+	Description string
+	Collapsed   bool
+	Inputs      []template.HTML
 }
 
 func (r *Renderer) RenderForm(
@@ -985,18 +995,26 @@ func (r *Renderer) executeForm(
 		action = fmt.Sprintf("%s/%s/%v/edit", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))
 	}
 
-	inputs := make([]template.HTML, 0, len(modelAdmin.FormFields()))
-	for _, fieldName := range modelAdmin.FormFields() {
-		field, _ := modelAdmin.Field(fieldName)
-		value, ok := submitted[fieldName]
-		if !ok && obj != nil {
-			value = field.GetValue(obj)
+	// Grouped rather than one flat list: Fieldsets() always yields at
+	// least one group, so this is the single path for both the declared
+	// and the undeclared case.
+	sets := modelAdmin.Fieldsets()
+	fieldsets := make([]fieldsetData, 0, len(sets))
+	for _, set := range sets {
+		group := fieldsetData{Title: set.Title, Description: set.Description, Collapsed: set.Collapsed}
+		for _, fieldName := range set.Fields {
+			field, _ := modelAdmin.Field(fieldName)
+			value, ok := submitted[fieldName]
+			if !ok && obj != nil {
+				value = field.GetValue(obj)
+			}
+			input, err := r.formInputHTML(r.basePath, field, value, errs[fieldName], relationOptions[fieldName])
+			if err != nil {
+				return "", err
+			}
+			group.Inputs = append(group.Inputs, input)
 		}
-		input, err := r.formInputHTML(r.basePath, field, value, errs[fieldName], relationOptions[fieldName])
-		if err != nil {
-			return "", err
-		}
-		inputs = append(inputs, input)
+		fieldsets = append(fieldsets, group)
 	}
 
 	mode := "placeholder"
@@ -1017,7 +1035,7 @@ func (r *Renderer) executeForm(
 		// button would render for a principal the authorizer would then
 		// reject at the route.
 		Permissions:    computePermissions(r.admin, principal, modelAdmin),
-		Inputs:         inputs,
+		Fieldsets:      fieldsets,
 		InlineSections: inlineSections,
 	}
 	if obj != nil {
