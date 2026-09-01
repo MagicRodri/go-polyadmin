@@ -1008,7 +1008,8 @@ func (r *Renderer) executeForm(
 			if !ok && obj != nil {
 				value = field.GetValue(obj)
 			}
-			input, err := r.formInputHTML(r.basePath, field, value, errs[fieldName], relationOptions[fieldName])
+			input, err := r.formInputHTML(r.basePath, field, value, errs[fieldName], relationOptions[fieldName],
+				modelAdmin.IsReadOnly(fieldName, obj))
 			if err != nil {
 				return "", err
 			}
@@ -1170,7 +1171,8 @@ func (r *Renderer) buildInlineSections(
 					if inline.Layout == core.InlineLayoutTabular {
 						cells = append(cells, inlineTableCellHTML(r.basePath, field, value, errs[name], relOptions[name]))
 					} else {
-						input, err := r.formInputHTML(r.basePath, field, value, errs[name], relOptions[name])
+						input, err := r.formInputHTML(r.basePath, field, value, errs[name], relOptions[name],
+							childAdmin.IsReadOnly(name, nil))
 						if err != nil {
 							return nil, err
 						}
@@ -1214,7 +1216,8 @@ func (r *Renderer) buildInlineSections(
 				if inline.Layout == core.InlineLayoutTabular {
 					cells = append(cells, inlineTableCellHTML(r.basePath, field, value, errs[name], relOptions[name]))
 				} else {
-					input, err := r.formInputHTML(r.basePath, field, value, errs[name], relOptions[name])
+					input, err := r.formInputHTML(r.basePath, field, value, errs[name], relOptions[name],
+						childAdmin.IsReadOnly(name, nil))
 					if err != nil {
 						return nil, err
 					}

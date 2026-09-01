@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/MagicRodri/go-polyadmin/core"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // -- date picker (Phase D) -----------------------------------------------
@@ -530,5 +532,75 @@ func TestUndeclaredFieldsetsRenderNoGroupChrome(t *testing.T) {
 	}
 	if !strings.Contains(page, `name="Name"`) {
 		t.Error("the flat form still has to render its fields")
+	}
+}
+
+// -- read-only fields -----------------------------------------------------
+
+type readOnlyAdmin struct{ datedAdmin }
+
+func newReadOnlyAdmin() *readOnlyAdmin {
+	a := &readOnlyAdmin{datedAdmin: *newDatedAdmin()}
+	a.ReadOnlyFieldNames = []string{"Name"}
+	return a
+}
+
+func (a *readOnlyAdmin) Update(ctx context.Context, obj any, data map[string]any) (any, error) {
+	item := obj.(*datedThing)
+	// Deliberately writes whatever it is handed: the protection has to
+	// come from the framework not passing the value, not from the
+	// application remembering to ignore it.
+	if v, ok := data["Name"].(string); ok {
+		item.Name = v
+	}
+	if v, ok := data["Priority"].(string); ok {
+		item.Priority = v
+	}
+	return item, nil
+}
+
+func readOnlyApp(t *testing.T) (*fiber.App, *readOnlyAdmin) {
+	t.Helper()
+	ma := newReadOnlyAdmin()
+	return newTestApp(t, core.New(core.WithModelAdmins(ma))), ma
+}
+
+// The one that matters: omitting the input is presentation, not
+// enforcement. A crafted POST must not be able to write the field.
+func TestReadOnlyFieldIsRefusedEvenWhenPosted(t *testing.T) {
+	app, ma := readOnlyApp(t)
+	before := ma.item.Name
+
+	resp := doPostForm(t, app, "/admin/tasks/1/edit", url.Values{
+		"Name":     {"hacked"},
+		"DueDate":  {"2026-03-14"},
+		"Priority": {"High"},
+	}, nil)
+	if resp.StatusCode >= 400 {
+		t.Fatalf("expected the save to succeed, got %d", resp.StatusCode)
+	}
+	if ma.item.Name != before {
+		t.Errorf("a read-only field was written by a posted value: %q -> %q", before, ma.item.Name)
+	}
+	// The writable field on the same form must still save, or this is
+	// just a broken form rather than a protected field.
+	if ma.item.Priority != "High" {
+		t.Errorf("the writable field did not save: %q", ma.item.Priority)
+	}
+}
+
+func TestReadOnlyFieldRendersAsAValueNotAnInput(t *testing.T) {
+	app, _ := readOnlyApp(t)
+	page := body(t, doGet(t, app, "/admin/tasks/1/edit", nil))
+
+	if strings.Contains(page, `name="Name"`) {
+		t.Error("a read-only field must not render a posting input")
+	}
+	if !strings.Contains(page, "Ship it") {
+		t.Error("expected the read-only field's value to still be shown")
+	}
+	// The writable fields are untouched.
+	if !strings.Contains(page, `name="Priority"`) {
+		t.Error("writable fields must still render inputs")
 	}
 }

@@ -184,20 +184,25 @@ type fieldOptionData struct {
 // A method on Renderer only because rendering goes through r.uiHTML,
 // which executes against the shared ui/*.html template set (see
 // NewRenderer's r.uiSet).
-func (r *Renderer) formInputHTML(basePath string, field core.Field, value any, errs []string, relation *relationFieldOptions) (template.HTML, error) {
+// readOnly renders the field as its value instead of a control. It is
+// distinct from core.Field.ReadOnly (which marks a native input
+// `readonly` but still posts): this one removes the control entirely,
+// and pairs with parseFormData refusing the name.
+func (r *Renderer) formInputHTML(basePath string, field core.Field, value any, errs []string, relation *relationFieldOptions, readOnly bool) (template.HTML, error) {
 	data := map[string]any{
-		"Name":        field.Name,
-		"Label":       field.Label,
-		"Required":    field.Required,
-		"ReadOnly":    field.ReadOnly,
-		"Disabled":    field.Disabled,
-		"Placeholder": field.Placeholder,
-		"HelpText":    field.HelpText,
-		"Type":        string(field.Type),
-		"InputType":   inputTypeFor(field.Type),
-		"StringValue": stringOrEmpty(value),
-		"Errors":      errs,
-		"BasePath":    basePath,
+		"ReadOnlyField": readOnly,
+		"Name":          field.Name,
+		"Label":         field.Label,
+		"Required":      field.Required,
+		"ReadOnly":      field.ReadOnly,
+		"Disabled":      field.Disabled,
+		"Placeholder":   field.Placeholder,
+		"HelpText":      field.HelpText,
+		"Type":          string(field.Type),
+		"InputType":     inputTypeFor(field.Type),
+		"StringValue":   stringOrEmpty(value),
+		"Errors":        errs,
+		"BasePath":      basePath,
 	}
 
 	switch field.Type {

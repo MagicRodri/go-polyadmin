@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 )
 
@@ -38,6 +39,8 @@ type ModelAdmin interface {
 	ListDisplay() []string
 	FormFields() []string
 	Fieldsets() []Fieldset
+	ReadOnlyFields(obj any) []string
+	IsReadOnly(name string, obj any) bool
 	SearchFields() []string
 	DetailFields() []string
 	Filters() []Filter
@@ -128,6 +131,11 @@ type BaseModelAdmin struct {
 	// there is one source of truth for what the form renders and what
 	// the handler parses. FormFieldNames is then unused.
 	DeclaredFieldsets []Fieldset
+	// ReadOnlyFieldNames are shown on the form as values rather than
+	// inputs, and are refused if posted anyway -- see the adapter's
+	// parseFormData. Override ReadOnlyFields to vary by object, which
+	// is how "editable on create, frozen afterwards" is expressed.
+	ReadOnlyFieldNames []string
 	// Relation (foreignkey/onetoone) form fields that render as a
 	// lookup-driven search box instead of a <select>
 	// populated from the target's full queryset -- for relations too
@@ -235,6 +243,17 @@ func (b BaseModelAdmin) FormFields() []string {
 		names = append(names, set.Fields...)
 	}
 	return names
+}
+
+// ReadOnlyFields returns the fields that must render as values rather
+// than inputs for this object. obj is nil on the create form, so an
+// override can distinguish creating from editing -- the declarative
+// default applies to both.
+func (b BaseModelAdmin) ReadOnlyFields(obj any) []string { return b.ReadOnlyFieldNames }
+
+// IsReadOnly is the question every call site actually asks.
+func (b BaseModelAdmin) IsReadOnly(name string, obj any) bool {
+	return slices.Contains(b.ReadOnlyFields(obj), name)
 }
 
 // Fieldsets always returns at least one group: the form template renders

@@ -271,3 +271,34 @@ func TestCollapsedFieldsetIsOptIn(t *testing.T) {
 		t.Error("Collapsed must be per-group and default false")
 	}
 }
+
+// -- read-only fields -----------------------------------------------------
+
+func TestReadOnlyFieldsDefaultToNone(t *testing.T) {
+	admin := BaseModelAdmin{FormFieldNames: []string{"Email"}}
+	if got := admin.ReadOnlyFields(nil); len(got) != 0 {
+		t.Errorf("expected nothing read-only by default, got %v", got)
+	}
+}
+
+func TestReadOnlyFieldsAreReportedForBothCreateAndEdit(t *testing.T) {
+	// The obj parameter exists so an admin can override for the common
+	// "editable on create, frozen afterwards" case; the declarative
+	// default ignores it and applies to both.
+	admin := BaseModelAdmin{ReadOnlyFieldNames: []string{"CreatedAt"}}
+	for _, obj := range []any{nil, &User{}} {
+		if got := strings.Join(admin.ReadOnlyFields(obj), ","); got != "CreatedAt" {
+			t.Errorf("obj=%v: got %q", obj, got)
+		}
+	}
+}
+
+func TestIsReadOnlyChecksTheNameAgainstTheList(t *testing.T) {
+	admin := BaseModelAdmin{ReadOnlyFieldNames: []string{"CreatedAt", "Slug"}}
+	if !admin.IsReadOnly("Slug", nil) {
+		t.Error("declared name should be read-only")
+	}
+	if admin.IsReadOnly("Email", nil) {
+		t.Error("undeclared name must stay writable")
+	}
+}

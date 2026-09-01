@@ -118,9 +118,35 @@ func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 	}
 }
 
-func parseFormData(c *fiber.Ctx, modelAdmin core.ModelAdmin) map[string]any {
+// validateWritable runs the ModelAdmin's own validation, then drops any
+// complaint about a read-only field. Such a field is never posted (see
+// parseFormData), so a `required` read-only field would otherwise fail
+// validation on every save -- the value is not missing, it is simply not
+// the form's to send.
+//
+// Wrapping rather than changing Validate keeps the ModelAdmin contract
+// as it was, so an application's own Validate override is unaffected.
+func validateWritable(modelAdmin core.ModelAdmin, data map[string]any, obj any) map[string][]string {
+	errs := modelAdmin.Validate(data)
+	for name := range errs {
+		if modelAdmin.IsReadOnly(name, obj) {
+			delete(errs, name)
+		}
+	}
+	return errs
+}
+
+// parseFormData reads the posted form into a data map. obj is the record
+// being edited (nil when creating), and is passed only so read-only
+// fields can be resolved: a read-only field is skipped entirely, so a
+// crafted POST naming it cannot write it. Omitting the input from the
+// form is presentation; this is the enforcement.
+func parseFormData(c *fiber.Ctx, modelAdmin core.ModelAdmin, obj any) map[string]any {
 	data := make(map[string]any, len(modelAdmin.FormFields()))
 	for _, name := range modelAdmin.FormFields() {
+		if modelAdmin.IsReadOnly(name, obj) {
+			continue
+		}
 		field, _ := modelAdmin.Field(name)
 		switch field.Type {
 		case core.FieldTypeBoolean:
@@ -163,8 +189,8 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *R
 		if result != authOK {
 			return writeAuthError(c, result)
 		}
-		data := parseFormData(c, modelAdmin)
-		errs := modelAdmin.Validate(data)
+		data := parseFormData(c, modelAdmin, nil)
+		errs := validateWritable(modelAdmin, data, nil)
 		if len(errs) > 0 {
 			relOptions := computeRelationOptions(admin, modelAdmin, nil)
 			var html string
@@ -231,8 +257,8 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Ren
 		if core.IsNil(obj) {
 			return c.Status(fiber.StatusNotFound).SendString("Not found")
 		}
-		data := parseFormData(c, modelAdmin)
-		errs := modelAdmin.Validate(data)
+		data := parseFormData(c, modelAdmin, obj)
+		errs := validateWritable(modelAdmin, data, obj)
 		if len(errs) > 0 {
 			relOptions := computeRelationOptions(admin, modelAdmin, obj)
 			var html string
@@ -458,7 +484,7 @@ func handleInlineCreate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 			return writeAuthError(c, result)
 		}
 
-		data := parseFormData(c, childAdmin)
+		data := parseFormData(c, childAdmin, nil)
 		data[inline.FKField] = stringOrEmpty(modelAdmin.GetPK(parentObj))
 		errs := childAdmin.Validate(data)
 		if len(errs) > 0 {
@@ -515,7 +541,7 @@ func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 			return c.Status(fiber.StatusNotFound).SendString("Not found")
 		}
 
-		data := parseFormData(c, childAdmin)
+		data := parseFormData(c, childAdmin, nil)
 		data[inline.FKField] = stringOrEmpty(modelAdmin.GetPK(parentObj))
 		errs := childAdmin.Validate(data)
 		if len(errs) > 0 {

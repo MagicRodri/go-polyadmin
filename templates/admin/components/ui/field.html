@@ -41,7 +41,14 @@
     {{.Label}}{{if .Required}}<span class="{{ui "field" "required"}}" aria-hidden="true">*</span>{{end}}
   </label>
   <div class="{{ui "field" "control"}}">
-    {{if eq .Type "text"}}
+    {{/* Read-only wins over every type branch below: the field renders
+         as its value with no control at all, and posts nothing. The
+         handler refuses the name too (see parseFormData) -- omitting
+         the input here is presentation, not protection. */}}
+    {{if .ReadOnlyField}}
+    <p class="{{ui "field" "readonly"}}">{{if .StringValue}}{{.StringValue}}{{else}}&mdash;{{end}}</p>
+
+    {{else if eq .Type "text"}}
     <textarea id="field-{{.Name}}" name="{{.Name}}" placeholder="{{.Placeholder}}" autocomplete="off"
               {{if .Required}}required{{end}} {{if .ReadOnly}}readonly{{end}} {{if .Disabled}}disabled{{end}}
               class="{{ui "textarea"}}">{{.StringValue}}</textarea>
