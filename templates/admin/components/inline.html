@@ -1,13 +1,8 @@
-{{/* Inline related records (Django-admin StackedInline/TabularInline
-     style) -- see core/inline.go and docs/inlines.md. One
-     inlineSectionData per ModelAdmin.Inlines() declaration;
-     "inlineSection" dispatches on .Mode (placeholder/readonly/edit)
-     and .Layout (stacked/tabular). Cells are already fully rendered
-     template.HTML by the time these defines run (see
-     render.go:buildInlineSections) -- which builder function ran
-     (formInputHTML/inlineTableCellHTML/fieldValueHTML/
-     inlineDetailRowHTML) already encodes the Stacked-vs-Tabular
-     difference, so these defines just print and wrap. */}}
+{{/* Inline related records -- see core/inline.go and docs/inlines.md.
+     One section per Inlines() declaration; "inlineSection" dispatches
+     on .Mode and .Layout. Cells arrive already rendered, and which
+     builder ran encodes the stacked-vs-tabular difference, so these
+     defines only print and wrap. */}}
 
 {{define "inlineSection"}}
 <div id="inline-{{.Slug}}" class="mt-8">
@@ -62,6 +57,10 @@
 {{define "inlineTable"}}
 {{$slug := .Slug}}
 <div class="{{ui "table" "wrapper"}}">
+{{/* The wrapper is overflow-hidden (it owns the rounded border), so
+     without this the table is clipped at the card's edge and the row's
+     own actions become unreachable. */}}
+<div class="{{ui "table" "scroll"}}">
 <table class="min-w-full divide-y divide-border">
   <thead class="bg-muted/50"><tr>
     {{range .Columns}}<th class="{{ui "table" "th-compact"}}">{{.Label}}</th>{{end}}
@@ -106,6 +105,9 @@
     {{end}}
   </tbody>
 </table>
+</div>
+{{/* The empty state sits outside the scroller: there is nothing to
+     scroll, and a centred message inside a scrolling box drifts. */}}
 {{if and (not .Rows) (not .AddRow)}}
 <p class="{{ui "table" "empty"}}">No {{.Label}}.</p>
 {{end}}

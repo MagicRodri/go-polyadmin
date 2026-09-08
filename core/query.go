@@ -6,9 +6,8 @@ import (
 	"strings"
 )
 
-// ListRequest is the query pipeline's input: search -> filters
-// -> ordering. ExecuteListQuery is deliberately independent of
-// pagination so the same filtered/ordered result set can back the list
+// ListRequest is the query pipeline's input: search -> filters ->
+// ordering, independent of pagination so one result set can back the list
 // view, an export, or a custom action.
 type ListRequest struct {
 	Search   string
@@ -16,10 +15,9 @@ type ListRequest struct {
 	Ordering string
 	Page     int
 	PageSize int
-	// Unlimited asks for every matching row rather than one page --
-	// what an export wants. It overrides Page/PageSize rather than
-	// being expressed as PageSize 0, so "unset" and "all" stay
-	// distinguishable.
+	// Unlimited asks for every matching row, which is what an export wants.
+	// It overrides Page/PageSize rather than being PageSize 0, so "unset" and
+	// "all" stay distinguishable.
 	Unlimited bool
 }
 
@@ -27,6 +25,11 @@ type ListRequest struct {
 // matches the handlers' own query-string default, so a ListRequest
 // built by hand and one parsed from a URL page the same way.
 const DefaultPageSize = 25
+
+// DefaultEmptyValue stands in for a nil or blank value on the list and
+// detail views -- an em dash, which reads as "nothing here" rather than
+// as an empty cell that might be a rendering bug.
+const DefaultEmptyValue = "\u2014"
 
 // Window converts the request's page into the (offset, limit) pair a
 // data source wants. A limit of 0 means no limit -- see Unlimited.
@@ -45,20 +48,14 @@ func (r ListRequest) Window() (offset, limit int) {
 	return (page - 1) * size, size
 }
 
-// ListQuerier is an optional ModelAdmin capability. Implement it to
-// resolve the whole list query -- search, filters, ordering and the
-// page window -- in the data source itself, typically as one SQL query,
-// instead of letting the framework do it in memory over everything
-// GetQueryset returns.
+// ListQuerier is an optional ModelAdmin capability: implement it to
+// resolve search, filters, ordering and the page window in the data source
+// itself, rather than in memory over everything GetQueryset returns.
 //
-// It is all-or-nothing by design: when a ModelAdmin implements this,
-// the framework applies *nothing* further, because it cannot tell what
-// the implementation already did and re-applying would double-filter.
-// The returned total is the count of rows matching search+filters
-// before the window, which is what pagination displays.
-//
-// A ModelAdmin that does not implement it keeps the in-memory path,
-// unchanged.
+// All-or-nothing by design. The framework applies nothing further, because
+// it cannot tell what the implementation already did and re-applying would
+// double-filter. The returned total counts rows matching search+filters
+// before the window. Not implementing it keeps the in-memory path.
 type ListQuerier interface {
 	ListPage(ctx context.Context, req ListRequest) (objects []any, total int, err error)
 }
@@ -166,26 +163,33 @@ func ExecuteListQuery(modelAdmin ModelAdmin, objects []any, req ListRequest) []a
 	return objects
 }
 
-// ListObjects resolves a list query, and is the only place that decides
-// how. A ModelAdmin implementing core.ListQuerier answers it itself --
-// one query in its own data source, with nothing re-applied here,
-// because we cannot tell what it already did. Everything else falls
-// back to loading the queryset and filtering it in memory.
-//
-// Every consumer goes through here (list view, both exports, the
-// autocomplete lookup, relation option lists), so the two paths cannot
-// drift: the request's Window is what distinguishes "one page" from
-// "capped at 20" from "every matching row".
-//
-// Returns the objects for the requested window and the total matching
-// rows before it, which is what pagination needs.
-func ListObjects(ctx context.Context, modelAdmin ModelAdmin, req ListRequest) ([]any, int, error) {
-	// Resolved here rather than inside the in-memory branch so a
-	// ListQuerier is told about it too -- it is part of the question,
-	// not part of the answer.
+// ApplyDefaults fills in the ModelAdmin's ordering and page size where the
+// request named neither. Resolved before the query runs so a ListQuerier
+// is told about them too: they are part of the question, not the answer.
+// Idempotent, so a caller needing the resolved values can apply it once
+// and pass the same request on.
+func ApplyDefaults(modelAdmin ModelAdmin, req ListRequest) ListRequest {
 	if req.Ordering == "" {
 		req.Ordering = modelAdmin.DefaultOrdering()
 	}
+	// Not for an unlimited request: that deliberately has no page.
+	if !req.Unlimited && req.PageSize < 1 {
+		req.PageSize = modelAdmin.PageSize()
+	}
+	return req
+}
+
+// ListObjects resolves a list query and is the only place that decides
+// how: a core.ListQuerier answers it itself, everything else loads the
+// queryset and filters in memory.
+//
+// Every consumer goes through here -- list view, both exports, the
+// autocomplete lookup, relation option lists -- so the paths cannot drift;
+// the request's Window is what separates "one page" from "capped at 20"
+// from "every matching row". Returns the window's objects and the total
+// before it.
+func ListObjects(ctx context.Context, modelAdmin ModelAdmin, req ListRequest) ([]any, int, error) {
+	req = ApplyDefaults(modelAdmin, req)
 	if querier, ok := modelAdmin.(ListQuerier); ok {
 		return querier.ListPage(ctx, req)
 	}

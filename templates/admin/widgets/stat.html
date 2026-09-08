@@ -1,14 +1,10 @@
-{{/* Headline number + period-over-period change, adapted from
-     Flowbite's admin-dashboard "Sales this week" card. Mirrors the
-     Python adapter's widgets/stat.html.
+{{/* Headline number plus period-over-period change.
 
      Green/red here are deliberate, unlike in widgets/donut.html which
-     avoids them: a delta really is a good/bad signal, so it should
-     read in the same colors as toasts.html's success/danger -- the
-     emerald pair (which has no shadcn token to defer to, so it names
-     an explicit dark variant) and the destructive token. The arrow
-     carries the direction too, so the meaning survives for anyone who
-     can't separate the two hues. */}}
+     avoids them: a delta really is a good/bad signal, so it reads in
+     the same colours as a success/danger toast. The arrow carries the
+     direction too, so the meaning survives for anyone who cannot
+     separate the two hues. */}}
 {{define "admin/widgets/stat.html"}}
 <div class="flex items-end justify-between gap-3">
   <p class="{{ui "text" "metric"}}">{{.Value}}</p>

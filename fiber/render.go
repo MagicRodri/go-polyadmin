@@ -1,8 +1,6 @@
-// Package fiber is the Fiber adapter: it mounts an
-// *core.Admin as routes on a *fiber.App. Rendering here mirrors the
-// Python FastAPI adapter's polyadmin/templating.py + polyadmin/core/template_context.py,
-// but field/form HTML is built in Go (render_helpers.go) rather than
-// inside the html/template files, for tighter control over escaping.
+// Package fiber mounts a *core.Admin as routes on a *fiber.App. Field and
+// form HTML is built in Go (render_helpers.go) rather than in the
+// html/template files, for tighter control over escaping.
 package fiber
 
 import (
@@ -34,10 +32,8 @@ type navLink struct {
 	Active bool
 }
 
-// navGroupIcon is fixed, not configurable per category -- a category
-// is just a string, not an object with its own settings -- so every
-// accordion section uses the same icon, distinct from any resource's
-// own icon (which nested links keep showing, see buildNav).
+// navGroupIcon is fixed, not per-category: a category is a string, not an
+// object with settings of its own.
 const navGroupIcon = "folder"
 
 // navGroup is one category's accordion section -- ModelAdmins and
@@ -67,23 +63,18 @@ type permissions struct {
 	CanExport bool
 }
 
-// breadcrumb is one entry in a page's trail (components rendered by
-// base.html). URL == "" means not a link (either the category
-// segment, which has no route of its own, or the current/active
-// page); Active distinguishes the two -- only the active crumb gets
-// the bold "current page" styling. base.html always prepends an
-// implicit home-icon crumb linking to the dashboard, so breadcrumb
-// lists here never include it.
+// breadcrumb is one entry in a page's trail. An empty URL means not a link
+// (a category segment has no route; the current page needs none), and
+// Active tells those two apart. base.html prepends the home crumb itself,
+// so these lists never include it.
 type breadcrumb struct {
 	Label  string
 	URL    string
 	Active bool
 }
 
-// categoryBreadcrumb is the category crumb, if any -- always the
-// first segment after the implicit home crumb, never a link (there's
-// no route for a category by itself) and never the active/current-page
-// crumb.
+// categoryBreadcrumb is the category crumb, if any: the first segment
+// after the home crumb, never a link and never active.
 func categoryBreadcrumb(category string) []breadcrumb {
 	if category == "" {
 		return nil
@@ -103,11 +94,9 @@ type pageBase struct {
 	Title     string
 	Header    string
 	BasePath  string
-	// CurrentSlug is the bare resource slug for a ModelAdmin view
-	// ("" for the dashboard or a custom page) -- used directly by
-	// form.html/delete.html to link back to the resource's list view.
-	// CurrentNavKey is the sidebar-active-highlight key ("resource:"+
-	// slug, "page:"+path, or "" for the dashboard); see buildNav.
+	// CurrentSlug is the bare resource slug, used by form.html/delete.html to
+	// link back to the list view. CurrentNavKey is the sidebar highlight key
+	// ("resource:"+slug, "page:"+path, or "").
 	CurrentSlug   string
 	CurrentNavKey string
 	NavItems      []navEntry
@@ -121,14 +110,11 @@ type pageBase struct {
 	CanSignOut bool
 }
 
-// buildNav returns ordered sidebar entries: flat links and
-// category-grouped accordion sections, interleaved in
-// first-registration-appearance order across ModelAdmins and
-// AdminPages -- mirrors the Python adapter's
-// template_context.py:build_nav. ModelAdmins with CanView()==false and
-// AdminPages with HideFromNav==true are omitted. A group's own
-// Expanded flag (seeding the accordion's initial Alpine `open` state)
-// is true iff any of its links is the current page.
+// buildNav returns sidebar entries, flat links and category groups
+// interleaved in first-registration order. Entries the principal cannot
+// view, and pages with HideFromNav, are omitted. A group's Expanded flag
+// seeds the accordion's initial Alpine `open` state and is true iff it
+// holds the current page.
 func (r *Renderer) buildNav(activeKey string) []navEntry {
 	var order []navEntry
 	groupIndex := map[string]int{}
@@ -191,10 +177,9 @@ func (r *Renderer) pageBase(principal *core.Principal, csrfToken, title, header,
 	}
 }
 
-// objectLabel is a short human-readable label for an object in a
-// breadcrumb trail. Prefers the first SearchFields entry (usually the
-// most identifying field, e.g. "email") over the first ListDisplay
-// column (often the primary key), falling back to the primary key.
+// objectLabel names an object in a breadcrumb trail: the first
+// SearchFields entry (usually the most identifying), else the first
+// ListDisplay column, else the primary key.
 func objectLabel(modelAdmin core.ModelAdmin, obj any) string {
 	names := modelAdmin.SearchFields()
 	if len(names) == 0 {
@@ -262,34 +247,25 @@ type Renderer struct {
 	lookup         *template.Template
 	inlineFragment *template.Template
 
-	// uiSet holds just the shadcn-derived component partials, so Go
-	// code that builds HTML directly (render_helpers.go's
-	// formInputHTML) can still render one -- the date field's Calendar
-	// popover -- instead of duplicating its markup as a Go string. See
-	// uiHTML.
+	// uiSet holds the component partials alone, so Go code building HTML
+	// directly (formInputHTML's Calendar popover) can render one instead of
+	// duplicating its markup as a Go string.
 	uiSet *template.Template
 
-	// templateDirs are application-supplied override directories,
-	// searched in the order given before the framework's own embedded
-	// templates -- see WithTemplateDirs and docs/templates.md. Empty
-	// unless an application opts in.
+	// templateDirs are application override directories, searched in order
+	// before the embedded templates. See WithTemplateDirs.
 	templateDirs []string
 
-	// overrideCache holds per-(ModelAdmin slug, view, resolved file)
-	// template sets built by contentTemplate, since -- unlike the
-	// eagerly-built framework defaults above -- they're resolved lazily
-	// on first use. A *template.Template is safe for concurrent
-	// ExecuteTemplate calls once built, but building/caching it needs
-	// its own lock since Fiber handlers run concurrently.
+	// overrideCache holds template sets contentTemplate resolves lazily. A
+	// built *template.Template is safe for concurrent execution, but building
+	// and caching one needs the lock, since handlers run concurrently.
 	overrideMu    sync.RWMutex
 	overrideCache map[string]*template.Template
 }
 
-// layoutFiles are the framework templates every full-page template set
-// needs: the layout itself, the theme's token/dark-mode block, and the
-// two globally-teleported overlays. Kept as one list so adding a shared
-// partial doesn't mean editing six ParseFS calls (and forgetting the
-// override path in contentTemplate/PageTemplate).
+// layoutFiles are the templates every full-page set needs. One list, so
+// adding a shared partial doesn't mean editing six ParseFS calls and
+// forgetting the override path.
 var layoutFiles = []string{
 	"admin/base.html",
 	"admin/theme.html",
@@ -297,28 +273,22 @@ var layoutFiles = []string{
 	"admin/components/action_confirm_modal.html",
 }
 
-// uiComponentsGlob matches the shadcn-derived component partials (see
-// plan/shadcnui-usage.md §5). Parsed into every template set -- unlike
-// the `ui` template func, which only yields a class string, these are
-// whole markup+Alpine blocks (dialog, sheet, dropdown, tooltip, ...)
-// invoked as {{template "ui/dialog" dict ...}}.
+// uiComponentsGlob matches the component partials, parsed into every
+// template set. Unlike the `ui` func, which yields a class string, these
+// are whole markup+Alpine blocks: {{template "ui/dialog" dict ...}}.
 const uiComponentsGlob = "admin/components/ui/*.html"
 
-// sharedPartials are framework partials that are not shadcn components
-// and so live outside uiComponentsGlob, but that any template set may
-// invoke. They go into every set, fragment sets included: csrf-field is
-// used by ui/bulk-actions, and Go resolves {{template}} names at
-// execution time, so a set that parses a component without its
-// dependencies fails only when that page is actually rendered.
+// sharedPartials are non-component framework partials any set may invoke.
+// They go into every set, fragments included: Go resolves {{template}}
+// names at execution time, so a set missing a dependency fails only when
+// that page is rendered.
 var sharedPartials = []string{
 	"admin/components/csrf-field.html",
 }
 
 // listPartials is the list view's file set. The page template is a shim
-// over components/list_content.html -- the swappable #resource-list
-// region, which the fragment route renders on its own -- exactly as the
-// Python adapter splits it, so the same three filenames mean the same
-// three things in both repositories.
+// over components/list_content.html, the swappable #resource-list region
+// the fragment route renders on its own.
 var listPartials = []string{
 	"admin/components/search.html",
 	"admin/components/list_content.html",
@@ -396,10 +366,9 @@ func NewRenderer(admin *core.Admin, basePath string, templateDirs ...string) (*R
 	return r, nil
 }
 
-// uiHTML renders one shadcn-derived component partial to HTML, for the
-// Go-built markup in render_helpers.go. Returns template.HTML because
-// the caller is assembling a larger HTML string by hand -- the partial's
-// own output is already escaped by html/template.
+// uiHTML renders one component partial for the Go-built markup in
+// render_helpers.go. It returns template.HTML because the caller assembles
+// a larger string by hand and the partial's output is already escaped.
 func (r *Renderer) uiHTML(name string, data any) (template.HTML, error) {
 	var buf bytes.Buffer
 	if err := r.uiSet.ExecuteTemplate(&buf, name, data); err != nil {
@@ -408,20 +377,15 @@ func (r *Renderer) uiHTML(name string, data any) (template.HTML, error) {
 	return template.HTML(buf.String()), nil
 }
 
-// templateCandidates mirrors the Python adapter's
-// ModelAdmin.get_template_candidates(view): an explicit override,
-// then a resource-specific template, then the framework default, in
-// that priority order.
-// frameworkViewTemplate is the built-in template for a resource view.
-// It sits under admin/resource/ -- the same namespace a resource's own
-// override lives in (admin/resource/{slug}/{view}.html) -- so the
-// default and its overrides are neighbours rather than the default
-// sitting a directory above. Matches the Python adapter's layout
-// file-for-file.
+// frameworkViewTemplate is the built-in template for a resource view. It
+// sits under admin/resource/, the same namespace a resource's own
+// override lives in, so the two are neighbours.
 func frameworkViewTemplate(view string) string {
 	return "admin/resource/" + view + ".html"
 }
 
+// templateCandidates returns, in priority order: an explicit override, a
+// resource-specific template, then the framework default.
 func templateCandidates(modelAdmin core.ModelAdmin, view string) []string {
 	candidates := make([]string, 0, 3)
 	if override := modelAdmin.TemplateOverride(view); override != "" {
@@ -434,10 +398,8 @@ func templateCandidates(modelAdmin core.ModelAdmin, view string) []string {
 	return candidates
 }
 
-// resolveContentSource finds the first candidate that exists, checking
-// the application's own template dirs (in the order given to
-// WithTemplateDirs) before the framework's embedded templates --
-// mirrors Jinja's FileSystemLoader search order in the Python adapter.
+// resolveContentSource returns the first candidate that exists, checking
+// the application's template dirs before the embedded ones.
 func (r *Renderer) resolveContentSource(candidates []string) (name string, source fs.FS, err error) {
 	for _, candidate := range candidates {
 		for _, dir := range r.templateDirs {
@@ -452,15 +414,11 @@ func (r *Renderer) resolveContentSource(candidates []string) (name string, sourc
 	return "", nil, fmt.Errorf("polyadmin: no template found among candidates %v", candidates)
 }
 
-// contentTemplate returns the *template.Template to render `view` for
-// `modelAdmin` with: `fallback` (one of the framework-default sets
-// built eagerly in NewRenderer) unless an explicit override or a
-// resource-specific template file actually resolves to something else,
-// in which case a fresh base+toasts+modal+content set is built (from
-// whichever filesystem the winning candidate came from) and cached for
-// reuse. Applications that never configure WithTemplateDirs or set a
-// ModelAdmin's own *Template field pay no extra cost here -- they hit
-// the fallback on the first check and never reach the cache at all.
+// contentTemplate returns the template to render `view`: the eagerly-built
+// `fallback`, unless an override or resource-specific file resolves to
+// something else, in which case a fresh set is built from whichever
+// filesystem won and cached. An application that configures neither hits
+// the fallback on the first check and never reaches the cache.
 func (r *Renderer) contentTemplate(modelAdmin core.ModelAdmin, view string, fallback *template.Template) (*template.Template, error) {
 	if len(r.templateDirs) == 0 && modelAdmin.TemplateOverride(view) == "" {
 		return fallback, nil
@@ -490,10 +448,8 @@ func (r *Renderer) contentTemplate(modelAdmin core.ModelAdmin, view string, fall
 		// {{template "inlineSection" .}} -- see components/inline.html.
 		baseFiles = append(baseFiles, "admin/components/inline.html")
 	}
-	// The partials the framework's own page templates are shims over, so
-	// an override that keeps most of a page can invoke them by name --
-	// {{template "listContent" .}}, {{template "search" .}},
-	// {{template "formWrapper" .}} -- instead of copying their markup.
+	// The partials the page templates are shims over, so an override keeping
+	// most of a page can invoke them by name instead of copying their markup.
 	switch view {
 	case "list":
 		baseFiles = append(baseFiles, "admin/components/search.html", "admin/components/list_content.html")
@@ -517,16 +473,26 @@ func (r *Renderer) contentTemplate(modelAdmin core.ModelAdmin, view string, fall
 	return tmpl, nil
 }
 
-// -- list -------------------------------------------------------------
+// scrollAreaCell bounds a many-to-many cell in a tabular inline. A comma-
+// joined run of links wraps in a table cell: three roles made the row
+// three lines tall and pushed its own actions off the edge. A ScrollArea
+// keeps row height a function of the table rather than of whichever record
+// has the most relations. Only many-to-many; every other field is a single
+// value that either fits or is worth wrapping.
+func scrollAreaCell(field core.Field, value template.HTML) template.HTML {
+	if field.Type != core.FieldTypeManyToMany {
+		return value
+	}
+	return template.HTML(`<span class="`+mustUI("scroll-area", "x")+`">`) + value + template.HTML(`</span>`)
+}
 
 type columnHeader struct {
 	Label     string
 	NextSort  string
 	Indicator string
-	// Sort dropdown (shadcn Tasks example's DataTableColumnHeader):
-	// explicit Asc/Desc choices rather than a link that cycles, so a
-	// click's effect is knowable before making it. Direction is "asc",
-	// "desc", or "" when this column isn't the one being sorted by.
+	// Explicit Asc/Desc choices rather than a link that cycles, so a click's
+	// effect is knowable before making it. Direction is "asc", "desc", or ""
+	// when this column isn't the sort column.
 	Direction string
 	AscURL    string
 	DescURL   string
@@ -608,12 +574,9 @@ type listData struct {
 	// narrowing it to.
 	ResetURL         string
 	HasActiveFilters bool
-	// ActiveFilterCount is how many declared filters are currently
-	// narrowing the list -- the badge on the Filters trigger, so the
-	// panel says how much it's hiding without being opened. Counted
-	// here rather than in the template because html/template has no
-	// arithmetic; search isn't included, since it has its own visible
-	// box in the toolbar.
+	// ActiveFilterCount badges the Filters trigger, so the panel says how
+	// much it hides without being opened. Counted here because html/template
+	// has no arithmetic. Search is excluded: it has its own visible box.
 	ActiveFilterCount int
 	Ordering          string
 	ExportQuery       string
@@ -664,16 +627,14 @@ func (r *Renderer) buildListData(
 		cells := make([]template.HTML, 0, len(modelAdmin.ListDisplay()))
 		for _, name := range modelAdmin.ListDisplay() {
 			field, _ := modelAdmin.Field(name)
-			cells = append(cells, fieldValueHTML(r.admin, r.basePath, relationPermissions, field, field.GetValue(obj)))
+			cells = append(cells, fieldValueHTML(r.admin, r.basePath, relationPermissions, field, field.GetValue(obj), modelAdmin.EmptyValue()))
 		}
 		rows = append(rows, listRow{PK: modelAdmin.GetPK(obj), Cells: cells})
 	}
 
-	// Django-admin-style filter sidebar: each choice is a link, not a
-	// <select> option, so every choice needs its own
-	// URL carrying search/ordering/other-filters and only changing the
-	// one filter it represents (page resets to 1, matching search/sort
-	// links elsewhere on this page).
+	// Each choice is a link, not a <select> option, so each needs its own URL
+	// carrying search/ordering/other filters and changing only the one it
+	// represents. Page resets to 1, as search and sort do.
 	filterControls := make([]filterControl, 0, len(modelAdmin.Filters()))
 	for _, filter := range modelAdmin.Filters() {
 		current := req.Filters[filter.Name()]
@@ -800,11 +761,9 @@ func exportQuery(req core.ListRequest) string {
 	return q.values
 }
 
-// filterChoiceURL is one link in the Django-admin-style filter sidebar
-// (list.html): search, ordering, and every other filter are carried
-// over unchanged; filterName is set to value (or omitted entirely when
-// value is "", meaning the choice clears that filter). Page is
-// deliberately omitted, resetting to page 1, matching search/sort.
+// filterChoiceURL is one link in the filter sidebar: everything else
+// carries over unchanged, filterName is set to value, and an empty value
+// clears that filter. Page is omitted, resetting to 1.
 func filterChoiceURL(basePath, slug string, req core.ListRequest, filterName, value string) string {
 	filters := make(map[string]string, len(req.Filters))
 	for name, other := range req.Filters {
@@ -825,10 +784,9 @@ var pageSizeChoices = [...]int{10, 25, 50, 100}
 
 const defaultPageSize = 25
 
-// listURLOpts overrides individual parameters of the current list
-// request. Go has no keyword arguments, so each override pairs with a
-// Has* flag -- otherwise "clear the search" and "leave the search
-// alone" would both be the zero value.
+// listURLOpts overrides individual parameters of the current list request.
+// Each override pairs with a Has* flag: without one, "clear the search"
+// and "leave it alone" would both be the zero value.
 type listURLOpts struct {
 	Search     string
 	HasSearch  bool
@@ -841,12 +799,10 @@ type listURLOpts struct {
 	HasSize    bool
 }
 
-// listURL builds one list-view URL, carrying over every parameter from
-// the current request except those explicitly overridden. Every control
-// on the list page (filters, sort, paging, rows-per-page, reset) is a
-// link, so they all need the same "keep what's there, change one thing"
-// rule; building it once here is what keeps the templates free of
-// query-string assembly. Mirrors the Python adapter's _list_url.
+// listURL carries over every parameter of the current request except those
+// overridden. Every control on the list page is a link needing the same
+// "keep what's there, change one thing" rule, so building it once here
+// keeps the templates free of query-string assembly.
 func listURL(basePath, slug string, req core.ListRequest, opts listURLOpts) string {
 	search := req.Search
 	if opts.HasSearch {
@@ -915,8 +871,6 @@ func (r *Renderer) RenderListFragment(principal *core.Principal, csrfToken strin
 	return buf.String(), nil
 }
 
-// -- detail -------------------------------------------------------------
-
 // A field's HelpText deliberately does not appear here: it explains how
 // to fill a field in, which is a question the form answers and the
 // detail page does not ask. See ui/field.html.
@@ -940,10 +894,10 @@ type detailData struct {
 	Actions        []actionInfo
 	Permissions    permissions
 	InlineSections []inlineSectionData
-	// History is empty unless the configured AuditLogger also reads
-	// back (core.AuditReader). A write-only logger records without
-	// surfacing anything here, which is a fine arrangement when the
-	// log's real consumer is elsewhere.
+	WideBody       bool
+	// History is empty unless the AuditLogger also reads back
+	// (core.AuditReader); a write-only logger is a fine arrangement when the
+	// log's consumer is elsewhere.
 	History []historyEntry
 }
 
@@ -993,7 +947,7 @@ func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, 
 		field, _ := modelAdmin.Field(name)
 		fields = append(fields, detailField{
 			Label: field.Label,
-			Value: fieldValueHTML(r.admin, r.basePath, relationPermissions, field, field.GetValue(obj)),
+			Value: fieldValueHTML(r.admin, r.basePath, relationPermissions, field, field.GetValue(obj), modelAdmin.EmptyValue()),
 		})
 	}
 	inlineSections, err := r.buildInlineSections(principal, modelAdmin, obj, "readonly", "", nil, nil, nil)
@@ -1009,6 +963,7 @@ func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, 
 		History:        r.historyFor(ctx, modelAdmin, obj),
 		Permissions:    perms,
 		InlineSections: inlineSections,
+		WideBody:       wideBody(inlineSections),
 	}
 	tmpl, err := r.contentTemplate(modelAdmin, "detail", r.detail)
 	if err != nil {
@@ -1020,8 +975,6 @@ func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, 
 	}
 	return buf.String(), nil
 }
-
-// -- form -------------------------------------------------------------
 
 type formData struct {
 	pageBase
@@ -1036,6 +989,7 @@ type formData struct {
 	NonFieldErrors []string
 	Fieldsets      []fieldsetData
 	InlineSections []inlineSectionData
+	WideBody       bool
 }
 
 // fieldsetData is one rendered group of form inputs. A group with an
@@ -1133,13 +1087,13 @@ func (r *Renderer) executeForm(
 		pageBase:    r.pageBase(principal, csrfToken, fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), formBreadcrumbs(modelAdmin, obj, r.basePath), nil),
 		VerboseName: modelAdmin.VerboseName(),
 		FormAction:  action,
-		// The edit form offers Delete in its action bar, so it needs the
-		// same permission map the detail page gets -- otherwise the
-		// button would render for a principal the authorizer would then
-		// reject at the route.
+		// The edit form offers Delete, so it needs the detail page's permission
+		// map: otherwise the button renders for a principal the route then
+		// rejects.
 		Permissions:    computePermissions(r.admin, principal, modelAdmin, obj),
 		Fieldsets:      fieldsets,
 		InlineSections: inlineSections,
+		WideBody:       wideBody(inlineSections),
 	}
 	if obj != nil {
 		data.Slug = modelAdmin.Slug()
@@ -1152,17 +1106,10 @@ func (r *Renderer) executeForm(
 	return buf.String(), nil
 }
 
-// -- inlines (Django-admin StackedInline/TabularInline style) -----------
-//
-// See core/inline.go and docs/inlines.md. inlineSectionData/
-// inlineRowData/inlineAddRowData carry pre-rendered template.HTML
-// cells (via formInputHTML/inlineTableCellHTML for editable rows,
-// fieldValueHTML/inlineDetailRowHTML for read-only ones) -- same
-// "pre-render in Go, template just prints" convention as
-// formData.Inputs/detailData.Fields. Which cell-building function
-// runs is decided here in Go by inline.Layout, not deferred to the
-// template, so admin/components/inline.html's stacked/tabular defines can stay a
-// uniform `{{range .Cells}}{{.}}{{end}}` either way.
+// Cells arrive pre-rendered, the same convention as formData.Inputs. Which
+// builder runs is decided here by inline.Layout rather than in the
+// template, so inline.html's stacked and tabular defines stay a uniform
+// `{{range .Cells}}{{.}}{{end}}`.
 
 type inlineColumn struct {
 	Name  string
@@ -1182,6 +1129,19 @@ type inlineAddRowData struct {
 	Cells     []template.HTML
 }
 
+// wideBody reports whether any inline section is tabular. A table needs
+// more than the max-w-xl a column of form fields wants -- squeezing one in
+// is what clipped its row actions -- so such a page gets ui "page" "body-
+// wide".
+func wideBody(sections []inlineSectionData) bool {
+	for _, section := range sections {
+		if section.Layout == core.InlineLayoutTabular {
+			return true
+		}
+	}
+	return false
+}
+
 type inlineSectionData struct {
 	Slug      string
 	Label     string
@@ -1189,28 +1149,20 @@ type inlineSectionData struct {
 	Mode      string // "placeholder" | "edit" | "readonly"
 	CanChange bool
 	CanDelete bool
-	// Columns holds header labels for the tabular layout only (column
-	// i corresponds to Rows[*].Cells[i] and AddRow.Cells[i]); the
-	// stacked layout doesn't need it since each cell already carries
-	// its own label (formInputHTML) or is wrapped with one
-	// (inlineDetailRowHTML).
+	// Columns holds header labels for the tabular layout only; column i
+	// matches Rows[*].Cells[i]. Stacked cells carry their own labels.
 	Columns []inlineColumn
 	Rows    []inlineRowData
 	AddRow  *inlineAddRowData // nil unless Mode == "edit" && the principal has the child's own create permission
 }
 
-// buildInlineSections builds one inlineSectionData per Inline the
-// principal may view -- reused by RenderForm/RenderFormFragment (via
-// executeForm), RenderDetail, and RenderInlineFragment, so all three
-// call sites can never drift out of sync (the same "full page and
-// fragment share the same context builder" principle this package's
-// own doc comment already states for list/form fragments).
+// buildInlineSections builds one inlineSectionData per viewable Inline.
+// Form, detail, and fragment rendering all go through it, so the three can
+// never drift apart.
 //
-// redisplayChildSlug/redisplayPK/redisplayData/redisplayErrs carry a
-// failed inline mutation's submitted values back into just the one
-// row (or the add-row, if redisplayPK is nil) being redisplayed --
-// zero values everywhere else, since only RenderInlineFragment ever
-// has a redisplay to show.
+// The redisplay* arguments carry a failed mutation's submitted values back
+// into the one row being redisplayed (the add-row if redisplayPK is nil),
+// and are zero everywhere but RenderInlineFragment.
 func (r *Renderer) buildInlineSections(
 	principal *core.Principal, modelAdmin core.ModelAdmin, obj any, mode string,
 	redisplayChildSlug string, redisplayPK any, redisplayData map[string]any, redisplayErrs map[string][]string,
@@ -1284,9 +1236,9 @@ func (r *Renderer) buildInlineSections(
 			} else {
 				for _, name := range detailNames {
 					field, _ := childAdmin.Field(name)
-					valueHTML := fieldValueHTML(r.admin, r.basePath, relPerms, field, field.GetValue(child))
+					valueHTML := fieldValueHTML(r.admin, r.basePath, relPerms, field, field.GetValue(child), childAdmin.EmptyValue())
 					if inline.Layout == core.InlineLayoutTabular {
-						cells = append(cells, valueHTML)
+						cells = append(cells, scrollAreaCell(field, valueHTML))
 					} else {
 						cells = append(cells, inlineDetailRowHTML(field.Label, valueHTML))
 					}
@@ -1337,11 +1289,9 @@ func (r *Renderer) buildInlineSections(
 	return out, nil
 }
 
-// RenderInlineFragment renders just the one inline section matching
-// inline.Child, standalone -- the response body for the three inline
-// create/update/delete routes (see fiber/handlers.go's
-// handleInlineCreate/Update/Delete), swapped into
-// #inline-{child_slug} via HTMX's outerHTML on every mutation.
+// RenderInlineFragment renders one inline section standalone: the response
+// body for the inline create/update/delete routes, swapped into
+// #inline-{child_slug} by htmx.
 func (r *Renderer) RenderInlineFragment(
 	principal *core.Principal, modelAdmin core.ModelAdmin, obj any, inline core.Inline,
 	redisplayPK any, redisplayData map[string]any, redisplayErrs map[string][]string,
@@ -1364,8 +1314,6 @@ func (r *Renderer) RenderInlineFragment(
 	return buf.String(), nil
 }
 
-// -- delete -------------------------------------------------------------
-
 type deleteData struct {
 	pageBase
 	VerboseName string
@@ -1387,8 +1335,6 @@ func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, mod
 	return buf.String(), nil
 }
 
-// -- dashboard -------------------------------------------------------------
-
 type renderedWidget struct {
 	Title string
 	Size  string
@@ -1401,9 +1347,8 @@ type dashboardData struct {
 	Widgets []renderedWidget
 }
 
-// widgetIcons maps a widget's Template() (see core/widget.go) to the
-// icon shown in its dashboard card badge, mirroring the Python side's
-// admin/dashboard.html widget_icons lookup.
+// widgetIcons maps a widget's Template() to the icon shown in its
+// dashboard card badge.
 var widgetIcons = map[string]string{
 	"admin/widgets/metric.html":   "metric",
 	"admin/widgets/progress.html": "progress",
@@ -1428,15 +1373,11 @@ type renderedPanel struct {
 // with a clear error instead of recursing until the stack runs out.
 const maxWidgetDepth = 8
 
-// widgetTemplate returns the *template.Template that defines
-// widget.Template()'s name: the framework's own pre-built set if it's
-// one of the built-in widgets, otherwise (application-supplied
-// WithTemplateDirs only) a freshly-resolved, cached one -- the same
-// "pay only if you use it" shape as contentTemplate, closing the
-// custom-widget-template gap that per-resource overrides alone don't
-// cover (widgets aren't tied to any one ModelAdmin). A custom widget's
-// template file must define a block named after its own Template()
-// value, the same convention the built-in widget templates use.
+// widgetTemplate returns the set defining widget.Template()'s name: the
+// pre-built one for a built-in widget, otherwise a resolved and cached set
+// from WithTemplateDirs. A custom widget's file must define a block named
+// after its own Template() value. Widgets aren't tied to a ModelAdmin, so
+// per-resource overrides can't cover them.
 func (r *Renderer) widgetTemplate(name string) (*template.Template, error) {
 	if r.widgets.Lookup(name) != nil {
 		return r.widgets, nil
@@ -1467,12 +1408,10 @@ func (r *Renderer) widgetTemplate(name string) (*template.Template, error) {
 	return nil, fmt.Errorf("polyadmin: no widget template named %q", name)
 }
 
-// renderWidgetBody executes one widget's template against its own
-// GetData. A widget implementing core.Container has its panels
-// rendered first and receives them as HTML instead: html/template
-// can't execute a template whose name is only known at runtime, so
-// the recursion has to happen out here rather than inside
-// admin/widgets/tabs.html.
+// renderWidgetBody executes one widget's template against its GetData. A
+// core.Container gets its panels rendered first and receives them as HTML:
+// html/template cannot execute a name known only at runtime, so the
+// recursion happens here rather than inside tabs.html.
 func (r *Renderer) renderWidgetBody(widget core.Widget, depth int) (template.HTML, error) {
 	if depth > maxWidgetDepth {
 		return "", fmt.Errorf("polyadmin: widget %q nests more than %d levels deep (a container widget's panels contain itself?)", widget.Template(), maxWidgetDepth)
@@ -1527,20 +1466,15 @@ func (r *Renderer) RenderDashboard(principal *core.Principal, csrfToken string, 
 	return buf.String(), nil
 }
 
-// -- pages ----------------------------------------------------------------
-
 type pageData struct {
 	pageBase
 	Page core.AdminPage
 	Data any // handler-supplied extra template data
 }
 
-// PageTemplate resolves and caches templateName for a custom AdminPage
-// the same way contentTemplate resolves a ModelAdmin override:
-// base+toasts+modal parsed from the framework's embedded FS, then
-// templateName parsed from the first WithTemplateDirs directory that
-// has it. Unlike ModelAdmin views, there's no framework-default
-// fallback -- a page template is always application-supplied.
+// PageTemplate resolves and caches an AdminPage's template the way
+// contentTemplate resolves an override. There is no framework default to
+// fall back on: a page template is always application-supplied.
 func (r *Renderer) PageTemplate(templateName string) (*template.Template, error) {
 	cacheKey := "page|" + templateName
 	r.overrideMu.RLock()
@@ -1572,10 +1506,8 @@ func (r *Renderer) PageTemplate(templateName string) (*template.Template, error)
 	return nil, fmt.Errorf("polyadmin: no page template named %q found in template dirs %v", templateName, r.templateDirs)
 }
 
-// RenderPage renders a custom AdminPage's own template inside the
-// shared admin layout (sidebar, breadcrumbs, flash toasts). data is
-// handed to the template as .Data, alongside .Page (the AdminPage
-// itself, for label/path access).
+// RenderPage renders an AdminPage's template inside the shared layout.
+// data reaches it as .Data, alongside .Page.
 func (r *Renderer) RenderPage(principal *core.Principal, csrfToken string, page core.AdminPage, templateName string, data any, messages []flashMessage) (string, error) {
 	tmpl, err := r.PageTemplate(templateName)
 	if err != nil {
@@ -1593,8 +1525,6 @@ func (r *Renderer) RenderPage(principal *core.Principal, csrfToken string, page 
 	}
 	return buf.String(), nil
 }
-
-// -- login ---------------------------------------------------------------
 
 // loginData is deliberately not a pageBase: nothing on this page comes
 // from the admin shell. There is no principal (that is the point), no
@@ -1627,8 +1557,6 @@ func (r *Renderer) RenderLogin(csrfToken, identifier, errorMessage, notice strin
 	}
 	return buf.String(), nil
 }
-
-// -- lookup -------------------------------------------------------------
 
 type lookupOption struct {
 	PK    any

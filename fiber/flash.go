@@ -7,8 +7,7 @@ import (
 )
 
 // flashMessage is a short-lived, cookie-carried notice that survives a
-// redirect and is rendered as a toast by the page it lands
-// on -- mirrors the Python adapter's admin/fastapi/responses.py.
+// redirect and is rendered as a toast by the page it lands on.
 type flashMessage struct {
 	Level string `json:"level"`
 	Text  string `json:"text"`

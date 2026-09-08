@@ -80,9 +80,17 @@ type inlineTestUser struct {
 	Email        string
 	IsActive     bool
 	Organization *inlineTestOrg
+	// A many-to-many so the inline's tabular layout is exercised with a
+	// multi-valued cell -- the case the ScrollArea exists for. []any by
+	// the adapter's "collections are []any" convention.
+	Teams []any
 }
 
 var inlineTestOrgRelation = core.Relation{Name: "Organization", Target: "organizations", DisplayField: "Name"}
+
+// Reuses the organizations admin as its target: the widget only cares
+// that a relation resolves to (pk, label) pairs.
+var inlineTestTeamsRelation = core.Relation{Name: "Teams", Target: "organizations", DisplayField: "Name", Cardinality: core.CardinalityMany}
 
 type inlineTestUserAdmin struct {
 	core.BaseModelAdmin
@@ -96,12 +104,13 @@ func newInlineTestUserAdmin(orgAdmin *inlineTestOrgAdmin) *inlineTestUserAdmin {
 		BaseModelAdmin: core.BaseModelAdmin{
 			ModelName:        "User",
 			DisplayFields:    []string{"ID", "Email", "IsActive", "Organization"},
-			DetailFieldNames: []string{"ID", "Email", "IsActive", "Organization"},
-			FormFieldNames:   []string{"Email", "IsActive", "Organization"},
+			DetailFieldNames: []string{"ID", "Email", "IsActive", "Organization", "Teams"},
+			FormFieldNames:   []string{"Email", "IsActive", "Organization", "Teams"},
 			DeclaredFields: []core.Field{
 				core.NewField("Email", core.FieldTypeEmail, core.WithRequired()),
 				core.NewField("IsActive", core.FieldTypeBoolean),
 				core.NewField("Organization", core.FieldTypeForeignKey, core.WithRelation(inlineTestOrgRelation)),
+				core.NewField("Teams", core.FieldTypeManyToMany, core.WithRelation(inlineTestTeamsRelation)),
 			},
 		},
 		store:    make(map[int]*inlineTestUser),
@@ -229,7 +238,19 @@ func TestInlineSectionReadonlyOnDetailPage(t *testing.T) {
 
 	resp := doGet(t, app, "/admin/organizations/"+strconv.Itoa(org.ID), nil)
 	text := body(t, resp)
+	// Bounded at the page's own action bar, not just "everything after
+	// the marker": the parent's record-action forms render further down
+	// the same page and carry hidden inputs of their own, which would
+	// make the assertion below fail for a reason that has nothing to do
+	// with the inline section.
 	section := strings.Split(text, `id="inline-users"`)[1]
+	pageActions, err := uiClasses("page", "actions")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	if idx := strings.Index(section, pageActions); idx >= 0 {
+		section = section[:idx]
+	}
 	if !strings.Contains(section, "a@example.com") {
 		t.Fatalf("expected seeded user, got %s", section)
 	}

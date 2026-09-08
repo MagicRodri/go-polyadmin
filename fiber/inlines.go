@@ -73,6 +73,12 @@ func excluding(names []string, exclude string) []string {
 	return out
 }
 
+// inlineMultiSelectRows is how many options a tabular inline's
+// many-to-many listbox shows before it scrolls. Four keeps the row
+// close to the height of the single-line controls beside it, which is
+// what makes the table read as rows rather than as stacked blocks.
+const inlineMultiSelectRows = 4
+
 // inlineTableCellHTML is a trimmed sibling of formInputHTML for the
 // tabular inline layout: a bare input/select, no <label>/wrapper <div>
 // (the column header <th> already carries the label; a <form> can't
@@ -83,7 +89,7 @@ func inlineTableCellHTML(basePath string, field core.Field, value any, errs []st
 	name := html.EscapeString(field.Name)
 	// Compact flavors of the same shadcn controls the full form uses.
 	fieldClasses := classInputCompact
-	selectClasses := classSelectSmall
+	selectClasses := classSelectCell
 
 	var b strings.Builder
 	switch field.Type {
@@ -103,11 +109,22 @@ func inlineTableCellHTML(basePath string, field core.Field, value any, errs []st
 		b.WriteString(`</select>`)
 
 	case core.FieldTypeManyToMany:
+		// Capped, and the cap is the whole point: sizing the listbox to
+		// the option count made every row as tall as the longest option
+		// list -- eight roles gave a 195px row, and three such rows
+		// filled the viewport. Past the cap a native <select multiple>
+		// scrolls internally, which is the ScrollArea behaviour here;
+		// the scroll-area classes only restyle that scrollbar onto the
+		// theme (see ui "scroll-area" and theme.html).
 		size := 1
 		if relation != nil && len(relation.Options) > size {
 			size = len(relation.Options)
 		}
-		fmt.Fprintf(&b, `<select multiple name="%s" autocomplete="off" size="%d" class="%s">`, name, size, classSelectAuto)
+		if size > inlineMultiSelectRows {
+			size = inlineMultiSelectRows
+		}
+		fmt.Fprintf(&b, `<select multiple name="%s" autocomplete="off" size="%d" class="%s %s">`,
+			name, size, classSelectMulti, classScrollAreaY)
 		if relation != nil {
 			for _, opt := range relation.Options {
 				selected := false

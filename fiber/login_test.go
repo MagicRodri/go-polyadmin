@@ -69,8 +69,6 @@ func newLoginApp(t *testing.T) (*fiber.App, *fakeLoginBackend) {
 	return newTestApp(t, admin), backend
 }
 
-// -- the gate -------------------------------------------------------------
-
 func TestUnauthenticatedRequestRedirectsToLogin(t *testing.T) {
 	app, _ := newLoginApp(t)
 	resp := doGet(t, app, "/admin/users", nil)
@@ -87,8 +85,6 @@ func TestUnauthenticatedRequestRedirectsToLogin(t *testing.T) {
 	}
 }
 
-// The query string is part of where they were going -- dropping it
-// would return someone to page 1 of an unsorted list after signing in.
 func TestLoginRedirectPreservesTheQueryString(t *testing.T) {
 	app, _ := newLoginApp(t)
 	resp := doGet(t, app, "/admin/users?page=3&sort=Email", nil)
@@ -97,10 +93,6 @@ func TestLoginRedirectPreservesTheQueryString(t *testing.T) {
 	}
 }
 
-// An expired session usually surfaces mid-page, on an htmx request. A
-// 303 there would be followed by htmx and swapped into the page as
-// content -- a login form inside a table cell. HX-Redirect navigates
-// the window instead.
 func TestUnauthenticatedHTMXRequestGetsHXRedirect(t *testing.T) {
 	app, _ := newLoginApp(t)
 	resp := doGet(t, app, "/admin/users", map[string]string{"HX-Request": "true"})
@@ -109,8 +101,6 @@ func TestUnauthenticatedHTMXRequestGetsHXRedirect(t *testing.T) {
 	}
 }
 
-// Without a LoginBackend there is nowhere to send anyone, so the
-// behaviour must be exactly what it was before login existed.
 func TestWithoutALoginBackendUnauthenticatedIsStill401(t *testing.T) {
 	admin := core.New(
 		core.WithModelAdmins(newTestUserAdmin()),
@@ -122,7 +112,6 @@ func TestWithoutALoginBackendUnauthenticatedIsStill401(t *testing.T) {
 	}
 }
 
-// ...and the login routes must not exist at all.
 func TestWithoutALoginBackendTheLoginRouteIsNotMounted(t *testing.T) {
 	app, _ := makeApp(t)
 	if resp := doGet(t, app, "/admin/login", nil); resp.StatusCode != fiber.StatusNotFound {
@@ -130,10 +119,6 @@ func TestWithoutALoginBackendTheLoginRouteIsNotMounted(t *testing.T) {
 	}
 }
 
-// -- the page -------------------------------------------------------------
-
-// The login page is reachable by someone with no session -- if it were
-// not, it could never be reached at all.
 func TestLoginPageIsPubliclyReachable(t *testing.T) {
 	app, _ := newLoginApp(t)
 	resp := doGet(t, app, "/admin/login", nil)
@@ -153,9 +138,6 @@ func TestLoginPageIsPubliclyReachable(t *testing.T) {
 	}
 }
 
-// It is the one page outside the admin shell: there is no principal
-// yet, so a sidebar listing resources would be both impossible to build
-// and a lie about what the visitor can reach.
 func TestLoginPageRendersWithoutTheAdminShell(t *testing.T) {
 	app, _ := newLoginApp(t)
 	page := body(t, doGet(t, app, "/admin/login", nil))
@@ -171,7 +153,6 @@ func TestLoginPageRendersWithoutTheAdminShell(t *testing.T) {
 	}
 }
 
-// The dropped login-04 controls: each would be a dead end.
 func TestLoginPageOmitsControlsWithNoRouteBehindThem(t *testing.T) {
 	app, _ := newLoginApp(t)
 	page := body(t, doGet(t, app, "/admin/login", nil))
@@ -181,8 +162,6 @@ func TestLoginPageOmitsControlsWithNoRouteBehindThem(t *testing.T) {
 		}
 	}
 }
-
-// -- signing in -----------------------------------------------------------
 
 func TestValidCredentialsBeginASessionAndReturnToNext(t *testing.T) {
 	app, backend := newLoginApp(t)
@@ -218,7 +197,6 @@ func TestInvalidCredentialsDoNotBeginASession(t *testing.T) {
 	}
 }
 
-// A wrong password must not cost the email as well.
 func TestFailedSignInEchoesTheIdentifierBack(t *testing.T) {
 	app, _ := newLoginApp(t)
 	resp := doPostForm(t, app, "/admin/login", url.Values{
@@ -230,7 +208,6 @@ func TestFailedSignInEchoesTheIdentifierBack(t *testing.T) {
 	}
 }
 
-// One message for both, or the form is an account enumerator.
 func TestUnknownUserAndWrongPasswordAreIndistinguishable(t *testing.T) {
 	app, _ := newLoginApp(t)
 	wrongPassword := body(t, doPostForm(t, app, "/admin/login", url.Values{
@@ -246,8 +223,6 @@ func TestUnknownUserAndWrongPasswordAreIndistinguishable(t *testing.T) {
 	}
 }
 
-// Credentials good, session store down: the visitor is not signed in
-// and must not be told they are.
 func TestSessionFailureDoesNotSignAnyoneIn(t *testing.T) {
 	app, backend := newLoginApp(t)
 	backend.beginErr = errStoreDown
@@ -263,8 +238,6 @@ func TestSessionFailureDoesNotSignAnyoneIn(t *testing.T) {
 	}
 }
 
-// The open-redirect guard, exercised through the actual route rather
-// than only against SafeNextURL directly.
 func TestSignInRefusesToRedirectOffSite(t *testing.T) {
 	app, _ := newLoginApp(t)
 	resp := doPostForm(t, app, "/admin/login?next=https%3A%2F%2Fevil.example", url.Values{
@@ -276,7 +249,6 @@ func TestSignInRefusesToRedirectOffSite(t *testing.T) {
 	}
 }
 
-// Nothing to do here for someone who already has a session.
 func TestLoginPageRedirectsAnAlreadySignedInVisitor(t *testing.T) {
 	app, _ := newLoginApp(t)
 	resp := doGet(t, app, "/admin/login", map[string]string{"Cookie": fakeSessionCookie + "=demo"})
@@ -285,10 +257,6 @@ func TestLoginPageRedirectsAnAlreadySignedInVisitor(t *testing.T) {
 	}
 }
 
-// -- signing out ----------------------------------------------------------
-
-// The control has to exist somewhere, or the only way out of the admin
-// is to clear cookies by hand.
 func TestSidebarOffersSignOutWhenALoginBackendIsConfigured(t *testing.T) {
 	app, _ := newLoginApp(t)
 	page := body(t, doGet(t, app, "/admin/users", map[string]string{"Cookie": fakeSessionCookie + "=demo"}))
@@ -301,8 +269,6 @@ func TestSidebarOffersSignOutWhenALoginBackendIsConfigured(t *testing.T) {
 	}
 }
 
-// Without a backend there is no logout route, so the control would be a
-// dead button.
 func TestSidebarOmitsSignOutWithoutALoginBackend(t *testing.T) {
 	admin := core.New(
 		core.WithModelAdmins(newTestUserAdmin()),
@@ -341,8 +307,6 @@ func TestLogoutEndsTheSessionAndSaysSo(t *testing.T) {
 	}
 }
 
-// A logout reachable by GET is one any <img src> on the internet can
-// fire at a signed-in admin.
 func TestLogoutRejectsGET(t *testing.T) {
 	app, backend := newLoginApp(t)
 	if resp := doGet(t, app, "/admin/logout", nil); resp.StatusCode != fiber.StatusMethodNotAllowed && resp.StatusCode != fiber.StatusNotFound {
@@ -352,8 +316,6 @@ func TestLogoutRejectsGET(t *testing.T) {
 		t.Error("a GET ended the session")
 	}
 }
-
-// -- helpers --------------------------------------------------------------
 
 var errStoreDown = &storeDownError{}
 

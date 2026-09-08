@@ -84,8 +84,6 @@ func TestListQuerierReceivesTheWholeRequest(t *testing.T) {
 	}
 }
 
-// The count the querier reports is what pagination believes -- it is
-// the whole point of returning it separately from the rows.
 func TestListQuerierTotalDrivesPagination(t *testing.T) {
 	ma := newQueryingUserAdmin()
 	app := newTestApp(t, core.New(core.WithModelAdmins(ma)))
@@ -96,7 +94,6 @@ func TestListQuerierTotalDrivesPagination(t *testing.T) {
 	}
 }
 
-// Export asks for every matching row, not the page the user was on.
 func TestExportAsksTheQuerierForEverything(t *testing.T) {
 	ma := newQueryingUserAdmin()
 	app := newTestApp(t, core.New(core.WithModelAdmins(ma)))
@@ -115,8 +112,6 @@ func TestExportAsksTheQuerierForEverything(t *testing.T) {
 	}
 }
 
-// The autocomplete caps its suggestions through the window, so a
-// querier applies the limit in its own query.
 func TestLookupAsksTheQuerierForACappedPage(t *testing.T) {
 	ma := newQueryingUserAdmin()
 	app := newTestApp(t, core.New(core.WithModelAdmins(ma)))
@@ -132,14 +127,6 @@ func TestLookupAsksTheQuerierForACappedPage(t *testing.T) {
 	}
 }
 
-// And the fallback still works: an admin with no ListPage keeps the
-// in-memory pipeline, windowed the same way.
-//
-// Both requests pin an explicit sort. The fixture stores rows in a map
-// and the framework has no default ordering, so without one each
-// request windows over a freshly randomised order and the two pages
-// legitimately overlap -- a property of the fixture, not a paging bug.
-// (That missing default ordering is a real gap; see the roadmap.)
 func TestAdminWithoutListPageStillPaginatesInMemory(t *testing.T) {
 	userAdmin := newTestUserAdmin()
 	for i := 0; i < 25; i++ {

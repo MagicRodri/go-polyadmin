@@ -1,20 +1,16 @@
 package main
 
-// A reference LoginBackend: cookie sessions over an in-memory user
-// table. Mirrors python-polyadmin/examples/fastapi/session.py.
+// A reference LoginBackend: cookie sessions over an in-memory user table.
 //
-// The admin owns the login *page* -- the form, the failure message, the
-// redirect back to where you were headed. It does not own the session,
-// which is why this file exists in the example rather than in the
-// framework: where a session lives is an application decision, and the
-// framework never needing a signing secret is what keeps it out of key
-// management. Swap this for whatever your app already has (a session
-// store, a JWT, an upstream IdP) and the admin's login page keeps
-// working unchanged.
+// The admin owns the login page but not the session, which is why this
+// lives in the example rather than the framework: where a session lives is
+// an application decision, and never needing a signing secret is what
+// keeps the framework out of key management. Swap it for whatever the app
+// already has and the login page keeps working.
 //
-// One type implements both halves on purpose: core.LoginBackend writes
-// the session, core.Authenticator reads it back. They have to agree on
-// the format, so they belong together.
+// One type implements both halves on purpose -- LoginBackend writes the
+// session, Authenticator reads it back, and they have to agree on the
+// format.
 
 import (
 	"crypto/hmac"
@@ -58,10 +54,8 @@ type demoAccount struct {
 	isSuperuser bool
 }
 
-// The example's two accounts. Two, not one, so the difference between a
-// superuser and an ordinary signed-in user is visible in the admin --
-// sign in as viewer@example.com and SuperuserAuthorizer starts refusing
-// things.
+// Two accounts, not one, so the difference between a superuser and an
+// ordinary signed-in user is visible in the admin.
 var demoCredentials = []struct {
 	email, password, displayName string
 	isSuperuser                  bool
@@ -70,20 +64,16 @@ var demoCredentials = []struct {
 	{"viewer@example.com", "polyadmin", "Demo Viewer", false},
 }
 
-// ReadOnlyForNonSuperusers is the example's Authorizer.
+// ReadOnlyForNonSuperusers grants reads to anyone signed in and reserves
+// writes for superusers.
 //
-// core.SuperuserAuthorizer would be the obvious choice and is the wrong
-// one here: it is all-or-nothing, so a signed-in non-superuser is
-// refused every permission -- including dashboard.view -- and sees a
-// bare "Permission denied." on every page. That makes the second demo
-// account useless, and makes the admin look broken rather than
-// permissioned.
-//
-// This grants reads to anyone signed in and reserves writes for
-// superusers, which is the smallest rule that actually shows the
-// permission system working: sign in as viewer@example.com and the
-// list's Add button, the row edit/delete controls and the custom Tools
-// page all disappear, because computePermissions asks this same
+// core.SuperuserAuthorizer is the obvious choice and the wrong one here:
+// being all-or-nothing, it refuses a signed-in non-superuser every
+// permission including dashboard.view, so the second demo account sees
+// "Permission denied." everywhere and the admin looks broken rather than
+// permissioned. This is the smallest rule that shows the permission system
+// working -- as viewer@example.com the Add button, the row controls and
+// the Tools page all disappear, because computePermissions asks this same
 // Authorizer which controls to render.
 type ReadOnlyForNonSuperusers struct{}
 
@@ -136,11 +126,10 @@ func NewCookieSessionBackend() *CookieSessionBackend {
 	return b
 }
 
-// sessionSecret keys the cookie signature. From the environment when
-// set; otherwise a fresh random one, which means sessions do not
-// survive a restart and would not be shared across replicas. That is
-// the right default for a demo and the wrong one for anything else,
-// hence the warning.
+// sessionSecret keys the cookie signature: from the environment when set,
+// otherwise a fresh random one, so sessions do not survive a restart and
+// are not shared across replicas. Right for a demo, wrong for anything
+// else, hence the warning.
 func sessionSecret() []byte {
 	if fromEnv := os.Getenv("ADMIN_SESSION_SECRET"); fromEnv != "" {
 		return []byte(fromEnv)
@@ -153,16 +142,14 @@ func sessionSecret() []byte {
 	return secret
 }
 
-// VerifyCredentials answers "are these good?" and nothing else -- it
-// does not touch the response. Establishing the session is
-// BeginSession's job, which is what lets the admin refuse to sign
-// someone in when the session store is broken.
+// VerifyCredentials answers "are these good?" and does not touch the
+// response. Establishing the session is BeginSession's job, which is what
+// lets the admin refuse to sign someone in when the store is broken.
 func (b *CookieSessionBackend) VerifyCredentials(request any, identifier, password string) *core.Principal {
 	account, found := b.accounts[strings.ToLower(strings.TrimSpace(identifier))]
 	if !found {
-		// Hash anyway. Returning early here would make "no such
-		// account" measurably faster than "wrong password", which is
-		// exactly the distinction core.LoginBackend asks
+		// Hash anyway: returning early would make "no such account" measurably
+		// faster than "wrong password", the distinction LoginBackend asks
 		// implementations not to leak.
 		account = demoAccount{salt: make([]byte, 16), hash: make([]byte, pbkdf2KeyLength)}
 	}
@@ -234,10 +221,9 @@ func (b *CookieSessionBackend) Authenticate(request any) *core.Principal {
 	}
 }
 
-// sign renders "<subject>|<expiry>|<mac>". The MAC covers the subject
-// and the expiry together, so neither can be edited independently --
-// signing only the subject would let anyone extend their own session
-// indefinitely.
+// sign renders "<subject>|<expiry>|<mac>". The MAC covers both together,
+// so neither can be edited alone: signing only the subject would let
+// anyone extend their own session indefinitely.
 func (b *CookieSessionBackend) sign(subject string, expires time.Time) string {
 	payload := subject + "|" + strconv.FormatInt(expires.Unix(), 10)
 	return payload + "|" + hex.EncodeToString(b.mac(payload))

@@ -80,9 +80,6 @@ func (denyDashboardAuthorizer) Can(principal *core.Principal, permission string,
 	return permission != core.DashboardView
 }
 
-// The tabs widget is the only one whose body is assembled by the
-// renderer rather than by its own template, so cover the round trip:
-// each panel's child widget must actually reach the page.
 func TestDashboardRendersNestedTabsPanels(t *testing.T) {
 	userAdmin := newTestUserAdmin()
 	dashboard := &core.Dashboard{

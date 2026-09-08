@@ -8,3 +8,9 @@ examples/fiber/admin-example-fiber
 # Editors / OS
 .DS_Store
 .idea/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -1,10 +1,7 @@
-{{/* Bulk-actions listbox, in its own file (not ui/table.html) so
-     components/list_content.html can put it beside the search bar
-     instead of stacked above the table -- row checkboxes still
-     reference the form it renders via the HTML form= attribute (see
-     ui/table.html), so the form itself never has to wrap the table.
-
-     Mirrors python-polyadmin/.../components/ui/bulk-actions.html. */}}
+{{/* Bulk-actions listbox, in its own file so list_content.html can put
+     it beside the search bar rather than stacked above the table. Row
+     checkboxes reference the form it renders through the HTML form=
+     attribute, so the form never has to wrap the table. */}}
 {{define "ui/bulk-actions"}}
 {{if .Actions}}
 <form id="bulk-actions-form" method="post" action="{{.BasePath}}/{{.Slug}}/actions/"

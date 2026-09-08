@@ -11,8 +11,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// -- per-object permissions ----------------------------------------------
-
 // ownRecordsOnly is the archetypal per-object rule: a principal may
 // change only the record whose Email matches their own. It answers on
 // the *resource* it is handed, which is a ModelAdmin for a coarse check
@@ -52,8 +50,6 @@ func TestPerObjectPermissionGatesTheEditForm(t *testing.T) {
 	}
 }
 
-// The gate has to hold on the write, not only on the form that leads to
-// it -- a denied principal can post straight to the route.
 func TestPerObjectPermissionGatesTheEditPost(t *testing.T) {
 	app, userAdmin, _, theirs := objectPermApp(t)
 	before := theirs.Email
@@ -79,8 +75,6 @@ func TestPerObjectPermissionGatesDeletion(t *testing.T) {
 	}
 }
 
-// A record you may see but not change must not be offered an Edit
-// button -- the controls follow the same per-object answer.
 func TestPerObjectPermissionHidesControlsOnTheDetailPage(t *testing.T) {
 	app, _, mine, theirs := objectPermApp(t)
 

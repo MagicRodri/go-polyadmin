@@ -1,18 +1,10 @@
-{{/* Select, ported from shadcn/ui (Radix Select) -- a styled trigger
-     + listbox for a plain, static choice list, the shadcn-equivalent
-     of a native <select>. Mirrors python-polyadmin/.../components/
-     ui/select.html and reuses the same trigger+listbox mechanics as
-     ui/bulk-actions.html, generalized into a value-holding form
-     control: a hidden input carries the posted value (matching
-     ui/field.html's relation combobox, which does the same for the
-     same reason -- Validate()/GetObject() never has to know a value
-     came from anything but a plain <select>), and Alpine owns only
-     open/close and which option is currently shown as the label.
+{{/* Select, ported from shadcn/ui -- a styled trigger and listbox for
+     a static choice list. A hidden input carries the posted value, so
+     Validate()/GetObject() never has to know it came from anything but
+     a plain <select>; Alpine owns only open/close and which option is
+     shown as the label.
 
-     Not used for <select multiple> (manytomany): a multi-value
-     combobox is a different control (shadcn ships no base component
-     for it either), so that field type keeps its native
-     <select multiple> for now.
+     Not used for manytomany, which keeps its native <select multiple>.
 
      Argument (via dict):
        .name         form field name
@@ -28,19 +20,15 @@
 {{$selected := ""}}
 {{range .options}}{{if .Selected}}{{$selected = .Label}}{{end}}{{end}}
 {{/* The initial label rides in as a data attribute and is read back
-     with $el.dataset in x-init, never interpolated into the x-data
-     expression: a label is arbitrary application text, and quoting it
-     into a JS string literal inside an HTML attribute is exactly the
-     trap ui/multi-select and the relation combobox avoid. (The Python
-     mirror hit it for real -- its tojson emitted a raw double quote
-     that closed the attribute early.) */}}
-{{/* Keyboard model: focus stays on the trigger and the arrow keys move a
-     highlight, which the trigger reports via aria-activedescendant --
-     rather than moving real DOM focus into the list. That matches the
-     relation combobox in ui/field.html (the codebase's existing
-     keyboard listbox) and means one focusable element instead of one
-     per option; the options are therefore tabindex="-1", so Tab leaves
-     the control instead of walking through every choice. */}}
+     with $el.dataset, never interpolated into the x-data expression: a
+     label is arbitrary application text, and quoting it into a JS
+     string inside an HTML attribute is a real trap -- a raw double
+     quote there closes the attribute early. */}}
+{{/* Focus stays on the trigger and the arrow keys move a highlight it
+     reports through aria-activedescendant, rather than moving real
+     focus into the list. That means one focusable element instead of
+     one per option, so the options are tabindex="-1" and Tab leaves
+     the control rather than walking every choice. */}}
 <div class="{{ui "combobox"}}" data-label="{{or $selected .placeholder}}"
      x-data="adminSelect()" x-init="hydrate()" x-id="['select-option', 'select-listbox']"
      @keydown.escape="closeToTrigger()" @click.outside="close()">

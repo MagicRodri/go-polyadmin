@@ -10,6 +10,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"sort"
 
 	"github.com/MagicRodri/go-polyadmin/core"
@@ -147,5 +148,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Fatal(app.Listen(":3000"))
+	// PORT so the browser suite can run this app on its own port
+	// without colliding with a development server.
+	addr := ":3000"
+	if port := os.Getenv("PORT"); port != "" {
+		addr = ":" + port
+	}
+	log.Printf("admin: http://127.0.0.1%s/admin", addr)
+	log.Fatal(app.Listen(addr))
 }

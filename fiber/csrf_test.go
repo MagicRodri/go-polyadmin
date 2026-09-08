@@ -130,10 +130,6 @@ func TestClickjackingHeadersAreSet(t *testing.T) {
 	}
 }
 
-// makeActionApp, not makeApp: the list page's bulk-actions form and the
-// detail page's record-action forms are both inside {{if .Actions}}, so
-// an admin with no declared actions renders neither, and the assertions
-// below would pass or fail for the wrong reason.
 func TestPagesCarryTheTokenForFormsAndHtmx(t *testing.T) {
 	app, userAdmin := makeActionApp(t)
 	u := userAdmin.createUser("a@example.com", true)

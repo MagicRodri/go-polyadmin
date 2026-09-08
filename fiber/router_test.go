@@ -269,13 +269,6 @@ func TestDetailViewMissingIs404(t *testing.T) {
 	}
 }
 
-// Regression test for a fmt.Sprintf("%s", ...) verb mismatch against an
-// int PK (produces the literal string "%!s(int=1)" instead of "1"),
-// which corrupted the edit form's action/hx-post URLs and made Save
-// silently no-op (htmx doesn't swap on a non-2xx/404 response). Posts
-// straight to the URL the *rendered form* advertises, rather than one
-// built independently by the test, so a broken action attribute would
-// actually be caught.
 func TestEditFormActionUsesCorrectPK(t *testing.T) {
 	app, userAdmin := makeApp(t)
 	user := userAdmin.createUser("john@example.com", true)

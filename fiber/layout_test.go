@@ -9,20 +9,13 @@ import (
 	coretemplates "github.com/MagicRodri/go-polyadmin/templates"
 )
 
-// The two implementations' template trees are kept path-for-path
-// identical, so a file that does a job in one repository has the same
-// name and location in the other (docs/templates.md). Pinned as an
-// explicit list rather than read from the Python tree -- the repos are
-// separate checkouts, and the point is to fail when someone moves or
-// adds a template on one side only.
-//
-// The mirror of this test lives in python-polyadmin/tests/test_layout.py.
 func TestTemplateTreeMatchesThePythonImplementationPathForPath(t *testing.T) {
 	expected := map[string]bool{
 		"admin/base.html":      true,
 		"admin/theme.html":     true,
 		"admin/login.html":     true,
 		"admin/dashboard.html": true,
+		"admin/error.html":     true,
 
 		"admin/resource/list.html":   true,
 		"admin/resource/detail.html": true,
@@ -38,6 +31,7 @@ func TestTemplateTreeMatchesThePythonImplementationPathForPath(t *testing.T) {
 		"admin/components/toasts.html":               true,
 		"admin/components/action_confirm_modal.html": true,
 		"admin/components/csrf-field.html":           true,
+		"admin/components/error_fragment.html":       true,
 
 		"admin/components/ui/breadcrumb.html":    true,
 		"admin/components/ui/bulk-actions.html":  true,
@@ -93,11 +87,6 @@ func TestTemplateTreeMatchesThePythonImplementationPathForPath(t *testing.T) {
 	}
 }
 
-// Python has two templates Go does not, because Go builds the same HTML
-// in Go code -- see the fiber package doc comment on why field and form
-// markup is assembled there rather than in html/template. Pinned so the
-// exception stays a deliberate two-file list rather than growing
-// quietly.
 func TestPythonOnlyTemplatesAreNotAccidentallyAddedHere(t *testing.T) {
 	for _, path := range []string{
 		"admin/components/icons.html", // Go: fiber/icons.go

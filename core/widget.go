@@ -2,11 +2,8 @@ package core
 
 import "math"
 
-// Widget is a single dashboard tile. Each widget type
-// computes its own data via GetData and names the template that
-// renders it (Template), so an application can add a custom widget
-// type just by implementing Widget and pointing Template at its own
-// file -- no framework change required.
+// Widget is a single dashboard tile. Each type computes its own data and
+// names its template, so a custom widget needs no framework change.
 type Widget interface {
 	Title() string
 	Size() string
@@ -66,31 +63,26 @@ func (m Metric) GetData() any {
 	return map[string]any{"Value": m.GetValue()}
 }
 
-// Stat is a headline number paired with its change against the
-// previous period, e.g. "$45,385" and "12.5% up" -- adapted from
-// Flowbite's admin-dashboard "Sales this week" card. Metric answers
-// "what is it now?"; Stat also answers "which way is it moving?".
+// Stat is a headline number paired with its change against the previous
+// period. Metric answers "what is it now?"; Stat also answers "which way
+// is it moving?".
 type Stat struct {
 	baseWidget
 	GetStat func() (value any, delta float64)
 }
 
-// NewStat builds a Stat from a function returning the current value
-// and its percentage change since the previous period -- signed, so
-// -4.2 means "down 4.2%". The widget assumes up is good (green) and
-// down is bad (red); for a metric where that's inverted, such as an
-// error rate, negate the delta and say so in the title.
+// NewStat builds a Stat from a function returning the current value and
+// its signed percentage change. Up is assumed good; for an inverted metric
+// such as an error rate, negate the delta and say so in the title.
 func NewStat(title string, getStat func() (any, float64), opts ...WidgetOption) Stat {
 	return Stat{baseWidget: newBaseWidget(title, "admin/widgets/stat.html", opts), GetStat: getStat}
 }
 
 func (s Stat) GetData() any {
 	value, delta := s.GetStat()
-	// The template branches on Direction rather than on the sign of
-	// Delta: html/template can't compare a number against zero without
-	// a helper func, and naming the three cases here keeps the arrow
-	// and color choice out of the markup. Delta itself is reported
-	// unsigned, since the arrow already carries the direction.
+	// The template branches on Direction, not the sign of Delta:
+	// html/template cannot compare against zero without a helper. Delta is
+	// reported unsigned, since the arrow carries the direction.
 	direction := "flat"
 	switch {
 	case delta > 0:
@@ -189,29 +181,16 @@ type donutSlice struct {
 	Color      string
 }
 
-// donutColors is the qualitative palette for Donut slices, spaced
-// around the color wheel so up to 6 categories stay visually
-// distinguishable at a glance.
-//
-// These name shadcn/ui's --chart-* CSS variables (declared in
-// templates/admin/theme.html) rather than literal Tailwind shades,
-// which is the distinction shadcn itself draws: chart tokens are for
-// *categorical data*, separate from the UI-chrome tokens, but still
-// theme-owned. So a Donut follows the active theme and gets a palette
-// re-tuned for dark mode, instead of keeping colors chosen against
-// white. Overriding admin/theme.html restyles the slices along with
-// everything else.
-//
-// A slice never lands on the success/warning/danger hues that
-// templates/toasts.html uses for status, so it can't be mistaken for
-// one.
+// donutColors is the qualitative palette for Donut slices, spaced around
+// the wheel so six categories stay distinguishable. They name theme.html's
+// --chart-* variables rather than literal shades, so a Donut follows the
+// active theme and is re-tuned for dark mode. No slice lands on the
+// success/warning/danger hues, so it cannot be mistaken for a status.
 var donutColors = [...]string{"chart-1", "chart-2", "chart-3", "chart-4", "chart-5", "chart-6"}
 
-// Donut is a share-of-total breakdown, e.g. "Traffic by device"
-// (Desktop / Phone / Tablet), rendered as an SVG ring with a legend --
-// adapted from Flowbite's admin-dashboard "Traffic by device" card.
-// Built from a handful of SVG <circle> arcs (stroke-dasharray), the
-// same "no charting-library dependency" stance as Chart.
+// Donut is a share-of-total breakdown drawn as an SVG ring with a legend,
+// built from <circle> arcs -- the same no-charting-library stance as
+// Chart.
 type Donut struct {
 	baseWidget
 	GetSeries func() []ChartPoint
@@ -234,12 +213,10 @@ func (d Donut) GetData() any {
 		if total > 0 {
 			percent = point.Value / total * 100
 		}
-		// The classic SVG-ring trick: a circle with circumference 100
-		// (r=15.9155) lets stroke-dasharray use percentages directly.
-		// 25 rotates the first slice's start point to 12 o'clock; each
-		// following slice is pushed further by its predecessors'
-		// combined share (kept unrounded here for precision; only the
-		// displayed Percent is rounded).
+		// A circle of circumference 100 (r=15.9155) lets stroke-dasharray take
+		// percentages directly. 25 rotates the first slice to 12 o'clock; each
+		// later one is pushed by its predecessors' combined share, kept
+		// unrounded for precision.
 		slices[i] = donutSlice{
 			Label: point.Label, Value: point.Value,
 			Percent: round1(percent), Remainder: round1(100 - percent),
@@ -265,21 +242,18 @@ func (a Activity) GetData() any {
 	return map[string]any{"Entries": a.GetEntries()}
 }
 
-// TimelineEntry is one dated event in a Timeline. Time is already
-// formatted for display ("April 2023", "2h ago") -- the widget never
-// parses or localizes it, so an application keeps full control of how
-// its timestamps read. Description may be empty.
+// TimelineEntry is one dated event. Time arrives already formatted: the
+// widget never parses or localizes it, so the application controls how its
+// timestamps read.
 type TimelineEntry struct {
 	Time        string
 	Title       string
 	Description string
 }
 
-// Timeline is a vertical feed of dated events, drawn as a rail of
-// dots -- adapted from Flowbite's admin-dashboard "Latest Activity"
-// card. Activity's flat strings are enough for a short "who did what"
-// list; Timeline is for entries that each need a timestamp and a body
-// of their own.
+// Timeline is a vertical feed of dated events drawn as a rail of dots.
+// Activity's flat strings suit a short "who did what" list; Timeline is
+// for entries needing a timestamp and a body of their own.
 type Timeline struct {
 	baseWidget
 	GetEntries func() []TimelineEntry
@@ -300,25 +274,20 @@ type TabPanel struct {
 	Widget Widget
 }
 
-// Container is implemented by widgets that nest other widgets inside
-// themselves. Rendering a nested widget means executing a template
-// whose name is only known at runtime, which html/template can't do
-// from inside another template -- so the adapter walks Panels() and
-// renders each child itself, before the container's own template
-// runs. A custom container widget only has to implement this
-// interface to get the same treatment.
+// Container is implemented by widgets nesting other widgets. A nested
+// widget's template name is known only at runtime, which html/template
+// cannot execute from inside another template, so the adapter walks
+// Panels() and renders each child before the container's own template
+// runs.
 type Container interface {
 	Widget
 	Panels() []TabPanel
 }
 
-// Tabs stacks several widgets into one card, showing one at a time --
-// adapted from Flowbite's admin-dashboard "Statistics this month"
-// card, which swaps a "Top products" table for a "Top customers" one.
-// Tabs holds no data of its own; every panel's widget still computes
-// its own, and all of them are computed on render (not on first
-// click), so a panel backed by a slow query costs the same whether or
-// not anyone opens it.
+// Tabs stacks several widgets into one card, showing one at a time. It
+// holds no data itself, and every panel is computed on render rather than
+// on first click, so a panel backed by a slow query costs the same whether
+// or not anyone opens it.
 type Tabs struct {
 	baseWidget
 	panels []TabPanel

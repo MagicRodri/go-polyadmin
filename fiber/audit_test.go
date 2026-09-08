@@ -72,9 +72,6 @@ func TestCreateUpdateAndDeleteAreRecorded(t *testing.T) {
 	}
 }
 
-// The label is captured at write time because the record may be gone by
-// the time anyone reads the log -- which is exactly the case for a
-// delete.
 func TestDeleteEntryKeepsTheRecordsLabel(t *testing.T) {
 	logger := &recordingLogger{}
 	app, userAdmin := auditApp(t, logger)
@@ -90,7 +87,6 @@ func TestDeleteEntryKeepsTheRecordsLabel(t *testing.T) {
 	}
 }
 
-// One entry per record, not one per action run.
 func TestBulkActionRecordsOneEntryPerRecord(t *testing.T) {
 	logger := &recordingLogger{}
 	app, userAdmin := auditApp(t, logger)
@@ -110,7 +106,6 @@ func TestBulkActionRecordsOneEntryPerRecord(t *testing.T) {
 	}
 }
 
-// A failed change must not be recorded as one.
 func TestNothingIsRecordedWhenTheChangeIsRejected(t *testing.T) {
 	logger := &recordingLogger{}
 	app, _ := auditApp(t, logger)
@@ -125,8 +120,6 @@ func TestNothingIsRecordedWhenTheChangeIsRejected(t *testing.T) {
 	}
 }
 
-// A logger that errors must not fail the request: the change already
-// happened, and showing an error next to it would be a lie.
 func TestALoggerErrorDoesNotFailTheChange(t *testing.T) {
 	logger := &recordingLogger{err: errors.New("log is down")}
 	app, _ := auditApp(t, logger)
@@ -145,7 +138,6 @@ func TestNoLoggerConfiguredRecordsNothingAndStillWorks(t *testing.T) {
 	}
 }
 
-// The read side is a separate capability: recording alone shows nothing.
 func TestHistoryPanelAppearsOnlyForAReadableLogger(t *testing.T) {
 	writeOnly := &recordingLogger{}
 	app, userAdmin := auditApp(t, writeOnly)

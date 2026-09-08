@@ -17,17 +17,14 @@ var ErrNotImplemented = errors.New("polyadmin: not implemented")
 // per-item icons existed, so it's the unsurprising default.
 const defaultIcon = "collection"
 
-// ModelAdmin is the central per-resource abstraction.
-// Applications normally satisfy it by embedding BaseModelAdmin and
-// shadowing whichever methods they need, rather than implementing every
-// method from scratch.
+// ModelAdmin is the central per-resource abstraction. Applications
+// normally satisfy it by embedding BaseModelAdmin and shadowing only the
+// methods they need.
 type ModelAdmin interface {
 	Slug() string
 	VerboseName() string
-	// Category groups this ModelAdmin (and any AdminPages sharing the
-	// same category) into one sidebar accordion section, in
-	// first-registration-appearance order. "" keeps today's flat
-	// top-level nav link.
+	// Category groups this ModelAdmin, and any AdminPages sharing the
+	// category, into one sidebar section. "" keeps a flat top-level link.
 	Category() string
 	// Icon names the sidebar-nav icon (see fiber/icons.go's iconPaths)
 	// shown next to this ModelAdmin's own link, whether it renders flat
@@ -41,6 +38,8 @@ type ModelAdmin interface {
 	Fieldsets() []Fieldset
 	ReadOnlyFields(obj any) []string
 	DefaultOrdering() string
+	PageSize() int
+	EmptyValue() string
 	IsReadOnly(name string, obj any) bool
 	SearchFields() []string
 	DetailFields() []string
@@ -59,14 +58,10 @@ type ModelAdmin interface {
 	CanUpdate() bool
 	CanDelete() bool
 	CanExport() bool
-	// Reorderable shows a drag handle on this ModelAdmin's list view.
-	// Unlike Can*/Disable* above, dragging never persists anywhere --
-	// it only reorders the <tr> elements already on the page, and
-	// reverts on the next reload, sort, search, or page change
-	// re-rendering the table from the server's own order. It exists
-	// for admins who want to eyeball/triage a list by hand without the
-	// framework taking a position on how (or whether) that order is
-	// stored.
+	// Reorderable shows a drag handle on the list view. Dragging never
+	// persists: it reorders the <tr> elements on the page and reverts on the
+	// next render. It is for triaging a list by hand without the framework
+	// taking a position on how that order would be stored.
 	Reorderable() bool
 
 	ListDisplayValues(obj any) map[string]any
@@ -79,30 +74,10 @@ type ModelAdmin interface {
 	Delete(ctx context.Context, obj any) error
 }
 
-// BaseModelAdmin provides default implementations of ModelAdmin.
-// Embed it in a resource-specific struct, set its declarative fields,
-// and shadow the CRUD methods that need real data access:
-//
-//	type UserAdmin struct {
-//	    core.BaseModelAdmin
-//	}
-//
-//	func NewUserAdmin() UserAdmin {
-//	    return UserAdmin{core.BaseModelAdmin{
-//	        ModelName:     "User",
-//	        DisplayFields: []string{"ID", "Email", "IsActive"},
-//	    }}
-//	}
-//
-//	func (a UserAdmin) GetQueryset(ctx context.Context) (any, error) { ... }
-//
 // Fieldset is one titled group of form fields -- Django's `fieldsets`.
 // A Title of "" renders the group with no header, which is how the
-// default (undeclared) case renders as a plain flat form.
-//
-// Collapsed only seeds the initial state; the group can always be
-// opened. It is for the sections a form has to carry but rarely needs,
-// which is exactly when a flat form starts to hurt.
+// undeclared default renders as a plain flat form. Collapsed only seeds
+// the initial state; the group can always be opened.
 type Fieldset struct {
 	Title       string
 	Description string
@@ -110,6 +85,13 @@ type Fieldset struct {
 	Fields      []string
 }
 
+// BaseModelAdmin provides default implementations of ModelAdmin. Embed
+// it in a resource-specific struct, set its declarative fields, and
+// shadow the CRUD methods that need real data access:
+//
+//	type UserAdmin struct{ core.BaseModelAdmin }
+//
+//	func (a UserAdmin) GetQueryset(ctx context.Context) (any, error) { ... }
 type BaseModelAdmin struct {
 	ModelName    string
 	SlugOverride string
@@ -127,26 +109,32 @@ type BaseModelAdmin struct {
 	DeclaredFilters  []Filter
 	DeclaredActions  []Action
 	DeclaredInlines  []Inline
-	// DeclaredFieldsets, when set, defines both the grouping and the
-	// form's field list -- FormFields() reports the flattened result, so
-	// there is one source of truth for what the form renders and what
-	// the handler parses. FormFieldNames is then unused.
+	// DeclaredFieldsets, when set, defines both the grouping and the field
+	// list: FormFields() reports it flattened, so the form and the handler
+	// agree. FormFieldNames is then unused.
 	DeclaredFieldsets []Fieldset
-	// ReadOnlyFieldNames are shown on the form as values rather than
-	// inputs, and are refused if posted anyway -- see the adapter's
-	// parseFormData. Override ReadOnlyFields to vary by object, which
-	// is how "editable on create, frozen afterwards" is expressed.
+	// ReadOnlyFieldNames render as values, not inputs, and are refused if
+	// posted anyway. Override ReadOnlyFields to vary by object, which is how
+	// "editable on create, frozen afterwards" is expressed.
 	ReadOnlyFieldNames []string
-	// OrderingDefault is the sort applied when a request names none --
-	// a field name, optionally prefixed with "-" for descending, the
-	// same syntax the ?sort= parameter uses. Without one, rows arrive
-	// in whatever order the data source happened to return, which for a
-	// map-backed store is not even stable between requests.
+	// OrderingDefault is the sort applied when a request names none, in the
+	// ?sort= syntax ("-field" for descending). Without one, rows arrive in
+	// whatever order the data source returned, which for a map-backed store
+	// is not stable between requests.
 	OrderingDefault string
-	// Relation (foreignkey/onetoone) form fields that render as a
-	// lookup-driven search box instead of a <select>
-	// populated from the target's full queryset -- for relations too
-	// large, or too principal-sensitive, to dump wholesale into a page.
+	// PageSizeDefault is how many rows a list page holds; zero means
+	// DefaultPageSize. Django calls this list_per_page.
+	PageSizeDefault int
+	// EmptyValueDisplay is what a read-only view shows in place of a
+	// value that is nil or blank. Empty means DefaultEmptyValue.
+	// Django calls this empty_value_display.
+	EmptyValueDisplay string
+	// DisableDeleteSelected removes the built-in bulk delete. Disable*, so
+	// the zero value keeps it, as Django does.
+	DisableDeleteSelected bool
+	// Relation fields that render as a lookup-driven search box rather than a
+	// <select> over the target's full queryset -- for relations too large, or
+	// too principal-sensitive, to dump into a page.
 	AutocompleteFieldNames []string
 	// PK returns the primary key used to build this object's URL,
 	// defaulting to reading an exported "ID" field via reflection.
@@ -194,11 +182,9 @@ func (b BaseModelAdmin) Icon() string {
 	return defaultIcon
 }
 
-// TemplateOverride returns the explicit template path set for the
-// given view ("list"/"detail"/"form"/"delete"), or "" if none is set
-// -- mirrors the Python adapter's `{view}_template` ModelAdmin
-// attributes. See docs/templates.md for the full override resolution
-// order.
+// TemplateOverride returns the explicit template path set for the given
+// view ("list"/"detail"/"form"/"delete"), or "". See docs/templates.md for
+// the full resolution order.
 func (b BaseModelAdmin) TemplateOverride(view string) string {
 	switch view {
 	case "list":
@@ -252,14 +238,26 @@ func (b BaseModelAdmin) FormFields() []string {
 	return names
 }
 
-// ReadOnlyFields returns the fields that must render as values rather
-// than inputs for this object. obj is nil on the create form, so an
-// override can distinguish creating from editing -- the declarative
-// default applies to both.
+// ReadOnlyFields returns the fields rendering as values rather than inputs
+// for this object. obj is nil on the create form, so an override can tell
+// creating from editing.
 func (b BaseModelAdmin) ReadOnlyFields(obj any) []string { return b.ReadOnlyFieldNames }
 
 // DefaultOrdering is the sort to use when the request names none.
 func (b BaseModelAdmin) DefaultOrdering() string { return b.OrderingDefault }
+
+// PageSize is the ModelAdmin's own page size, or 0 to accept the
+// framework default. See PageSizeDefault.
+func (b BaseModelAdmin) PageSize() int { return b.PageSizeDefault }
+
+// EmptyValue is what stands in for a nil or blank value on the list and
+// detail views. See EmptyValueDisplay.
+func (b BaseModelAdmin) EmptyValue() string {
+	if b.EmptyValueDisplay == "" {
+		return DefaultEmptyValue
+	}
+	return b.EmptyValueDisplay
+}
 
 // IsReadOnly is the question every call site actually asks.
 func (b BaseModelAdmin) IsReadOnly(name string, obj any) bool {
@@ -292,8 +290,25 @@ func (b BaseModelAdmin) DetailFields() []string {
 	return names
 }
 
-func (b BaseModelAdmin) Filters() []Filter            { return b.DeclaredFilters }
-func (b BaseModelAdmin) Actions() []Action            { return b.DeclaredActions }
+func (b BaseModelAdmin) Filters() []Filter { return b.DeclaredFilters }
+
+// Actions are the declared ones plus the built-in bulk delete every admin
+// that can delete gets for free. Declaring one named DeleteSelectedName
+// replaces it rather than duplicating it.
+func (b BaseModelAdmin) Actions() []Action {
+	if b.DisableDeleteSelected || !b.CanDelete() {
+		return b.DeclaredActions
+	}
+	for _, action := range b.DeclaredActions {
+		if action.Name == DeleteSelectedName {
+			return b.DeclaredActions
+		}
+	}
+	// Appended, not prepended: an application's own actions are the ones
+	// it went to the trouble of writing, and the destructive one should
+	// not be the first thing in the listbox.
+	return append(append([]Action{}, b.DeclaredActions...), NewDeleteSelectedAction())
+}
 func (b BaseModelAdmin) Inlines() []Inline            { return b.DeclaredInlines }
 func (b BaseModelAdmin) AutocompleteFields() []string { return b.AutocompleteFieldNames }
 

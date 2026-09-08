@@ -147,7 +147,10 @@ func TestListShowsDashWhenRelationIsNone(t *testing.T) {
 	userAdmin.store[1] = &relUser{ID: 1, Email: "john@example.com"}
 
 	resp := doGet(t, app, "/admin/users", nil)
-	if !strings.Contains(body(t, resp), "&mdash;") {
+	// The em dash itself, not the &mdash; entity: the placeholder is now
+	// a configurable string (EmptyValueDisplay) written through
+	// html.EscapeString, which leaves a literal em dash alone.
+	if !strings.Contains(body(t, resp), core.DefaultEmptyValue) {
 		t.Fatalf("expected a dash for the empty relation")
 	}
 }
@@ -214,8 +217,6 @@ func TestLookupRouteReturnsMatchingOptions(t *testing.T) {
 	}
 }
 
-// -- many-to-many: the searchable multi-select --------------------------
-
 // multiSelectMarkup returns just the multi-select component's markup:
 // from its x-data to the next component's, so an assertion about this
 // control can neither be satisfied nor broken by a sibling field.
@@ -270,9 +271,6 @@ func TestManyToManyRendersSearchableMultiSelectNotANativeMultiple(t *testing.T) 
 	}
 }
 
-// The widget posts what a <select multiple> posted: repeated inputs
-// under the field's own name, which is what parseFormData's PeekMulti
-// reads.
 func TestManyToManySelectionPostsUnderTheFieldName(t *testing.T) {
 	app, userAdmin, orgAdmin := makeRelationApp(t)
 	acme := &testOrg{ID: 1, Name: "Acme"}
@@ -393,10 +391,6 @@ func TestRelatedLinkHiddenWhenTargetNotViewable(t *testing.T) {
 	}
 }
 
-// The multi-select declares role=combobox/listbox, which promises
-// assistive tech that the keyboard works. Focus stays in the search
-// box -- typing is the point of this control -- so the arrows move an
-// aria-activedescendant highlight rather than real focus.
 func TestMultiSelectIsKeyboardOperable(t *testing.T) {
 	app, _, orgAdmin := makeRelationApp(t)
 	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
@@ -418,9 +412,6 @@ func TestMultiSelectIsKeyboardOperable(t *testing.T) {
 	}
 }
 
-// aria-modal="true" is a promise that focus cannot leave the drawer.
-// x-trap is what keeps it; without it Tab walks straight out into the
-// page behind the overlay.
 func TestFilterDrawerTrapsFocus(t *testing.T) {
 	page := filterablePage(t, nil)
 	if !strings.Contains(page, `x-trap="open"`) {
@@ -428,9 +419,6 @@ func TestFilterDrawerTrapsFocus(t *testing.T) {
 	}
 }
 
-// The autocomplete relation field is the fourth listbox in the tree.
-// It always had arrow keys, but announced nothing: no combobox role and
-// no way for a screen reader to know which result was highlighted.
 func TestRelationComboboxIsAnnouncedToAssistiveTech(t *testing.T) {
 	// newAutocompleteRelUserAdmin, not makeRelationApp: the plain
 	// fixture renders a ui/select for the relation and a multi-select
@@ -464,7 +452,6 @@ func TestRelationComboboxIsAnnouncedToAssistiveTech(t *testing.T) {
 	}
 }
 
-// The /lookup fragment's rows are the options of that listbox.
 func TestLookupResultsAreListboxOptions(t *testing.T) {
 	app, _, orgAdmin := makeRelationApp(t)
 	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}

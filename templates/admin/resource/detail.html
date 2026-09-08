@@ -1,16 +1,13 @@
-{{/* Detail page. Layout comes from ui "page", shared with form.html, so
-     viewing and editing the same record don't jump width or alignment:
-     the record sits in a vertically centered max-w-xl column and
-     scrolls under an action bar pinned to the bottom of the viewport.
+{{/* Detail page. Layout comes from ui "page", shared with the form, so
+     viewing and editing the same record do not jump width or
+     alignment.
 
-     Edit/Delete/record actions sit below the record, not above it --
-     the record itself is what a viewer came here to read, not a button
-     bar first -- and now stay reachable on a long record without
-     scrolling to the end. Mirrors the Python adapter's
-     resource/detail.html. */}}
+     Edit, Delete and the record actions sit below the record, not above
+     it -- the record is what a viewer came to read -- and stay
+     reachable on a long one thanks to the pinned bar. */}}
 {{define "content"}}
 <div class="{{ui "page"}}">
-  <div class="{{ui "page" "body"}}">
+  <div class="{{if .WideBody}}{{ui "page" "body-wide"}}{{else}}{{ui "page" "body"}}{{end}}">
     <dl class="{{ui "card"}} divide-y divide-border">
       {{range .Fields}}
       <div class="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-3 sm:gap-4">
@@ -41,7 +38,7 @@
        record is something you opt into by entering edit mode rather
        than a click away from merely looking at one. */}}
   <div class="{{ui "page" "actions"}}">
-    <div class="{{ui "page" "actions-inner"}}">
+    <div class="{{if .WideBody}}{{ui "page" "actions-inner-wide"}}{{else}}{{ui "page" "actions-inner"}}{{end}}">
       <div class="{{ui "page" "actions-primary"}}">
         {{if .Permissions.CanUpdate}}
         <a href="{{.BasePath}}/{{.Slug}}/{{.PK}}/edit"
@@ -49,13 +46,11 @@
           {{icon "edit" "w-4 h-4"}} Edit</a>
         {{end}}
         {{range .Actions}}
-        {{/* w-full sm:w-auto tracks "actions-primary"'s own flex-col ->
-             sm:flex-row switch by hand: Edit is a direct flex child, so
-             align-items:stretch already gives it the full width while
-             the group is stacked, but an action's button is a
-             grandchild -- the stretch stops at the <form> wrapping it --
-             and would otherwise sit stunted at its content width next
-             to a full-width Edit. */}}
+        {{/* w-full sm:w-auto tracks "actions-primary"'s flex-col ->
+             sm:flex-row switch by hand: stretch gives Edit its full
+             width as a direct child, but an action's button is a
+             grandchild -- the stretch stops at the <form> -- and would
+             otherwise sit stunted beside a full-width Edit. */}}
         <form method="post" action="{{$.BasePath}}/{{$.Slug}}/actions/{{.Name}}"
               {{if .Confirm}}data-confirm="{{.Confirm}}"{{end}}
               onsubmit="return window.adminConfirmSubmit(event, this, this.dataset.confirm)">

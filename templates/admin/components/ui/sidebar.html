@@ -1,25 +1,17 @@
-{{/* Sidebar, ported from shadcn/ui's sidebar-07 block ("a sidebar that
-     collapses to icons"). Mirrors the Python adapter's
-     components/ui/sidebar.html.
-
-     Three regions, exactly as the block has them:
-       SidebarHeader  -- the brand, styled as the block's team-switcher
-                         button (square logo + two stacked lines).
-       SidebarContent -- one SidebarGroup of SidebarMenu items; a
-                         grouped category becomes a Collapsible with a
-                         SidebarMenuSub, matching the block's NavMain.
-       SidebarFooter  -- NavUser: avatar + name, opening a dropdown.
-     Plus SidebarRail, the hairline on the outer edge that toggles it.
+{{/* Sidebar, ported from shadcn/ui's sidebar-07 block. Three regions,
+     as the block has them: the brand header, one group of menu items
+     (a category becomes a Collapsible with a sub-menu), and a footer
+     showing who is signed in. Plus the rail on the outer edge.
 
      `collapsed` (the desktop icon rail) and `sidebarOpen` (the mobile
-     sheet) both come from base.html's SidebarProvider x-data. They are
-     separate axes on purpose: a phone gets the overlay, never the rail.
+     sheet) both come from base.html's provider, and are separate axes
+     on purpose: a phone gets the overlay, never the rail.
 
-     Collapsing hides labels rather than re-templating the markup, so
-     there is exactly one copy of the nav. Every label sits in an
-     x-show="!collapsed" span while the icon stays put -- nav-item's p-2
-     plus a size-4 icon is precisely the 3rem collapsed width, so
-     nothing slides sideways as the width animates. */}}
+     Collapsing hides labels rather than re-templating, so there is one
+     copy of the nav. Each label sits in an x-show="!collapsed" span
+     while the icon stays put -- nav-item's p-2 plus a size-4 icon is
+     exactly the 3rem collapsed width, so nothing slides sideways as
+     the width animates. */}}
 {{define "ui/sidebar"}}
 <aside x-cloak
        :class="[
@@ -66,11 +58,9 @@
           </a>
           {{end}}
           {{else}}
-          {{/* Collapsible + SidebarMenuSub, per the block's NavMain. The
-               chevron rotates 90deg on open, as there. Collapsed to the
-               icon rail there's nowhere to put a sub-menu, so the group
-               behaves as a plain link to its first child instead of
-               expanding into nothing. */}}
+          {{/* Collapsed to the icon rail there is nowhere to put a
+               sub-menu, so the group behaves as a plain link to its
+               first child rather than expanding into nothing. */}}
           {{with .Group}}
           <div x-data="{ open: {{if .Expanded}}true{{else}}false{{end}} }">
             <a x-show="collapsed" href="{{if .Links}}{{(index .Links 0).URL}}{{else}}#{{end}}"
@@ -147,10 +137,10 @@
           </span>
         </div>
         <div class="{{ui "dropdown" "separator"}}"></div>
-        {{/* Only when there is a session to end -- see pageBase's
-             CanSignOut. A form, not a link: a logout reachable by GET
-             is one any <img src> on the internet can fire at a
-             signed-in admin, so it posts and carries the CSRF token. */}}
+        {{/* Only when there is a session to end. A form, not a link: a
+             logout reachable by GET is one any <img src> on the
+             internet can fire at a signed-in admin, so it posts and
+             carries the CSRF token. */}}
         {{if $canSignOut}}
         <form method="post" action="{{$logoutURL}}">
           {{template "csrf-field" $csrf}}

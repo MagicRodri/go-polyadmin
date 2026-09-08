@@ -219,8 +219,6 @@ func TestValidateRequiredField(t *testing.T) {
 	}
 }
 
-// -- fieldsets -----------------------------------------------------------
-
 func TestFieldsetsDefaultToOneUnnamedGroupOverFormFields(t *testing.T) {
 	// Undeclared is the common case, and the form template renders
 	// fieldsets unconditionally -- so "no fieldsets" has to mean one
@@ -271,8 +269,6 @@ func TestCollapsedFieldsetIsOptIn(t *testing.T) {
 		t.Error("Collapsed must be per-group and default false")
 	}
 }
-
-// -- read-only fields -----------------------------------------------------
 
 func TestReadOnlyFieldsDefaultToNone(t *testing.T) {
 	admin := BaseModelAdmin{FormFieldNames: []string{"Email"}}

@@ -1,6 +1,9 @@
 package core
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 // ActionHandler runs an Action over the resolved objects. The returned
 // string, if non-empty, becomes the flash message; principal is nil
@@ -46,6 +49,47 @@ func WithActionConfirm(confirm string) func(*Action) {
 
 func WithActionPermission(permission string) func(*Action) {
 	return func(a *Action) { a.Permission = permission }
+}
+
+// DeleteSelectedName is the built-in bulk delete's action name. It is
+// reserved: a ModelAdmin that declares an Action of the same name
+// replaces the built-in rather than colliding with it, which is how you
+// customise the confirmation text or the deletion itself.
+const DeleteSelectedName = "delete_selected"
+
+// NewDeleteSelectedAction is the bulk delete every admin gets for free
+// -- Django ships the same one, and it is the single most common action
+// anyone would otherwise write by hand.
+//
+// It is expressed entirely in terms of the ModelAdmin's own Delete
+// hook, so it works against whatever storage the application actually
+// has and honours whatever that hook already does (cascades, soft
+// deletes, hooks of its own).
+//
+// Permission "delete", not the resource's bare "view": the action route
+// checks it on top, so a principal who may look at a list but not
+// destroy its rows is refused -- and, because the same check drives the
+// listbox, never offered it in the first place.
+func NewDeleteSelectedAction() Action {
+	return Action{
+		Name:       DeleteSelectedName,
+		Label:      "Delete selected",
+		Confirm:    "Delete the selected records? This cannot be undone.",
+		Permission: "delete",
+		Handler: func(ctx context.Context, modelAdmin ModelAdmin, objects []any, principal *Principal) (string, error) {
+			deleted := 0
+			for _, obj := range objects {
+				if err := modelAdmin.Delete(ctx, obj); err != nil {
+					// Stop at the first failure and report how far it
+					// got: silently continuing would leave the user
+					// unable to tell which records survived.
+					return "", fmt.Errorf("deleted %d of %d, then: %w", deleted, len(objects), err)
+				}
+				deleted++
+			}
+			return fmt.Sprintf("Deleted %d record(s).", deleted), nil
+		},
+	}
 }
 
 // GetAction finds a ModelAdmin's declared Action by name.

@@ -155,16 +155,18 @@ func TestActionBarSubmitsOnSelectWithNoApplyStep(t *testing.T) {
 }
 
 func TestListViewHidesActionBarWhenNoActionsDeclared(t *testing.T) {
-	app, _ := makeApp(t)
+	// DisableDeleteSelected as well as declaring none: every admin that
+	// can delete now carries the built-in bulk delete, so "no actions"
+	// means opting out of that too.
+	userAdmin := newTestUserAdmin()
+	userAdmin.DisableDeleteSelected = true
+	app := newTestApp(t, core.New(core.WithModelAdmins(userAdmin)))
 	resp := doGet(t, app, "/admin/users", nil)
 	if strings.Contains(body(t, resp), `id="bulk-actions-form"`) {
 		t.Fatalf("expected no action bar")
 	}
 }
 
-// Both record pages use ui "page": a width-capped column centered on
-// both axes, with the action bar pinned to the bottom so a long record
-// scrolls underneath it instead of burying its own buttons.
 func TestDetailAndFormPagesShareTheSamePageShell(t *testing.T) {
 	app, userAdmin := makeActionApp(t)
 	a := userAdmin.createUser("a@example.com", true)
@@ -184,9 +186,6 @@ func TestDetailAndFormPagesShareTheSamePageShell(t *testing.T) {
 	}
 }
 
-// The buttons must be outside the scrolling column -- if they drift back
-// into it they scroll away on a long record, which is the whole thing
-// the sticky bar exists to prevent.
 func TestRecordPageActionsSitInTheStickyBar(t *testing.T) {
 	app, userAdmin := makeActionApp(t)
 	a := userAdmin.createUser("a@example.com", true)
@@ -243,11 +242,6 @@ func TestDetailRecordActionButtonsStretchWhileTheBarIsStacked(t *testing.T) {
 	}
 }
 
-// A validation error re-renders the whole form wrapper (executeForm runs
-// the entire "content" block), so the swap has to replace the wrapper.
-// It used to target the inner <form> with outerHTML, which nested a
-// fresh wrapper inside the old one on every failed save -- duplicating
-// the inline sections and the action bar.
 func TestFormErrorSwapTargetsTheWrapperNotTheInnerForm(t *testing.T) {
 	app, _ := makeActionApp(t)
 
@@ -269,9 +263,6 @@ func TestFormErrorSwapTargetsTheWrapperNotTheInnerForm(t *testing.T) {
 	}
 }
 
-// Delete belongs to the edit form only: there is nothing to delete
-// while creating, and the detail page deliberately no longer offers it,
-// so looking at a record can't put a destructive action one click away.
 func TestDeleteButtonOnlyAppearsWhileEditing(t *testing.T) {
 	app, userAdmin := makeActionApp(t)
 	a := userAdmin.createUser("a@example.com", true)
@@ -291,9 +282,6 @@ func TestDeleteButtonOnlyAppearsWhileEditing(t *testing.T) {
 	}
 }
 
-// Delete sits alone on the left, Save/Cancel on the right, so the
-// destructive action is never adjacent to the one people click by
-// reflex.
 func TestDeleteIsSeparatedFromTheSaveButtons(t *testing.T) {
 	app, userAdmin := makeActionApp(t)
 	a := userAdmin.createUser("a@example.com", true)
@@ -355,12 +343,6 @@ func TestActionKeepsAnOnSiteReferer(t *testing.T) {
 	}
 }
 
-// -- select all matching --------------------------------------------------
-
-// A checkbox can only reach the rows on screen, so before this an action
-// over a filtered set of 60 from a 25-row page was impossible to
-// express: the user ticked "all", got 25, and was told 25 records were
-// affected. The count in that message was honest; the intent was not.
 func TestSelectAllMatchingActsOnEveryFilteredRowNotJustThePage(t *testing.T) {
 	app, userAdmin := makeActionApp(t)
 	for i := 0; i < 60; i++ {
@@ -379,13 +361,6 @@ func TestSelectAllMatchingActsOnEveryFilteredRowNotJustThePage(t *testing.T) {
 	}
 }
 
-// The posted filters, not the whole table: "all matching" means matching
-// what the user was looking at.
-//
-// The excluded record is *active* and the filter selects *inactive*
-// ones, so acting on everything would flip it and honouring the filter
-// leaves it alone -- the two outcomes differ, which an excluded record
-// that already looked like the action's result could not show.
 func TestSelectAllMatchingHonoursThePostedFilters(t *testing.T) {
 	app, userAdmin := makeActionApp(t)
 	userAdmin.DeclaredFilters = []core.Filter{core.NewBooleanFilter("IsActive")}
@@ -402,8 +377,6 @@ func TestSelectAllMatchingHonoursThePostedFilters(t *testing.T) {
 	}
 }
 
-// Without the flag, nothing changes: an empty tick list is still "no
-// items selected", not "everything".
 func TestNoSelectionWithoutTheFlagStillActsOnNothing(t *testing.T) {
 	app, userAdmin := makeActionApp(t)
 	a := userAdmin.createUser("a@example.com", true)

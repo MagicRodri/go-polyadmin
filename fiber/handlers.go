@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/MagicRodri/go-polyadmin/core"
 
@@ -17,10 +18,17 @@ var filterKeyPattern = regexp.MustCompile(`^filter\[(\w+)\]$`)
 // user chose "select all N matching" rather than ticking rows.
 const selectAllField = "_select_all"
 
-// parseListRequestFromForm rebuilds the list query from the *posted*
-// form rather than the URL. A bulk action posts to its own route, so the
-// filters the user was looking at arrive as form fields; reading them
-// from the query string would silently act on the unfiltered set.
+// The submit buttons meaning something other than "save and show me the
+// record". An unclicked submit button's name never reaches the server, so
+// the handler reads presence rather than a value.
+const (
+	saveContinueField   = "_continue"
+	saveAddAnotherField = "_addanother"
+)
+
+// parseListRequestFromForm rebuilds the list query from the posted form,
+// not the URL: a bulk action posts to its own route, so reading the query
+// string would silently act on the unfiltered set.
 func parseListRequestFromForm(c *fiber.Ctx) core.ListRequest {
 	filters := make(map[string]string)
 	c.Context().PostArgs().VisitAll(func(key, value []byte) {
@@ -46,9 +54,12 @@ func parseListRequest(c *fiber.Ctx) core.ListRequest {
 	if err != nil {
 		page = 1
 	}
-	pageSize, err := strconv.Atoi(c.Query("page_size", "25"))
+	// No default here: an unset page_size stays 0 so ApplyDefaults can fall
+	// back to the ModelAdmin's own PageSize() first. Defaulting here would
+	// make that unreachable.
+	pageSize, err := strconv.Atoi(c.Query("page_size"))
 	if err != nil {
-		pageSize = 25
+		pageSize = 0
 	}
 	return core.ListRequest{
 		Search:   c.Query("search"),
@@ -65,32 +76,22 @@ func isHTMXRequest(c *fiber.Ctx) bool {
 
 // writeAuthError turns a rejected authorize() into a response.
 //
-// The unauthenticated case has two answers, and which one is right
-// depends entirely on whether the admin has a login page to offer. With
-// a core.LoginBackend configured, a browser is redirected there,
-// carrying where it was going; without one there is nowhere to send
-// anybody and 401 is the whole story. This is the only behavioural
-// change WithLoginBackend makes to existing routes.
-//
-// Forbidden never redirects: the visitor is signed in and simply may
-// not do this, so bouncing them to a login form would invite them to
-// re-authenticate as the same person to the same refusal.
+// Which answer the unauthenticated case gets depends on whether there is a
+// login page to offer: with a LoginBackend the browser is redirected there
+// carrying where it was going, without one 401 is the whole story.
+// Forbidden never redirects -- the visitor is signed in and simply may not
+// do this, so a login form would invite them to re-authenticate as the
+// same person to the same refusal.
 func writeAuthError(c *fiber.Ctx, admin *core.Admin, basePath string, result authResult) error {
 	if result != authUnauthenticated {
-		return writeForbidden(c)
+		return writeForbidden(c, admin, basePath)
 	}
 	if admin.LoginBackend == nil {
-		return c.Status(fiber.StatusUnauthorized).SendString("Authentication required.")
+		return writeUnauthenticated(c, admin, basePath)
 	}
-	// redirectTo, not c.Redirect: an expired session most often shows up
-	// mid-page on an htmx request, where a 303 would be swapped into the
-	// page as content. redirectTo sends HX-Redirect for those, which
-	// navigates the whole window instead.
+	// redirectTo, not c.Redirect: an expired session usually surfaces mid-
+	// page on an htmx request, where a 303 would be swapped in as content.
 	return redirectTo(c, loginURL(basePath, requestedURL(c)))
-}
-
-func writeForbidden(c *fiber.Ctx) error {
-	return c.Status(fiber.StatusForbidden).SendString("Permission denied.")
 }
 
 func queryset(ctx context.Context, modelAdmin core.ModelAdmin) ([]any, error) {
@@ -113,7 +114,10 @@ func handleList(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rendere
 		perms := computePermissions(admin, principal, modelAdmin, nil)
 		relPerms := computeRelationPermissions(admin, principal, modelAdmin, modelAdmin.ListDisplay())
 
-		req := parseListRequest(c)
+		// Resolved once, then handed to both the query and the pager --
+		// otherwise PageOf would size the page control from the raw
+		// request and disagree with the rows actually fetched.
+		req := core.ApplyDefaults(modelAdmin, parseListRequest(c))
 		objects, total, err := core.ListObjects(c.Context(), modelAdmin, req)
 		if err != nil {
 			return err
@@ -144,17 +148,17 @@ func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
+		obj, err := modelAdmin.GetObject(c.Context(), pathParam(c, "pk"))
 		if err != nil {
 			return err
 		}
 		if core.IsNil(obj) {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		// The record's own page: per-object rules decide whether it
 		// offers Edit/Delete at all.
 		if !authorizeObject(admin, principal, core.ResourcePermission(slug, "view"), obj) {
-			return writeForbidden(c)
+			return writeForbidden(c, admin, basePath)
 		}
 		perms := computePermissions(admin, principal, modelAdmin, obj)
 		relPerms := computeRelationPermissions(admin, principal, modelAdmin, modelAdmin.DetailFields())
@@ -168,14 +172,11 @@ func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 	}
 }
 
-// validateWritable runs the ModelAdmin's own validation, then drops any
-// complaint about a read-only field. Such a field is never posted (see
-// parseFormData), so a `required` read-only field would otherwise fail
-// validation on every save -- the value is not missing, it is simply not
-// the form's to send.
-//
-// Wrapping rather than changing Validate keeps the ModelAdmin contract
-// as it was, so an application's own Validate override is unaffected.
+// validateWritable runs the ModelAdmin's validation, then drops complaints
+// about read-only fields. Such a field is never posted, so a required one
+// would otherwise fail every save: the value is not missing, it is simply
+// not the form's to send. Wrapping rather than changing Validate leaves an
+// application's own override unaffected.
 func validateWritable(modelAdmin core.ModelAdmin, data map[string]any, obj any) map[string][]string {
 	errs := modelAdmin.Validate(data)
 	for name := range errs {
@@ -186,11 +187,31 @@ func validateWritable(modelAdmin core.ModelAdmin, data map[string]any, obj any) 
 	return errs
 }
 
+// formValue reads a posted field and returns a string that outlives the
+// request.
+//
+// Not defensive tidiness but a correctness fix: c.FormValue returns a
+// string pointing into fasthttp's request buffer, and fasthttp reuses
+// that buffer for the next request, so a value stored on a record
+// silently becomes whatever the next request posted. Create
+// "aaa@example.com" then "bbb@example.com", and the first record's
+// email had become "bbb@example.com" with no write to it.
+func formValue(c *fiber.Ctx, name string) string {
+	return strings.Clone(c.FormValue(name))
+}
+
+// pathParam is formValue's counterpart for a URL segment: c.Params has
+// the same request-buffer lifetime, and a pk reaches application code
+// (GetObject, and whatever it keys off).
+func pathParam(c *fiber.Ctx, name string) string {
+	return strings.Clone(c.Params(name))
+}
+
 // parseFormData reads the posted form into a data map. obj is the record
-// being edited (nil when creating), and is passed only so read-only
-// fields can be resolved: a read-only field is skipped entirely, so a
-// crafted POST naming it cannot write it. Omitting the input from the
-// form is presentation; this is the enforcement.
+// being edited, nil when creating, and is passed only to resolve
+// read-only fields: such a field is skipped entirely, so a crafted POST
+// naming it cannot write it. Omitting the input is presentation; this is
+// the enforcement.
 func parseFormData(c *fiber.Ctx, modelAdmin core.ModelAdmin, obj any) map[string]any {
 	data := make(map[string]any, len(modelAdmin.FormFields()))
 	for _, name := range modelAdmin.FormFields() {
@@ -209,7 +230,7 @@ func parseFormData(c *fiber.Ctx, modelAdmin core.ModelAdmin, obj any) map[string
 			}
 			data[name] = values
 		default:
-			data[name] = field.ParseFormValue(c.FormValue(name))
+			data[name] = field.ParseFormValue(formValue(c, name))
 		}
 	}
 	return data
@@ -264,8 +285,14 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *R
 			return err
 		}
 		setFlash(c, "success", modelAdmin.VerboseName()+" created.")
+		// "Save and add another" goes back to an empty form, which is the
+		// whole point when entering records in a batch -- checked before
+		// building the record's own URL, since it never uses one.
+		if c.FormValue(saveAddAnotherField) != "" {
+			return redirectTo(c, basePath+"/"+slug+"/create")
+		}
 		target := basePath + "/" + slug + "/" + stringOrEmpty(modelAdmin.GetPK(obj))
-		if c.FormValue("_continue") != "" {
+		if c.FormValue(saveContinueField) != "" {
 			target += "/edit"
 		}
 		return redirectTo(c, target)
@@ -279,15 +306,15 @@ func handleEditGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rend
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
+		obj, err := modelAdmin.GetObject(c.Context(), pathParam(c, "pk"))
 		if err != nil {
 			return err
 		}
 		if core.IsNil(obj) {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		if !authorizeObject(admin, principal, core.ResourcePermission(slug, "update"), obj) {
-			return writeForbidden(c)
+			return writeForbidden(c, admin, basePath)
 		}
 		relOptions := computeRelationOptions(admin, modelAdmin, obj)
 		html, err := renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, nil, nil, relOptions)
@@ -306,15 +333,15 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Ren
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
+		obj, err := modelAdmin.GetObject(c.Context(), pathParam(c, "pk"))
 		if err != nil {
 			return err
 		}
 		if core.IsNil(obj) {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		if !authorizeObject(admin, principal, core.ResourcePermission(slug, "update"), obj) {
-			return writeForbidden(c)
+			return writeForbidden(c, admin, basePath)
 		}
 		data := parseFormData(c, modelAdmin, obj)
 		errs := validateWritable(modelAdmin, data, obj)
@@ -337,8 +364,11 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Ren
 		}
 		recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditUpdate, obj)
 		setFlash(c, "success", modelAdmin.VerboseName()+" updated.")
+		if c.FormValue(saveAddAnotherField) != "" {
+			return redirectTo(c, basePath+"/"+slug+"/create")
+		}
 		target := basePath + "/" + slug + "/" + c.Params("pk")
-		if c.FormValue("_continue") != "" {
+		if c.FormValue(saveContinueField) != "" {
 			target += "/edit"
 		}
 		return redirectTo(c, target)
@@ -352,15 +382,15 @@ func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Re
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
+		obj, err := modelAdmin.GetObject(c.Context(), pathParam(c, "pk"))
 		if err != nil {
 			return err
 		}
 		if core.IsNil(obj) {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		if !authorizeObject(admin, principal, core.ResourcePermission(slug, "delete"), obj) {
-			return writeForbidden(c)
+			return writeForbidden(c, admin, basePath)
 		}
 		html, err := renderer.RenderDelete(principal, csrfToken(c), modelAdmin, obj)
 		if err != nil {
@@ -378,13 +408,13 @@ func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
+		obj, err := modelAdmin.GetObject(c.Context(), pathParam(c, "pk"))
 		if err != nil {
 			return err
 		}
 		if !core.IsNil(obj) {
 			if !authorizeObject(admin, principal, core.ResourcePermission(slug, "delete"), obj) {
-				return writeForbidden(c)
+				return writeForbidden(c, admin, basePath)
 			}
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
 				return err
@@ -406,13 +436,13 @@ func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		obj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
+		obj, err := modelAdmin.GetObject(c.Context(), pathParam(c, "pk"))
 		if err != nil {
 			return err
 		}
 		if !core.IsNil(obj) {
 			if !authorizeObject(admin, principal, core.ResourcePermission(slug, "delete"), obj) {
-				return writeForbidden(c)
+				return writeForbidden(c, admin, basePath)
 			}
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
 				return err
@@ -423,17 +453,15 @@ func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 	}
 }
 
-// handleLookup serves GET /{slug}/lookup?q=... -- an HTML fragment of
-// matching options for this resource, meant to be consumed
-// by another resource's autocomplete combobox (the ui/field.html
-// template's combobox branch, see render_helpers.go's formInputHTML).
-// Gated on *this* resource's own "view" permission, since that's what's
-// actually being browsed.
 // lookupLimit caps the autocomplete's suggestions. The control is a
 // search box, not a browser -- past a screenful the answer is "type
 // more", not "scroll".
 const lookupLimit = 20
 
+// handleLookup serves GET /{slug}/lookup?q=..., an HTML fragment of
+// matching options consumed by another resource's autocomplete combobox.
+// Gated on this resource's own "view" permission, since that is what is
+// being browsed.
 func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
@@ -476,13 +504,10 @@ func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 	}
 }
 
-// handleAction serves POST /{slug}/actions/:name -- runs a ModelAdmin
-// Action over the objects named by the "pks" form field.
-// Serves both entry points with the same route: the list view's
-// bulk-select form posts every checked row's pk, the detail page's
-// per-record action buttons post a single-item "pks". Mirrors the
-// FastAPI adapter's build_action_handler, including the flash message
-// left for whichever page (list or detail) the redirect lands on.
+// handleAction serves POST /{slug}/actions/:name, running an Action over
+// the objects named by the "pks" form field. One route for both entry
+// points: the list's bulk-select form posts every checked row, a detail
+// page's action button posts a single-item "pks".
 func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
@@ -492,11 +517,11 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 		}
 		action, ok := core.GetAction(modelAdmin, c.Params("name"))
 		if !ok {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		if action.Permission != "" && admin.Authorizer != nil {
 			if !admin.Authorizer.Can(principal, core.ResourcePermission(slug, action.Permission), modelAdmin) {
-				return c.Status(fiber.StatusForbidden).SendString("Permission denied.")
+				return writeForbidden(c, admin, basePath)
 			}
 		}
 
@@ -506,11 +531,9 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 		redirectTarget := core.SafeRedirectPath(
 			c.Get("Referer"), string(c.Request().Host()), basePath, basePath+"/"+slug)
 
-		// "Select all N matching" posts the filters instead of the pks:
-		// a checkbox can only reach the rows on screen, so acting on a
-		// filtered set of 500 from a 25-row page was impossible to
-		// express. The set is resolved server-side from the same query
-		// the list was showing.
+		// "Select all N matching" posts the filters instead of the pks: a
+		// checkbox only reaches the rows on screen. The set is resolved server-
+		// side from the same query the list was showing.
 		selectAll := c.FormValue(selectAllField) != ""
 		if !selectAll && len(raw) == 0 {
 			setFlash(c, "warning", "No items selected.")
@@ -560,29 +583,26 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 	}
 }
 
-// handleInlineCreate serves POST {slug}/{pk}/inlines/:child -- creates
-// one inline child row (see core/inline.go, docs/inlines.md). The
-// response always carries just the freshly rebuilt whole inline
-// section (full-region-swap, matching RenderListFragment/
-// RenderFormFragment's existing idiom), never a redirect and never
-// the whole parent page.
+// handleInlineCreate serves POST {slug}/{pk}/inlines/:child. The response
+// is the rebuilt inline section alone -- never a redirect, never the whole
+// parent page -- matching the other fragment routes.
 func handleInlineCreate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
 	parentSlug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
 		inline, ok := findInline(modelAdmin, c.Params("child"))
 		if !ok {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		principal, result := authorize(admin, c, core.ResourcePermission(parentSlug, "update"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		parentObj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
+		parentObj, err := modelAdmin.GetObject(c.Context(), pathParam(c, "pk"))
 		if err != nil {
 			return err
 		}
 		if core.IsNil(parentObj) {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		childAdmin, _ := admin.GetModelAdmin(inline.Child)
 		if _, result := authorize(admin, c, core.ResourcePermission(inline.Child, "create"), childAdmin); result != authOK {
@@ -620,18 +640,18 @@ func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 	return func(c *fiber.Ctx) error {
 		inline, ok := findInline(modelAdmin, c.Params("child"))
 		if !ok {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		principal, result := authorize(admin, c, core.ResourcePermission(parentSlug, "update"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		parentObj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
+		parentObj, err := modelAdmin.GetObject(c.Context(), pathParam(c, "pk"))
 		if err != nil {
 			return err
 		}
 		if core.IsNil(parentObj) {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		childAdmin, _ := admin.GetModelAdmin(inline.Child)
 		if _, result := authorize(admin, c, core.ResourcePermission(inline.Child, "update"), childAdmin); result != authOK {
@@ -643,7 +663,7 @@ func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 			return err
 		}
 		if core.IsNil(childObj) {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 
 		data := parseFormData(c, childAdmin, nil)
@@ -677,24 +697,24 @@ func handleInlineDelete(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 	return func(c *fiber.Ctx) error {
 		inline, ok := findInline(modelAdmin, c.Params("child"))
 		if !ok {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		principal, result := authorize(admin, c, core.ResourcePermission(parentSlug, "update"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		parentObj, err := modelAdmin.GetObject(c.Context(), c.Params("pk"))
+		parentObj, err := modelAdmin.GetObject(c.Context(), pathParam(c, "pk"))
 		if err != nil {
 			return err
 		}
 		if core.IsNil(parentObj) {
-			return c.Status(fiber.StatusNotFound).SendString("Not found")
+			return writeNotFound(c, admin, basePath)
 		}
 		childAdmin, _ := admin.GetModelAdmin(inline.Child)
 		if _, result := authorize(admin, c, core.ResourcePermission(inline.Child, "delete"), childAdmin); result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		childObj, err := childAdmin.GetObject(c.Context(), c.Params("childPK"))
+		childObj, err := childAdmin.GetObject(c.Context(), pathParam(c, "childPK"))
 		if err != nil {
 			return err
 		}
@@ -713,10 +733,9 @@ func handleInlineDelete(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 	}
 }
 
-// redirectTo mirrors the FastAPI adapter's HTMX-aware redirect: a
-// plain 303 for a normal browser navigation, an HX-Redirect response
-// for an HTMX request, since htmx otherwise treats a redirected AJAX
-// response as content to swap in, not a page navigation.
+// redirectTo is htmx-aware: a plain 303 for a browser navigation, HX-
+// Redirect for an htmx request, which otherwise swaps the redirected
+// response in as content.
 func redirectTo(c *fiber.Ctx, url string) error {
 	if isHTMXRequest(c) {
 		c.Set("HX-Redirect", url)

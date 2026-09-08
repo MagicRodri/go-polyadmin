@@ -281,6 +281,10 @@ func TestUIRegistryMatchesThePythonImplementationKeyForKey(t *testing.T) {
 		"history": true,
 		// login page (shadcn's login-04 block)
 		"login": true,
+		// 401/403/404 page
+		"error": true,
+		// bounded scrolling region (shadcn ScrollArea)
+		"scroll-area": true,
 	}
 	for component := range uiRegistry {
 		if !expected[component] {

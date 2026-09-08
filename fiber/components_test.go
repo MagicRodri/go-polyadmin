@@ -11,8 +11,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// -- date picker (Phase D) -----------------------------------------------
-
 type datedThing struct {
 	ID       int
 	Name     string
@@ -108,9 +106,6 @@ func TestDateFieldStillWrappedInTheFormFieldUnit(t *testing.T) {
 	}
 }
 
-// Filtering is one drawer behind one toolbar trigger (Django admin's
-// filter column, in Unfold's drawer form), not a dropdown per filter --
-// so a ModelAdmin's filter count costs the toolbar nothing.
 func TestFiltersRenderAsOneDrawerBehindOneTrigger(t *testing.T) {
 	page := filterablePage(t, nil)
 
@@ -140,8 +135,6 @@ func TestFiltersRenderAsOneDrawerBehindOneTrigger(t *testing.T) {
 	}
 }
 
-// The trigger carries a count so the drawer says how much it's hiding
-// without being opened -- and only once something is applied.
 func TestFilterTriggerCountsOnlyAppliedFilters(t *testing.T) {
 	count, err := uiClasses("filter-panel", "count")
 	if err != nil {
@@ -156,9 +149,6 @@ func TestFilterTriggerCountsOnlyAppliedFilters(t *testing.T) {
 	}
 }
 
-// Reset clears search *and* every filter, so it lives with the things
-// it clears -- in the drawer's footer -- which is also what keeps the
-// stacked mobile toolbar to its five controls.
 func TestResetLivesInTheDrawerAndOnlyWhenSomethingIsApplied(t *testing.T) {
 	if strings.Contains(filterablePage(t, nil), "Clear all") {
 		t.Error("expected no Reset while nothing is applied")
@@ -169,10 +159,6 @@ func TestResetLivesInTheDrawerAndOnlyWhenSomethingIsApplied(t *testing.T) {
 	}
 }
 
-// Every toolbar control fills its own line while the toolbar is a
-// single stacked column below sm. The ones wrapped in a <form> or a
-// positioning <div> can't inherit that from the flex row, so each
-// carries "toolbar item" itself.
 func TestToolbarControlsFillTheirLineWhileStacked(t *testing.T) {
 	item, err := uiClasses("toolbar", "item")
 	if err != nil {
@@ -207,9 +193,6 @@ func filterablePage(t *testing.T, query map[string]string) string {
 	return body(t, doGet(t, app, path, nil))
 }
 
-// A stacked toolbar control is a full-width bar, so its label goes hard
-// left and its icon hard right rather than sitting centred. Every
-// control that has both carries the pair.
 func TestStackedToolbarControlsPutTheLabelLeftAndTheIconRight(t *testing.T) {
 	label, err := uiClasses("toolbar", "item-label")
 	if err != nil {
@@ -234,11 +217,6 @@ func TestStackedToolbarControlsPutTheLabelLeftAndTheIconRight(t *testing.T) {
 	}
 }
 
-// A label is arbitrary application text, so it reaches Alpine as a data
-// attribute the browser decodes -- never quoted into the x-data
-// expression, where one stray quote closes the attribute and every
-// select on the page fails to initialise. (The Python mirror shipped
-// exactly that bug via tojson.)
 func TestSelectLabelIsADataAttributeNotAJSStringLiteral(t *testing.T) {
 	page := datedFormPage(t, "/admin/tasks/1/edit")
 
@@ -258,11 +236,6 @@ func TestSelectLabelIsADataAttributeNotAJSStringLiteral(t *testing.T) {
 	}
 }
 
-// -- booleans as icons ----------------------------------------------------
-
-// A column of booleans is scannable as glyphs and not as two
-// similar-length words, so list cells render a check or a cross. The
-// word stays as an sr-only label, so nothing depends on the icon alone.
 func TestBooleanCellsRenderAsIconsWithAnAccessibleLabel(t *testing.T) {
 	app, userAdmin := makeApp(t)
 	userAdmin.createUser("yes@example.com", true)
@@ -288,9 +261,6 @@ func TestBooleanCellsRenderAsIconsWithAnAccessibleLabel(t *testing.T) {
 	}
 }
 
-// Exports stringify through core/exporter.go, never through
-// fieldValueHTML, so a CSV still carries a readable value rather than
-// an SVG.
 func TestBooleanExportIsUnaffectedByTheIconRendering(t *testing.T) {
 	app, userAdmin := makeApp(t)
 	userAdmin.createUser("yes@example.com", true)
@@ -303,8 +273,6 @@ func TestBooleanExportIsUnaffectedByTheIconRendering(t *testing.T) {
 		t.Errorf("expected the boolean as text in the export, got %s", csv)
 	}
 }
-
-// -- shadcn Select for plain choice fields -------------------------------
 
 func TestEnumFieldRendersShadcnSelectNotNativeOptions(t *testing.T) {
 	page := datedFormPage(t, "/admin/tasks/1/edit")
@@ -331,8 +299,6 @@ func TestEnumFieldSelectListsAllChoicesAsOptions(t *testing.T) {
 	}
 }
 
-// -- export dropdown (Phase B) ------------------------------------------
-
 func TestListRendersExportDropdownRatherThanOneButtonPerFormat(t *testing.T) {
 	admin := core.New(core.WithModelAdmins(newTestUserAdmin()))
 	app := newTestApp(t, admin)
@@ -348,8 +314,6 @@ func TestListRendersExportDropdownRatherThanOneButtonPerFormat(t *testing.T) {
 		t.Error("expected menu items")
 	}
 }
-
-// -- list-view reordering ------------------------------------------------
 
 func TestListShowsDragHandleOnlyWhenReorderable(t *testing.T) {
 	plain := newTestUserAdmin()
@@ -393,8 +357,6 @@ func TestListRowActionsRenderAsOneDropdownMenu(t *testing.T) {
 	}
 }
 
-// -- combobox (Phase D) --------------------------------------------------
-
 func TestComboboxUsesTokenClasses(t *testing.T) {
 	// The autocomplete relation field is the one genuinely Alpine-driven
 	// form control; its panel/active-item classes must come from the
@@ -417,10 +379,6 @@ func TestComboboxUsesTokenClasses(t *testing.T) {
 	}
 }
 
-// shadcn's ToastViewport, pinned bottom-right. pointer-events-none
-// matters: record pages now carry a sticky action bar in that same
-// corner, and the viewport spans a strip of the screen even with no
-// toasts in it -- without it, Save would be unclickable.
 func TestToastViewportSitsBottomRightAndDoesNotBlockClicks(t *testing.T) {
 	viewport, err := uiClasses("toast", "list")
 	if err != nil {
@@ -447,10 +405,6 @@ func TestToastViewportSitsBottomRightAndDoesNotBlockClicks(t *testing.T) {
 	}
 }
 
-// The three listbox-ish components declare ARIA roles, which is a
-// promise to assistive tech that the keyboard works. These pin the
-// mechanics that make the promise true; the behaviour itself is
-// exercised in a browser (see the accessibility CDP run).
 func TestSelectIsKeyboardOperable(t *testing.T) {
 	page := datedFormPage(t, "/admin/tasks/1/edit")
 
@@ -473,8 +427,6 @@ func TestSelectIsKeyboardOperable(t *testing.T) {
 		t.Error("options must not be individually tabbable")
 	}
 }
-
-// -- fieldsets ------------------------------------------------------------
 
 type fieldsetAdmin struct{ datedAdmin }
 
@@ -519,8 +471,6 @@ func TestCollapsedFieldsetStartsClosedAndOthersOpen(t *testing.T) {
 	}
 }
 
-// The default case must not gain a wrapper: an admin that declares no
-// fieldsets should render exactly the flat form it always did.
 func TestUndeclaredFieldsetsRenderNoGroupChrome(t *testing.T) {
 	page := datedFormPage(t, "/admin/tasks/1/edit")
 	base, err := uiClasses("fieldset")
@@ -534,8 +484,6 @@ func TestUndeclaredFieldsetsRenderNoGroupChrome(t *testing.T) {
 		t.Error("the flat form still has to render its fields")
 	}
 }
-
-// -- read-only fields -----------------------------------------------------
 
 type readOnlyAdmin struct{ datedAdmin }
 
@@ -565,8 +513,6 @@ func readOnlyApp(t *testing.T) (*fiber.App, *readOnlyAdmin) {
 	return newTestApp(t, core.New(core.WithModelAdmins(ma))), ma
 }
 
-// The one that matters: omitting the input is presentation, not
-// enforcement. A crafted POST must not be able to write the field.
 func TestReadOnlyFieldIsRefusedEvenWhenPosted(t *testing.T) {
 	app, ma := readOnlyApp(t)
 	before := ma.item.Name
@@ -605,10 +551,6 @@ func TestReadOnlyFieldRendersAsAValueNotAnInput(t *testing.T) {
 	}
 }
 
-// -- boolean fields render as an inline switch ---------------------------
-
-// Django Unfold's treatment: a toggle beside its name, not a checkbox
-// stacked under a label.
 func TestBooleanFieldRendersAsASwitchInlineWithItsLabel(t *testing.T) {
 	admin := core.New(core.WithModelAdmins(newActionableUserAdmin()))
 	page := body(t, doGet(t, newTestApp(t, admin), "/admin/users/create", nil))
@@ -635,8 +577,6 @@ func TestBooleanFieldRendersAsASwitchInlineWithItsLabel(t *testing.T) {
 	}
 }
 
-// Every other type keeps the label-above-control layout -- the inline
-// row is specific to booleans.
 func TestNonBooleanFieldsKeepTheStackedLayout(t *testing.T) {
 	page := datedFormPage(t, "/admin/tasks/create")
 	row, err := uiClasses("field", "row")
@@ -647,8 +587,6 @@ func TestNonBooleanFieldsKeepTheStackedLayout(t *testing.T) {
 		t.Error("a form with no boolean field must not use the inline row layout")
 	}
 }
-
-// -- field descriptions ---------------------------------------------------
 
 type describedAdmin struct{ datedAdmin }
 
@@ -669,24 +607,18 @@ func describedPage(t *testing.T, path string) string {
 	return body(t, doGet(t, newTestApp(t, admin), path, nil))
 }
 
-// A field's help text is where an ORM/DB column comment lands. It
-// belongs to the form, which is where someone is being asked to fill the
-// field in.
 func TestFieldDescriptionShowsOnTheForm(t *testing.T) {
 	if !strings.Contains(describedPage(t, "/admin/tasks/1/edit"), "What the task is called.") {
 		t.Error("expected the field's help text on the form")
 	}
 }
 
-// The detail page asks nothing, so it shows no help text -- it would be
-// instructions next to a value nobody is editing.
 func TestFieldDescriptionDoesNotShowOnTheDetailPage(t *testing.T) {
 	if strings.Contains(describedPage(t, "/admin/tasks/1"), "What the task is called.") {
 		t.Error("the detail page must not render field help text")
 	}
 }
 
-// A field without one must not render an empty description block.
 func TestFieldWithoutADescriptionRendersNone(t *testing.T) {
 	page := describedPage(t, "/admin/tasks/1/edit")
 	desc, err := uiClasses("field", "description")

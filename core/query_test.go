@@ -107,8 +107,6 @@ func TestExecuteListQueryComposesSearchFilterOrdering(t *testing.T) {
 	}
 }
 
-// -- the ListQuerier capability ------------------------------------------
-
 func TestListWindowDerivesOffsetAndLimitFromThePage(t *testing.T) {
 	cases := []struct {
 		req           ListRequest
@@ -140,8 +138,6 @@ func TestUnlimitedWindowIgnoresThePageNumber(t *testing.T) {
 		t.Errorf("got (%d,%d), want (0,0)", offset, limit)
 	}
 }
-
-// -- default ordering -----------------------------------------------------
 
 type orderedAdmin struct {
 	BaseModelAdmin

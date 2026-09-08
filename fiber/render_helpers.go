@@ -9,11 +9,9 @@ import (
 	"github.com/MagicRodri/go-polyadmin/core"
 )
 
-// mustUI resolves a ui.go class string or panics. Only ever called from
-// package-level var initializers below, so an unknown component or
-// modifier fails at program start rather than mid-request -- the same
-// loud-failure guarantee uiClasses gives templates, moved to init time
-// for the class strings this file bakes in.
+// mustUI resolves a ui.go class string or panics. Called only from the
+// package-level vars below, so an unknown name fails at program start
+// rather than mid-request.
 func mustUI(component string, modifiers ...string) string {
 	classes, err := uiClasses(component, modifiers...)
 	if err != nil {
@@ -22,17 +20,15 @@ func mustUI(component string, modifiers ...string) string {
 	return classes
 }
 
-// The shadcn-derived class strings this file emits directly in Go,
-// for the read-only value renderer (fieldValueHTML) and the compact
-// tabular inline cell renderer (inlineTableCellHTML) -- both
-// deliberately still build HTML by hand rather than through a
-// template (see each's own doc comment for why). The full form-field
-// renderer does not use these: it delegates to the ui/field template
-// partial instead -- see formInputHTML.
+// The class strings this file emits directly, for the two renderers that
+// build HTML by hand. formInputHTML does not use them: it delegates to the
+// ui/field partial.
 var (
 	classInputCompact = mustUI("input", "size-sm")
 	classSelectSmall  = mustUI("select", "size-sm")
-	classSelectAuto   = mustUI("select", "size-auto")
+	classSelectCell   = mustUI("select", "cell")
+	classSelectMulti  = mustUI("select", "cell-multi")
+	classScrollAreaY  = mustUI("scroll-area", "y")
 	classCheckbox     = mustUI("checkbox")
 	classTextError    = mustUI("text", "error")
 
@@ -40,15 +36,28 @@ var (
 	classLink        = mustUI("text", "link")
 )
 
-// fieldValueHTML renders a field's read-only value (list/detail),
-// including permission-aware relation links. Built in
-// Go rather than inside a template so every dynamic bit of text goes
-// through html.EscapeString explicitly -- template.HTML bypasses
-// html/template's auto-escaping, so this function is the one place
-// that has to get escaping right by hand.
-func fieldValueHTML(admin *core.Admin, basePath string, relationPermissions map[string]bool, field core.Field, value any) template.HTML {
-	dash := template.HTML(`<span class="` + classPlaceholder + `">&mdash;</span>`)
-	if core.IsNil(value) {
+// isBlank reports whether a value is an empty string. Only strings:
+// a zero int or a false bool are real values, and showing a dash for
+// them would be a lie.
+func isBlank(value any) bool {
+	str, ok := value.(string)
+	return ok && strings.TrimSpace(str) == ""
+}
+
+// fieldValueHTML renders a field's read-only value for list and detail,
+// including permission-aware relation links. Built in Go rather than in
+// a template so every dynamic string goes through html.EscapeString
+// explicitly: template.HTML bypasses html/template's auto-escaping, so
+// this is the one place that has to get escaping right by hand.
+func fieldValueHTML(admin *core.Admin, basePath string, relationPermissions map[string]bool, field core.Field, value any, emptyValue string) template.HTML {
+	if emptyValue == "" {
+		emptyValue = core.DefaultEmptyValue
+	}
+	dash := template.HTML(`<span class="` + classPlaceholder + `">` + html.EscapeString(emptyValue) + `</span>`)
+	// Blank counts as empty, not just nil: a column of empty cells and a
+	// column of dashes say different things to a reader, and "" is by
+	// far the more common way a value goes missing in practice.
+	if core.IsNil(value) || isBlank(value) {
 		return dash
 	}
 	switch field.Type {
@@ -79,18 +88,12 @@ func fieldValueHTML(admin *core.Admin, basePath string, relationPermissions map[
 	}
 }
 
-// boolIconHTML renders a boolean as a check or a cross rather than the
-// words "Yes"/"No" -- Django admin's convention, and the one thing that
-// makes a column of booleans scannable: a glyph reads as a shape at a
-// glance where two similar-length words have to be read.
-//
-// The word stays in the markup as an sr-only label, so a screen reader
-// still hears "Yes"/"No" and nothing depends on the icon alone (the
-// icon itself is aria-hidden, from iconHTML). Exports are untouched --
-// they stringify through core/exporter.go, never through here.
-//
-// `class` and `label` are package-internal constants, never field data,
-// so neither needs escaping the way the value branches above do.
+// boolIconHTML renders a boolean as a check or a cross rather than
+// "Yes"/"No": a glyph reads as a shape at a glance where two similar-
+// length words have to be read. The word stays as an sr-only label, so
+// nothing depends on the icon alone. Exports stringify through
+// core/exporter.go and are untouched. `class` and `label` are package
+// constants, never field data, so neither needs escaping.
 func boolIconHTML(icon, class, label string) template.HTML {
 	return template.HTML(`<span class="inline-flex items-center ` + class + `">` +
 		string(iconHTML(icon, "size-4")) +
@@ -170,24 +173,19 @@ type fieldOptionData struct {
 	Selected bool
 }
 
-// formInputHTML renders a field's form input as the Form/FormItem unit
-// ported from shadcn/ui -- label, control, description, error -- by
-// resolving every per-type value (stringification, selection matching,
-// option lists) here in Go and handing the result to the ui/field
-// template partial to dispatch and print. The Go counterpart to
-// fieldValueHTML; the same care around correct escaping applies,
-// though here it's html/template's own contextual auto-escaping doing
-// the work rather than a manual html.EscapeString call, since every
-// value reaches the template as a plain field on the data map instead
-// of a hand-built HTML string.
+// formInputHTML renders a field's form input as shadcn's Form/FormItem
+// unit -- label, control, description, error -- resolving every per-type
+// value here in Go and handing the result to the ui/field partial to
+// dispatch and print. Unlike fieldValueHTML, escaping is html/template's
+// own, since every value reaches the template as a plain field on the
+// data map rather than a hand-built HTML string.
 //
-// A method on Renderer only because rendering goes through r.uiHTML,
-// which executes against the shared ui/*.html template set (see
-// NewRenderer's r.uiSet).
-// readOnly renders the field as its value instead of a control. It is
-// distinct from core.Field.ReadOnly (which marks a native input
-// `readonly` but still posts): this one removes the control entirely,
-// and pairs with parseFormData refusing the name.
+// The readOnly argument renders the field as its value instead of a
+// control, which is distinct from core.Field.ReadOnly (a native
+// `readonly` input, which still posts): it removes the control
+// entirely, and pairs with parseFormData refusing the name.
+//
+// A method on Renderer only because it renders through r.uiHTML.
 func (r *Renderer) formInputHTML(basePath string, field core.Field, value any, errs []string, relation *relationFieldOptions, readOnly bool) (template.HTML, error) {
 	data := map[string]any{
 		"ReadOnlyField": readOnly,

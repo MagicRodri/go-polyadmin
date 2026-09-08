@@ -2,41 +2,31 @@
      `w-full caption-bottom text-sm` table, muted uppercase headers, and
      rows that highlight on hover. Class strings come from ui("table", ...)
      so the dashboard's Table widget and tabular inlines match this one.
-     Mirrors python-polyadmin/.../components/ui/table.html.
 
-     Called from admin/components/list_content.html with the listData context (.Columns,
-     .Rows, .Actions, .Permissions, .BasePath, .Slug, .Ordering,
-     .VerboseName, .Reorderable).
+     Called from components/list_content.html with the listData context
+     (.Columns, .Rows, .Actions, .Permissions, .BasePath, .Slug,
+     .Ordering, .VerboseName, .Reorderable).
 
-     Row actions are one dropdown-menu button (dots-vertical) instead
-     of a row of icon buttons -- shadcn/ui's own dashboard-01 data
-     table does the same once a row has more than one or two actions.
-     Built inline here rather than through ui/dropdown-menu: that
-     partial's items are URL links or plain labels only (see its own
-     doc comment), and Delete needs hx-delete/hx-confirm on an item,
-     which isn't a shape that component's data-only item list
-     expresses -- matching the framework's existing precedent of
-     bespoke overlay markup at a specific call site (dialog, toast,
-     tabs) rather than forcing every variant through one shared
-     partial.
+     Row actions are one dropdown trigger rather than a row of icon
+     buttons. Built inline instead of through ui/dropdown-menu, whose
+     items are links or labels only: Delete needs hx-delete/hx-confirm
+     on an item, which that data-only list cannot express.
 
-     Reorderable drag-and-drop is visual only: SortableJS (theme.html)
-     reorders the actual <tr> elements in place with no onEnd handler
-     and nothing hydrated from a data attribute, so there's no state to
-     keep in sync -- the next sort, search, page, or plain reload
-     re-renders the table from the server's real order and the drag
-     is simply gone. That statelessness is also why x-init lives
-     directly on <tbody> with no x-data: htmx's outerHTML swap
-     (search/sort/pagination) replaces this whole component, and
-     Alpine re-runs x-init on every element it discovers, so the drag
-     keeps working after a swap for free. */}}
+     Reorderable drag-and-drop is visual only: SortableJS reorders the
+     <tr> elements with no onEnd handler and nothing hydrated from a
+     data attribute, so there is no state to keep in sync and the next
+     sort, search, page, or reload simply re-renders the server's real
+     order. That is also why x-init sits on <tbody> with no x-data:
+     htmx's outerHTML swap replaces this whole component, and Alpine
+     re-runs x-init on what it discovers, so the drag survives a swap
+     for free. */}}
 
 {{define "ui/table"}}
-{{/* selectAll state lives here rather than on the bulk-actions form:
-     the header checkbox is inside this table, the form is a sibling in
-     the toolbar (the two are linked by the HTML form= attribute), and
-     Alpine state cannot span them. The form's hidden flag is written
-     imperatively for the same reason. */}}
+{{/* selectAll state lives here, not on the bulk-actions form: the
+     header checkbox is inside this table and the form is a sibling in
+     the toolbar (linked by the HTML form= attribute), so Alpine state
+     cannot span them. The form's hidden flag is written imperatively
+     for the same reason. */}}
 <div class="{{ui "table" "wrapper"}}"
      x-data="{
        pageTicked: false,
@@ -75,7 +65,7 @@
   </button>
 </div>
 {{end}}
-<div class="overflow-x-auto">
+<div class="{{ui "table" "scroll"}}">
   <table class="min-w-full divide-y divide-border">
     <thead class="{{ui "table" "head"}}">
       <tr class="text-muted-foreground">
@@ -87,14 +77,10 @@
                  class="{{ui "checkbox"}}">
         </th>
         {{end}}
-        {{/* DataTableColumnHeader, from shadcn/ui's Tasks example: the
-             header is a dropdown trigger offering Asc/Desc explicitly,
-             rather than a link that cycles direction on each click --
-             with a cycling link you can't tell what a click will do
-             until you try it. The trigger's icon shows the current
-             direction, or the neutral up/down glyph when the column
-             isn't sorted. Both choices are real hrefs (URLs precomputed
-             in buildListData), so sorting still works with JS off. */}}
+        {{/* The header is a dropdown offering Asc/Desc explicitly rather
+             than a link that cycles: with a cycling link you cannot
+             tell what a click will do until you try it. Both choices
+             are real hrefs, so sorting works with JS off. */}}
         {{range $i, $col := .Columns}}
         <th scope="col" class="{{ui "table" "th"}}"
             {{if eq $col.Direction "asc"}}aria-sort="ascending"{{else if eq $col.Direction "desc"}}aria-sort="descending"{{end}}>

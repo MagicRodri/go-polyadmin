@@ -65,8 +65,7 @@ func csrfMiddleware(admin *core.Admin, basePath string) fiber.Handler {
 			submitted = c.FormValue(core.CSRFFieldName)
 		}
 		if !core.CSRFTokensMatch(submitted, token) {
-			return c.Status(fiber.StatusForbidden).
-				SendString("CSRF token missing or invalid. Reload the page and try again.")
+			return writeCSRFFailure(c, admin, basePath)
 		}
 		return c.Next()
 	}

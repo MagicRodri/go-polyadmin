@@ -1,17 +1,15 @@
-{{/* DataTablePagination, ported from shadcn/ui's Tasks example: the
-     selection count on the left, then rows-per-page, the page
-     indicator, and the four jump buttons on the right. Mirrors the
-     Python adapter's components/ui/pagination.html.
+{{/* DataTablePagination, from shadcn's Tasks example: selection count
+     left, then rows-per-page, the page indicator and the four jump
+     buttons right.
 
-     Unlike the old prev/next pair this always renders, even for a
-     single page -- the row count and the rows-per-page control are
-     useful when there's nothing to page through, and a footer that
-     vanishes makes the table appear to jump as you filter.
+     It always renders, even for a single page: the row count and the
+     rows-per-page control are useful with nothing to page through, and
+     a footer that vanishes makes the table appear to jump as you
+     filter.
 
-     Every URL is precomputed by Renderer.buildListData (PageURLs,
-     PageSizeOptions), so this template assembles no query strings.
-     Each is a real href as well as an hx-get, so paging still works
-     with JS off. */}}
+     Every URL is precomputed, so this template assembles no query
+     strings, and each is a real href as well as an hx-get, so paging
+     works with JS off. */}}
 {{define "ui/pagination"}}
 <nav class="{{ui "pagination"}}">
   {{/* The example shows "N of M row(s) selected". Selection is client

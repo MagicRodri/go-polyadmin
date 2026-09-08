@@ -1,30 +1,16 @@
-{{/* Form/FormItem, ported from shadcn/ui (plan/shadcnui-usage.md
-     Phase D): label + control + description + error, one wrapper for
-     every generated form input. Mirrors
-     python-polyadmin/.../components/ui/field.html's render_form_input
-     macro branch-for-branch -- see it for the shared rationale (why
-     native controls stay native, why the combobox pk/label never flow
-     through an interpolated JS expression).
+{{/* Form/FormItem, ported from shadcn/ui: label + control +
+     description + error, one wrapper for every generated form input.
 
      The checkbox and the date input stay native elements styled to
-     match shadcn, so they keep working with JS off; the choice
-     controls do not, and haven't since ui/select replaced the native
-     <select> -- see ui/select.html and ui/multi-select.html for what
-     each posts instead. The Alpine-driven ports here are the relation
-     combobox, the date picker's calendar popover (ui/date-picker),
-     ui/select, and ui/multi-select.
+     match shadcn, so they keep working with JS off. The Alpine-driven
+     ports are the relation combobox, the calendar popover, ui/select
+     and ui/multi-select.
 
-     Called from render_helpers.go's formInputHTML, which does every
-     bit of per-type derivation (stringifying values, matching
-     selections, building option lists) in Go before handing this
-     partial a flat, pre-resolved struct -- so every branch below is a
-     pure dispatch-and-print, with no comparison or lookup logic
-     living in the template. That was a deliberate choice, not a
-     stylistic one: html/template's `eq`/`and`/truthiness semantics on
-     typed values (a nil interface holding a zero int, a named string
-     type) have sharp edges a plain Go `==` doesn't, and getting one
-     wrong here would silently corrupt a selected value rather than
-     fail loudly. Takes:
+     formInputHTML resolves every per-type value in Go first, so each
+     branch below is a pure dispatch-and-print. That is deliberate:
+     html/template's `eq` and truthiness semantics on typed values have
+     sharp edges a plain Go `==` does not, and getting one wrong would
+     silently corrupt a selected value rather than fail loudly. Takes:
        .Name .Label .Required .ReadOnly .Disabled .Placeholder .HelpText
        .Type          the field's core.FieldType, as a plain string
        .InputType     the <input type="..."> for the default branch
@@ -36,9 +22,8 @@
        .Errors        []string
        .BasePath      for the combobox's /lookup URL */}}
 {{define "ui/field"}}
-{{/* A boolean renders as a switch on the same row as its name, the
-     way Django Unfold does it: a toggle reads as a setting, and a
-     setting's name belongs beside it rather than stacked above it.
+{{/* A boolean renders as a switch on the same row as its name: a
+     toggle reads as a setting, and a setting's name belongs beside it.
      Every other type keeps the label-above-control layout. */}}
 {{$inline := and (eq .Type "boolean") (not .ReadOnlyField)}}
 <div class="{{ui "field"}}{{if $inline}} {{ui "field" "row"}}{{end}}">
@@ -59,9 +44,8 @@
   </span>
   {{if not $inline}}
   <div class="{{ui "field" "control"}}">
-    {{/* Read-only wins over every type branch below: the field renders
-         as its value with no control at all, and posts nothing. The
-         handler refuses the name too (see parseFormData) -- omitting
+    {{/* Read-only wins over every type branch below: no control, and
+         nothing posted. The handler refuses the name too -- omitting
          the input here is presentation, not protection. */}}
     {{if .ReadOnlyField}}
     <p class="{{ui "field" "readonly"}}">{{if .StringValue}}{{.StringValue}}{{else}}&mdash;{{end}}</p>
@@ -73,10 +57,9 @@
 
 
     {{else if eq .Type "date"}}
-    {{/* DatePicker: a native date input (already posts YYYY-MM-DD with
-         no JS, gets the platform picker on mobile) plus the shadcn
-         Calendar port in a popover beside it -- see
-         admin/components/ui/calendar.html. */}}
+    {{/* A native date input -- it already posts YYYY-MM-DD with no JS
+         and gets the platform picker on mobile -- plus the Calendar
+         port in a popover beside it. */}}
     {{template "ui/date-picker" dict
         "name" .Name "value" .StringValue "required" .Required "disabled" .Disabled}}
 
@@ -86,28 +69,19 @@
 
     {{else if or (eq .Type "foreignkey") (eq .Type "onetoone")}}
       {{if .Autocomplete}}
-      {{/* Combobox, ported from shadcn/ui (Radix Popover + cmdk). cmdk
-           filters a client-side item array; the whole point of
-           AutocompleteFieldNames is never loading the target's full
-           dataset into the page, so the filtering stays server-side on
-           the /lookup route -- htmx owns the round-trip and Alpine owns
-           only open/close and arrow-key navigation of whatever came
-           back.
+      {{/* Combobox, from shadcn's Popover + cmdk. cmdk filters a
+           client-side array, but the point of AutocompleteFieldNames is
+           never loading the target's full dataset into the page, so
+           filtering stays server-side on /lookup: htmx owns the
+           round-trip, Alpine only open/close and arrow keys.
 
-           The pk/label of a *searched* result flow through that
-           result's data-pk/data-label attributes (read via
-           `$el.dataset` in selectItem), and the *initial* selection's
-           pk/label are just the hidden/text inputs' own
-           server-rendered `value` attributes -- selectItem writes a
-           new pk straight to $refs.hiddenInput.value (imperatively,
-           not via a reactive `:value` binding) so there's no risk of
-           Alpine's x-bind/x-init ordering clobbering the
-           server-rendered value with empty state before it's ever
-           read (x-bind directives run before x-init, so a `:value`
-           tied to x-data would blank the field on every page load).
-           Both routes go through ordinary HTML-attribute escaping, so
-           a label containing quotes never has to survive being
-           embedded in a JS expression. */}}
+           A result's pk and label ride in on data-pk/data-label and are
+           read back through `$el.dataset`; the initial selection is the
+           inputs' own server-rendered `value`. selectItem writes the pk
+           imperatively rather than through a reactive `:value`, because
+           x-bind runs before x-init and would blank the
+           server-rendered value on every load. Neither route puts a
+           label inside a JS expression. */}}
       <div class="{{ui "combobox"}}"
            x-data="{
              open: false, query: '', activeEl: null, activeId: '',

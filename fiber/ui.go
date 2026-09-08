@@ -6,32 +6,14 @@ import (
 	"strings"
 )
 
-// uiComponent is one shadcn/ui component's class lists, split the same
-// way shadcn itself splits them:
+// uiComponent is one component's class lists. Base/Variants/Sizes are
+// cva axes and compose; Parts replace the base.
 //
-//   - Base/Variants/Sizes are the class-variance-authority (cva) axes.
-//     They are *composed*: `ui "button" "outline" "size-sm"` yields
-//     Base + Variants["outline"] + Sizes["size-sm"].
-//   - Parts are sub-components -- shadcn ships CardTitle, TableHead,
-//     BreadcrumbLink and friends as separate components with their own
-//     class lists, not as variants of the parent. They *replace* the
-//     base: `ui "card" "title"` yields Parts["title"] alone.
-//
-// Keeping the two apart matters for more than tidiness. cva composes
-// safely only because a base never sets a property its variants or
-// sizes also set (shadcn's button base carries no height, padding, or
-// background -- those live solely in Sizes and Variants), and because
-// React-side cva runs its output through tailwind-merge to drop
-// conflicts. There is no tailwind-merge here, so the discipline has to
-// hold by construction: two competing utilities in one class attribute
-// resolve by Tailwind's own output order, not the order written.
-// TestUIRegistryBaseDoesNotFightItsVariants pins that.
-//
-// Parts must never be composed with the base for the same reason -- and,
-// in one case, for a sharper one: `combobox`'s "item-active" is handed
-// to classList.add() by the combobox's arrow-key handler, and
-// classList.add throws InvalidCharacterError on a value containing a
-// space. TestUIRegistryPartsUsableFromClassList pins that.
+// There is no tailwind-merge here, so a base must never set a property
+// its variants or sizes also set: two competing utilities resolve by
+// Tailwind's output order, not the order written. Parts must stay
+// space-free where classList.add() consumes them (combobox
+// "item-active"), which throws on a value containing a space.
 type uiComponent struct {
 	Base     string
 	Variants map[string]string
@@ -39,35 +21,18 @@ type uiComponent struct {
 	Parts    map[string]string
 }
 
-// uiRegistry is the server-side equivalent of shadcn/ui's cva variant
-// objects -- see plan/shadcnui-usage.md §6 step 3. shadcn ships each
-// component's class list as a JS lookup resolved at React render time;
-// there is no JS render step here, so the same lookup lives in Go and
-// is resolved while the template executes, via the "ui" template func:
+// uiRegistry resolves shadcn's cva lookups at template-execution time,
+// via the "ui" template func: {{ui "button" "outline" "size-sm"}}.
 //
-//	{{ui "button" "outline" "size-sm"}}
-//	{{ui "table" "th"}}
-//
-// Every class string below is a token-based rewrite of the
-// corresponding shadcn component's own classes: colors come from the
-// CSS variables declared in admin/theme.html (bg-background,
-// text-muted-foreground, border-input, ...) rather than a literal
-// palette, which is what makes the whole admin themeable and
-// dark-mode-capable at once.
-//
-// Sizes are prefixed "size-" because shadcn has a variant named
-// "default" *and* a size named "default"; the prefix is also how the
-// resolver knows which axis a caller supplied.
-//
-// Mirrored by python-polyadmin/polyadmin/ui.py -- the two registries
-// are kept key-for-key identical so a template in either language can
-// be read against the other.
+// Colors are the CSS variables from admin/theme.html rather than a
+// literal palette, which is what makes the admin themeable. Sizes are
+// prefixed "size-" because shadcn has both a variant and a size named
+// "default"; the prefix also tells the resolver which axis was given.
 var uiRegistry = map[string]uiComponent{
-	// -- Phase A: primitives ------------------------------------------
 
 	"button": {
-		// No height, padding, or background here -- see the uiComponent
-		// note on why a base must not fight its own axes.
+		// No height, padding, or background: those live in Sizes and
+		// Variants, and a base must not fight its own axes.
 		Base: "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 		Variants: map[string]string{
 			// shadcn's six stock button variants, verbatim in intent.
@@ -77,14 +42,11 @@ var uiRegistry = map[string]uiComponent{
 			"secondary":   "bg-secondary text-secondary-foreground hover:bg-secondary/80",
 			"ghost":       "text-foreground hover:bg-accent hover:text-accent-foreground",
 			"link":        "text-primary underline-offset-4 hover:underline",
-			// Not shadcn variants, but each has a real job here.
-			// shadcn ships no destructive counterpart to `outline`, and
-			// two places need one: a detail page's Delete link, which
-			// sits beside an outline Edit and should match its weight
-			// rather than out-shout it (solid `destructive` is reserved
-			// for the actual confirmation page's submit), and a table
-			// row's icon-only Delete, which wants the color with no
-			// chrome at all.
+			// shadcn ships no destructive counterpart to `outline`. A
+			// detail page's Delete must match the weight of the outline
+			// Edit beside it (solid `destructive` is reserved for the
+			// confirmation page's submit), and a row's icon-only Delete
+			// wants the colour with no chrome at all.
 			"destructive-outline": "border border-destructive/40 bg-background text-destructive hover:bg-destructive hover:text-destructive-foreground",
 			"ghost-destructive":   "text-destructive hover:bg-destructive/10 hover:text-destructive",
 			// Low-emphasis muted ghost: the view/edit row buttons, the
@@ -134,22 +96,25 @@ var uiRegistry = map[string]uiComponent{
 			// <select multiple> sizes itself by its `size` attribute.
 			"size-auto": "h-auto px-3 py-2",
 		},
+		Parts: map[string]string{
+			// Table-cell flavours. The base's w-full leaves a <td> select
+			// with no intrinsic width, so the column ignores the options
+			// and clips the widest ("Enterprise" as "Enterpri"). w-auto
+			// lets the browser measure them; max-w-full caps the damage
+			// one long option can do. Spelled out in full because a part
+			// cannot compose with a size.
+			"cell":       "flex h-9 w-auto max-w-full items-center rounded-md border border-input bg-background px-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+			"cell-multi": "flex h-auto w-auto max-w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+		},
 	},
 
 	"label": {
 		Base: "block text-sm font-medium leading-none text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
 	},
 
-	// Native checkbox/radio tinted with `accent-primary` (CSS
-	// accent-color) rather than shadcn's Radix Checkbox, for the same
-	// no-JS-form reason as select above.
-	// Checkbox, ported from shadcn/ui. appearance-none is what makes the
-	// rest of this apply at all: a native checkbox draws itself and
-	// ignores border/radius/background, which is why the previous
-	// version was really just accent-color on an OS control.
-	//
-	// The check glyph is a background image set in theme.html rather
-	// than a class here -- see the .ui-checkbox rule there for why.
+	// appearance-none is what makes the rest apply: a native checkbox
+	// draws itself and ignores border/radius/background. The check glyph
+	// is a background image on .ui-checkbox in theme.html.
 	"checkbox": {
 		Base: "ui-checkbox peer size-4 shrink-0 appearance-none rounded-[4px] border border-input bg-background shadow-sm outline-none transition-shadow checked:border-primary checked:bg-primary focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
 	},
@@ -158,17 +123,9 @@ var uiRegistry = map[string]uiComponent{
 		Base: "h-4 w-4 shrink-0 border-input bg-background accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
 	},
 
-	// Alpine-driven switch (a <button role="switch"> plus a hidden
-	// input), so unlike checkbox it is a real shadcn port. "on"/"off"
-	// and "thumb-on"/"thumb-off" are applied *alongside* "track"/"thumb"
-	// by an Alpine :class binding, which is why neither carries a
-	// background or a size of its own.
-	// Switch, ported from shadcn/ui (Radix Switch), built on a native
-	// checkbox rather than a button: it toggles with no JavaScript at
-	// all, and posts exactly like the checkbox it replaces.
-	//
-	// track and thumb are both siblings of the input, not nested, so
-	// Tailwind's peer-checked: variant reaches both -- `peer` compiles
+	// Built on a native checkbox rather than a button, so it toggles
+	// with no JavaScript and posts like the checkbox it replaces. track
+	// and thumb are siblings of the input, not children: `peer` compiles
 	// to a sibling combinator and would not cross into a child.
 	"switch": {
 		Base: "relative inline-flex shrink-0 cursor-pointer items-center",
@@ -200,19 +157,11 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// The login page, ported from shadcn/ui's login-04 block: a
-	// two-column card, form on the left, a muted panel on the right that
-	// drops away below md.
-	//
-	// Parts only, and no Base -- there is no "a login" element to style,
-	// just the scaffold the one page hangs off. The block's social
-	// buttons, "Sign up" and "Forgot your password?" are deliberately
-	// not here: the framework has no route behind any of them, and a
-	// control that does nothing teaches the wrong thing.
-	//
-	// login-04 fills the right-hand column with a photograph
-	// (/placeholder.svg). A framework cannot ship one, so "aside-*"
-	// styles a typographic panel carrying the site title instead.
+	// shadcn's login-04 block. Its social buttons, "Sign up" and "Forgot
+	// your password?" are deliberately absent: the framework has no
+	// route behind any of them. login-04 fills the right column with a
+	// photograph, which a framework cannot ship, so "aside" styles a
+	// typographic panel instead.
 	"login": {
 		Parts: map[string]string{
 			"page":      "flex min-h-svh flex-col items-center justify-center bg-muted p-6 md:p-10",
@@ -226,18 +175,37 @@ var uiRegistry = map[string]uiComponent{
 			"title":    "text-2xl font-bold",
 			"subtitle": "text-balance text-muted-foreground",
 			"group":    "grid gap-2",
-			// login-04 fills this column edge to edge with a photograph,
-			// so its own bg-muted never shows. With type in place of the
-			// photo the fill is all there is -- and bg-muted is exactly
-			// the page's own colour, which made the card read as
-			// half-width with text floating beside it. The chart tokens
-			// are the palette's decorative slots and are defined in both
-			// themes, so a tint built from them stays distinct from the
-			// card and the page without hardcoding a colour.
+			// bg-muted is the page's own colour, so without login-04's
+			// photograph over it the card read as half-width with text
+			// floating beside it. The chart tokens are defined in both
+			// themes, so a tint from them stays distinct without
+			// hardcoding a colour.
 			"aside": "relative hidden border-l border-border bg-gradient-to-br from-chart-1/20 via-chart-6/10 to-chart-3/20 md:block",
 			"panel": "absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center",
 			"logo":  "h-12 w-auto opacity-80",
 			"brand": "text-xl font-semibold text-foreground",
+		},
+	},
+
+	// The 401/403/404 page.
+	"error": {
+		Parts: map[string]string{
+			"page":    "flex min-h-svh flex-col items-center justify-center bg-muted p-6 md:p-10",
+			"card":    "flex w-full max-w-md flex-col items-center gap-3 rounded-lg border border-border bg-card p-8 text-center text-card-foreground shadow-sm",
+			"status":  "text-5xl font-bold tracking-tight text-muted-foreground/40",
+			"title":   "text-xl font-semibold",
+			"message": "text-balance text-sm text-muted-foreground",
+		},
+	},
+
+	// The native overflow box, with the scrollbar restyled by the
+	// .ui-scroll-area rules in theme.html (a scrollbar cannot be
+	// expressed as Tailwind utilities without a plugin). The axis is the
+	// whole decision, so there are two parts and no base.
+	"scroll-area": {
+		Parts: map[string]string{
+			"x": "ui-scroll-area block max-w-xs overflow-x-auto overflow-y-hidden whitespace-nowrap",
+			"y": "ui-scroll-area block max-h-40 overflow-y-auto overflow-x-hidden",
 		},
 	},
 
@@ -288,8 +256,6 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// -- Phase B: overlays --------------------------------------------
-
 	"dialog": {
 		Parts: map[string]string{
 			"overlay":     "fixed inset-0 bg-black/80",
@@ -323,20 +289,16 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// Sonner is what shadcn ships for toasts now; the existing
-	// PinesUI-derived queue in toasts.html already has the same shape
-	// (teleported stack, per-type icon, auto-dismiss), so this is a
-	// restyle of that rather than a fresh port.
+	// A restyle of the existing PinesUI-derived queue in toasts.html,
+	// which already has Sonner's shape (teleported stack, per-type icon,
+	// auto-dismiss).
 	"toast": {
 		Parts: map[string]string{
-			// ToastViewport, from shadcn/ui's Toast: pinned bottom-right
-			// on sm and up, full-width along the bottom edge on a phone.
-			//
-			// pointer-events-none is load-bearing now that record pages
-			// carry a sticky action bar in that same corner -- the
-			// viewport spans a strip of the screen even with no toasts
-			// in it, and would otherwise swallow clicks on Save. Each
-			// toast re-enables pointer events for itself.
+			// pointer-events-none is load-bearing: the viewport spans a
+			// strip of the screen even when empty, and record pages put
+			// a sticky action bar in that same corner, so it would
+			// otherwise swallow clicks on Save. Each toast re-enables
+			// pointer events for itself.
 			"list": "pointer-events-none fixed inset-x-0 bottom-0 z-[100] flex max-h-screen " +
 				"flex-col gap-2 p-4 sm:inset-x-auto sm:right-0 sm:bottom-0 md:max-w-[420px]",
 			"root": "pointer-events-auto group relative flex w-full items-start gap-3 overflow-hidden " +
@@ -364,15 +326,11 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// -- Phase C: navigation & data ------------------------------------
-
-	// Sidebar, ported from shadcn/ui's sidebar-07 block ("a sidebar that
-	// collapses to icons"). The block's own --sidebar-* colour scale is
-	// deliberately *not* reproduced: its Zinc values are within a hair of
-	// card/accent/border, and theme.html's whole premise is that
-	// restyling the admin means editing those variables and nothing
-	// else. Widths match the block exactly (16rem open, 3rem collapsed,
-	// 18rem for the mobile sheet).
+	// shadcn's sidebar-07 block, at its exact widths (16rem open, 3rem
+	// collapsed, 18rem mobile sheet). Its --sidebar-* colour scale is
+	// deliberately not reproduced: the Zinc values are within a hair of
+	// card/accent/border, and restyling the admin must mean editing
+	// theme.html's variables and nothing else.
 	"sidebar": {
 		Base: "flex h-full shrink-0 flex-col border-r border-border bg-card " +
 			"transition-[width] duration-200 ease-linear",
@@ -455,55 +413,37 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// Toolbar + footer of the list page's data table, ported from
-	// shadcn/ui's Tasks example. The toolbar is one row: search and the
-	// faceted filter dropdowns on the left, the page's own actions
-	// (Export, New) on the right. The footer is the example's
-	// DataTablePagination: selection count left, rows-per-page + page
-	// indicator + the four jump buttons right.
+	// Toolbar + footer of the list table, from shadcn's Tasks example:
+	// search and filters left, page actions right; below, the
+	// DataTablePagination row.
 	"toolbar": {
-		// Stacked into one full-width column until lg, a row from lg up.
-		//
-		// lg, not sm, because of where the sidebar lands: it's an
-		// off-canvas sheet below md and a static 16rem column from md
-		// up, so the content area *shrinks* at md (735px -> 549px at
-		// the breakpoint itself) rather than growing. Measured, the
-		// five controls only stop wrapping into a ragged three-or-four
-		// line block at ~1024px; sm (640px) and md (768px) both put
-		// them in a row that immediately wraps, which reads as
-		// misalignment above the table. So they stay stacked, one per
-		// line, through both.
+		// Stacked until lg, a row from lg up. lg, not sm, because the
+		// sidebar becomes a static 16rem column at md: the content area
+		// *shrinks* there (735px -> 549px), and measured, the five
+		// controls only stop wrapping into a ragged block at ~1024px.
 		Base: "flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between",
 		Parts: map[string]string{
-			// Every control inside carries its own "item" to fill its
-			// line while stacked -- stretch alone can't do it, since
-			// several of them are buttons wrapped in a <form> or a
-			// positioning <div>.
-			//
-			// flex-1 so the filter cluster takes the slack and the
-			// actions stay hard right once they are rows.
+			// Every control carries its own "item" to fill its line while
+			// stacked: stretch alone cannot, since several are buttons
+			// wrapped in a <form> or a positioning <div>. flex-1 so the
+			// filter cluster takes the slack once they are rows.
 			"filters": "flex flex-1 flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center",
 			"actions": "flex flex-col gap-2 lg:flex-row lg:items-center",
 			"item":    "w-full lg:w-auto",
-			// A stacked control is a full-width bar, and centred content
-			// in a full-width bar reads as floating: the label goes hard
-			// left, the icon hard right. "item-label" takes the slack
-			// (which also makes the button base's justify-center a no-op
-			// while stacked -- there is no free space left to centre,
-			// so the two never fight), and "item-icon" moves a *leading*
-			// icon to the trailing edge without reordering the markup.
-			// Both revert at lg, where the button is content-width again
-			// and icon-then-label centred is right.
+			// Centred content in a full-width bar reads as floating, so
+			// while stacked the label goes hard left and the icon hard
+			// right. "item-label" takes the slack (which also leaves the
+			// base's justify-center nothing to centre, so the two never
+			// fight); "item-icon" moves a leading icon to the trailing
+			// edge without reordering the markup. Both revert at lg.
 			"item-label": "flex-1 text-left lg:flex-none",
 			"item-icon":  "order-last lg:order-none",
 		},
 	},
 
-	// The filter drawer, after Django admin's right-hand filter column
-	// as Unfold restyles it: one Filters trigger in the toolbar, and a
-	// sheet that slides in from the right listing every filter
-	// vertically. One trigger stays one trigger however many filters a
-	// ModelAdmin declares, which a row of per-filter dropdowns doesn't.
+	// The filter drawer: one Filters trigger in the toolbar opening a
+	// sheet from the right. One trigger stays one trigger however many
+	// filters a ModelAdmin declares, which per-filter dropdowns don't.
 	"filter-panel": {
 		Parts: map[string]string{
 			"header": "flex items-center justify-between gap-2 border-b border-border px-4 py-3",
@@ -529,7 +469,6 @@ var uiRegistry = map[string]uiComponent{
 			"link":     "relative inline-flex h-full items-center px-3 transition-colors hover:bg-accent hover:text-accent-foreground",
 			"disabled": "pointer-events-none text-muted-foreground/40",
 			"current":  "hidden h-full items-center px-3 font-medium text-foreground sm:flex",
-			// -- Tasks-example footer --
 			// The selection count, which stays visible (as "0 of N")
 			// even with nothing selected, exactly as the example does.
 			"selection":      "flex-1 text-sm text-muted-foreground",
@@ -571,8 +510,6 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// -- Phase D: forms & advanced -------------------------------------
-
 	// The label + control + description + error unit. shadcn calls this
 	// FormItem/FormLabel/FormDescription/FormMessage; here it is what
 	// wraps every generated form input.
@@ -584,14 +521,11 @@ var uiRegistry = map[string]uiComponent{
 			"control":     "mt-1.5",
 			"description": "mt-1.5 text-xs text-muted-foreground",
 			"message":     "mt-1.5 text-xs font-medium text-destructive",
-			// A boolean field puts its control on the same row as its
-			// name (Django Unfold's treatment): a toggle reads as a
-			// setting, and a setting's name belongs beside it.
+			// A boolean puts its control on the same row as its name.
 			// items-start, not items-center: with a description the text
-			// block is two lines, and centring the control against it
-			// leaves it sitting low next to the name. row-label gives
-			// the label a 20px line box to match the switch's height, so
-			// top-aligning them reads as centred either way.
+			// block is two lines and centring leaves the toggle sitting
+			// low. row-label's 20px line box matches the switch height,
+			// so top-aligning reads as centred either way.
 			"row":       "flex items-start gap-2",
 			"row-text":  "min-w-0",
 			"row-label": "leading-5",
@@ -616,13 +550,10 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// The many-to-many control: a Command-style searchable list (shadcn's
-	// Combobox/Command idiom) over the relation's options, with the
-	// current selection shown as removable chips on the trigger. Same
-	// job as Django admin's filter_horizontal permissions widget -- the
-	// point of both is that a long option list is unusable until you can
-	// type at it -- without the two-pane layout, which needs width this
-	// form column doesn't have.
+	// The many-to-many control: shadcn's Combobox/Command idiom over the
+	// relation's options, selection shown as removable chips. Django's
+	// filter_horizontal without the two-pane layout, which needs width
+	// this form column doesn't have.
 	"multi-select": {
 		Parts: map[string]string{
 			// min-h matches the single Select's h-10 so a field with
@@ -666,8 +597,6 @@ var uiRegistry = map[string]uiComponent{
 			"output": "w-12 shrink-0 text-right text-sm tabular-nums text-muted-foreground",
 		},
 	},
-
-	// -- dashboard / misc ---------------------------------------------
 
 	"widget": {
 		Base: "rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm sm:p-6",
@@ -724,31 +653,32 @@ var uiRegistry = map[string]uiComponent{
 		// viewport for a long record instead of clipping it.
 		Base: "flex min-h-full flex-col",
 		Parts: map[string]string{
-			// my-auto is the whole trick: while there's free space it
-			// splits it above and below, centering the record
-			// vertically; once the content overflows there's no free
-			// space left and it collapses to 0, so the same rule gives
-			// "centered when it fits, scrolls when it doesn't" without
-			// a media query or any JS measuring anything.
+			// my-auto gives "centred when it fits, scrolls when it
+			// doesn't" with no media query: free space splits above and
+			// below, and collapses to 0 once the content overflows.
 			"body": "mx-auto my-auto w-full max-w-xl space-y-4",
-			// sticky rather than fixed: it stays inside <main>'s scroll
-			// container, so it needs no sidebar-width offset to avoid
-			// overlapping the nav and no compensating bottom padding on
-			// the content -- it reserves its own space in flow, and the
-			// record scrolls underneath it. The negative margins cancel
-			// <main>'s p-4 so the bar spans the full content width and
-			// sits flush with the bottom edge.
+			// max-w-xl is the measure for a column of form fields, but a
+			// tabular inline is a table: squeezing one into 576px is
+			// what clipped its own row actions, so a page holding one
+			// gets the wider cap.
+			"body-wide": "mx-auto my-auto w-full max-w-5xl space-y-4",
+			// sticky rather than fixed: it reserves its own space inside
+			// <main>'s scroll container, so it needs no sidebar-width
+			// offset and no compensating bottom padding. The negative
+			// margins cancel <main>'s p-4 so it spans the full width.
 			"actions": "sticky bottom-0 z-10 -mx-4 -mb-4 mt-4 border-t border-border " +
 				"bg-background/95 px-4 py-3 backdrop-blur",
 			// Matched to "body"'s max-w-xl so the buttons line up with
-			// the record above them rather than drifting to the edges.
-			//
-			// flex-col-reverse below sm puts the primary group (last in
-			// source order) on top and the destructive one at the
-			// bottom, so Delete is never the button under your thumb
-			// when the bar stacks. From sm up, source order is restored
-			// and "actions-primary" pushes itself right.
+			// the record. flex-col-reverse below sm floats the primary
+			// group to the top, so Delete is never the button under your
+			// thumb when the bar stacks.
 			"actions-inner": "mx-auto flex w-full max-w-xl flex-col-reverse gap-2 " +
+				"sm:flex-row sm:items-center",
+			// Matched to "body-wide" for the same reason "actions-inner"
+			// is matched to "body": the bar has to line up with the
+			// card above it, so widening one without the other leaves
+			// the buttons drifting.
+			"actions-inner-wide": "mx-auto flex w-full max-w-5xl flex-col-reverse gap-2 " +
 				"sm:flex-row sm:items-center",
 			// The right-hand group. sm:ml-auto does the separating, so
 			// the bar reads Delete-left / everything-else-right when a
@@ -759,19 +689,14 @@ var uiRegistry = map[string]uiComponent{
 	},
 }
 
-// uiClasses resolves a component's class string from uiRegistry.
-// Registered as the "ui" template func (see templateFuncs), so
-// admin/*.html can call {{ui "button" "outline" "size-sm"}}.
+// uiClasses resolves a component's class string from uiRegistry, and is
+// registered as the "ui" template func.
 //
-// A modifier naming a Part resolves to that part alone; modifiers naming
-// a Variant or Size compose with the component's Base, filling in
-// "default"/"size-default" for whichever axis the caller left out. See
-// the uiComponent doc comment for why the two behave differently.
-//
-// An unknown component or modifier is returned as an error rather than
-// silently skipped: a template func returning a non-nil error aborts
-// ExecuteTemplate, so a typo fails loudly in the adapter's own render
-// tests instead of shipping an unstyled button.
+// A modifier naming a Part resolves to that part alone; Variant and Size
+// modifiers compose with Base, defaulting whichever axis was left out.
+// An unknown name is an error rather than a silent skip: a template func
+// returning non-nil aborts ExecuteTemplate, so a typo fails loudly in
+// the render tests instead of shipping an unstyled button.
 func uiClasses(component string, modifiers ...string) (string, error) {
 	spec, ok := uiRegistry[component]
 	if !ok {

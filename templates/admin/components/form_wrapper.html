@@ -1,32 +1,29 @@
 {{/* Form (create/edit) page.
 
      HTMX posts to itself and swaps its own outerHTML with the response,
-     so a validation error redisplays this form in place; a plain HTML
-     POST to `action` works identically without JS.
+     so a validation error redisplays the form in place; a plain POST to
+     `action` works identically without JS.
 
      The swap targets #resource-form-wrapper -- this whole element --
-     and not the <form> inside it, because the error response *is* this
-     template. Targeting the <form> nested a fresh copy of the wrapper
-     inside the old one on every failed save, duplicating the inline
-     sections and the action bar each time.
+     not the <form> inside it, because the error response *is* this
+     template. Targeting the <form> nested a fresh wrapper inside the
+     old one on every failed save, duplicating the inline sections and
+     the action bar each time.
 
-     Layout comes from ui "page": the record scrolls in a vertically
-     centered column and Save/Cancel stay pinned to the bottom of the
-     viewport, so a long form never buries its own submit button. See
-     fiber/ui.go's "page" entry for why sticky beats fixed here.
-     Mirrors python-polyadmin/.../components/form_wrapper.html. */}}
+     Layout comes from ui "page": the record scrolls in a centred column
+     while Save/Cancel stay pinned to the bottom of the viewport, so a
+     long form never buries its own submit button. */}}
 {{define "formWrapper"}}
 <div id="resource-form-wrapper" class="{{ui "page"}}">
-  <div class="{{ui "page" "body"}}">
+  <div class="{{if .WideBody}}{{ui "page" "body-wide"}}{{else}}{{ui "page" "body"}}{{end}}">
     <form id="resource-form" method="post" action="{{.FormAction}}"
           hx-post="{{.FormAction}}" hx-target="#resource-form-wrapper" hx-swap="outerHTML"
           class="{{ui "panel" "form"}}">
       {{template "csrf-field" .CSRFToken}}
       {{if .NonFieldErrors}}
-      {{/* Alert (destructive), ported from shadcn/ui: a tinted, outlined
-           panel rather than the solid red block this used to be -- solid
-           destructive is reserved for buttons, so an error summary doesn't
-           out-shout the Save button. */}}
+      {{/* A tinted, outlined panel rather than a solid red block: solid
+           destructive is reserved for buttons, so an error summary does
+           not out-shout Save. */}}
       <div role="alert" class="{{ui "alert" "destructive"}} mb-4">
         <h5 class="{{ui "alert" "title"}}">Couldn't save {{.VerboseName}}</h5>
         <div class="{{ui "alert" "description"}}">
@@ -34,9 +31,8 @@
         </div>
       </div>
       {{end}}
-      {{/* Fieldsets (Django's `fieldsets`). An untitled group renders
-           bare -- no header, no border -- so a form that declares none
-           is visually identical to the flat form this replaced. A
+      {{/* An untitled group renders bare -- no header, no border -- so
+           a form declaring none looks exactly like a flat form. A
            titled group is always collapsible; Collapsed only decides
            whether it starts closed. */}}
       {{range .Fieldsets}}
@@ -65,25 +61,22 @@
     {{range .InlineSections}}{{template "inlineSection" .}}{{end}}
   </div>
   {{/* The buttons sit outside #resource-form so the bar can span the
-       full content width instead of being trapped in the centered
+       full content width rather than being trapped in the centred
        column. form="resource-form" re-associates them: the browser
-       submits the form normally, and htmx resolves the same attribute
-       (its getRelatedFormData checks '#' + the form attribute before
-       falling back to the closest ancestor form), so the _continue
-       submitter value below still reaches the handler over HTMX.
+       submits normally, and htmx resolves the same attribute, so the
+       submitter value still reaches the handler over HTMX.
 
-       name="_continue" rides along only when *this* button is the one
-       that submitted the form (per the HTML spec, an unclicked submit
-       button's name/value never makes it into the form data) -- the
-       handler reads its presence to redirect back to this same edit
-       page instead of the detail page, Django-admin style. */}}
+       An unclicked submit button's name never makes it into the form
+       data, so name="_continue" rides along only when it was the button
+       that submitted -- which is how the handler knows to come back
+       here instead of the detail page. */}}
   <div class="{{ui "page" "actions"}}">
-    <div class="{{ui "page" "actions-inner"}}">
-      {{/* Delete lives here, on the edit form, and nowhere else: there's
-           nothing to delete while creating (PK is unset), and the detail
-           page deliberately no longer offers it. Kept alone on the left,
-           away from Save, so the destructive action is never adjacent to
-           the one people click by reflex. */}}
+    <div class="{{if .WideBody}}{{ui "page" "actions-inner-wide"}}{{else}}{{ui "page" "actions-inner"}}{{end}}">
+      {{/* Delete lives on the edit form and nowhere else: there is
+           nothing to delete while creating, and the detail page
+           deliberately no longer offers it. Kept alone on the left, so
+           it is never adjacent to the button people click by
+           reflex. */}}
       {{if and .PK .Permissions.CanDelete}}
       <a href="{{.BasePath}}/{{.Slug}}/{{.PK}}/delete"
          class="{{ui "button" "destructive-outline"}}">
@@ -96,6 +89,14 @@
         <button type="submit" form="resource-form" name="_continue" value="1"
                 class="{{ui "button" "outline"}}">
           {{icon "edit" "w-4 h-4"}} Save and continue editing</button>
+        {{/* Only where adding another makes sense -- offering it on a
+             form the principal may not create from would be a button
+             that 403s. */}}
+        {{if .Permissions.CanCreate}}
+        <button type="submit" form="resource-form" name="_addanother" value="1"
+                class="{{ui "button" "outline"}}">
+          {{icon "plus" "w-4 h-4"}} Save and add another</button>
+        {{end}}
         <a href="{{.BasePath}}/{{.CurrentSlug}}"
            class="{{ui "button" "ghost-muted"}}">
           Cancel</a>

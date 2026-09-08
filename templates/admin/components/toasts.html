@@ -1,19 +1,15 @@
-{{/* Toast notifications, adapted from PinesUI's Toast component
-     (devdojo.com/pines/docs/toast) -- mirrors the Python adapter's
-     components/toasts.html. Pines' own implementation includes an
-     elaborate peek-stack/hover-expand animation tuned for many
-     concurrent toasts; this framework only ever shows the handful of
-     short-lived flash messages left by a redirect, so that
-     choreography is trimmed to a plain vertical stack -- everything
-     else (per-type icon/color, slide transition, auto-dismiss, dismiss
-     button, the global toast() trigger function) is kept.
+{{/* Toast notifications, adapted from PinesUI's Toast. Its own
+     peek-stack/hover-expand animation is tuned for many concurrent
+     toasts; this framework only ever shows the handful of short-lived
+     flash messages a redirect leaves, so that choreography is trimmed
+     to a plain vertical stack. Everything else -- per-type icon,
+     slide transition, auto-dismiss, the global toast() trigger -- is
+     kept.
 
-     Flash messages come in as plain data (.Messages, a slice of
-     {Level, Text}) rather than a JS call, so they're relayed into
-     toast() via a hidden data-* element read by a tiny script below --
-     the same safe pattern render_helpers.go's combobox and this file's
-     sibling action_confirm_modal.html use, so a message containing
-     quotes can never break out of an interpolated JS string. */}}
+     Flash messages arrive as plain data rather than a JS call, and are
+     relayed into toast() through a hidden data-* element, so a message
+     containing quotes can never break out of an interpolated JS
+     string. */}}
 {{define "toasts"}}
 {{if .Messages}}
 <div id="flash-messages" class="hidden" aria-hidden="true">

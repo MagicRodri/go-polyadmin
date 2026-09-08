@@ -154,8 +154,7 @@ type XLSXRowWriter struct {
 }
 
 // NewXLSXRowWriter creates a single-sheet workbook named after the
-// resource being exported (matching the Python adapter's
-// workbook.create_sheet(model_admin.get_verbose_name())).
+// resource being exported.
 func NewXLSXRowWriter(sheetName string) *XLSXRowWriter {
 	file := excelize.NewFile()
 	file.SetSheetName(file.GetSheetName(0), sheetName)
