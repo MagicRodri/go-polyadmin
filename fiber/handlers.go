@@ -37,9 +37,9 @@ func parseListRequestFromForm(c *fiber.Ctx) core.ListRequest {
 		}
 	})
 	return core.ListRequest{
-		Search:   c.FormValue("search"),
+		Search:   formValue(c, "search"),
 		Filters:  filters,
-		Ordering: c.FormValue("sort"),
+		Ordering: formValue(c, "sort"),
 	}
 }
 
@@ -62,9 +62,9 @@ func parseListRequest(c *fiber.Ctx) core.ListRequest {
 		pageSize = 0
 	}
 	return core.ListRequest{
-		Search:   c.Query("search"),
+		Search:   queryValue(c, "search"),
 		Filters:  filters,
-		Ordering: c.Query("sort"),
+		Ordering: queryValue(c, "sort"),
 		Page:     page,
 		PageSize: pageSize,
 	}
@@ -205,6 +205,13 @@ func formValue(c *fiber.Ctx, name string) string {
 // (GetObject, and whatever it keys off).
 func pathParam(c *fiber.Ctx, name string) string {
 	return strings.Clone(c.Params(name))
+}
+
+// queryValue is formValue's counterpart for the query string, which
+// c.Query also returns out of the request buffer. The list request built
+// from it reaches a ListQuerier, i.e. application code.
+func queryValue(c *fiber.Ctx, name string) string {
+	return strings.Clone(c.Query(name))
 }
 
 // parseFormData reads the posted form into a data map. obj is the record
@@ -468,8 +475,8 @@ func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rende
 		if _, result := authorize(admin, c, core.ResourcePermission(slug, "view"), modelAdmin); result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		query := c.Query("q")
-		displayName := c.Query("display")
+		query := queryValue(c, "q")
+		displayName := queryValue(c, "display")
 		if displayName == "" && len(modelAdmin.SearchFields()) > 0 {
 			displayName = modelAdmin.SearchFields()[0]
 		}
@@ -657,7 +664,7 @@ func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 		if _, result := authorize(admin, c, core.ResourcePermission(inline.Child, "update"), childAdmin); result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
-		childPK := c.Params("childPK")
+		childPK := pathParam(c, "childPK")
 		childObj, err := childAdmin.GetObject(c.Context(), childPK)
 		if err != nil {
 			return err

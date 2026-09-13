@@ -65,8 +65,8 @@ func handleLoginGet(admin *core.Admin, renderer *Renderer, basePath string) fibe
 // and the GET above is what mints the cookie the form echoes back.
 func handleLoginPost(admin *core.Admin, renderer *Renderer, basePath string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		identifier := c.FormValue("identifier")
-		password := c.FormValue("password")
+		identifier := formValue(c, "identifier")
+		password := formValue(c, "password")
 		next := core.SafeNextURL(c.Query(core.NextQueryParam), basePath)
 
 		principal := admin.LoginBackend.VerifyCredentials(c, identifier, password)
