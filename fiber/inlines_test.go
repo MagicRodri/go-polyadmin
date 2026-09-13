@@ -259,6 +259,30 @@ func TestInlineSectionReadonlyOnDetailPage(t *testing.T) {
 	}
 }
 
+func TestReadonlyTabularInlineLinksEachRowFromATrailingViewColumn(t *testing.T) {
+	app, orgAdmin, userAdmin := newInlineTestApp(t, core.InlineLayoutTabular)
+	org, users := seedOrgWithUsers(orgAdmin, userAdmin, "a@example.com")
+
+	section := strings.Split(body(t, doGet(t, app, "/admin/organizations/"+strconv.Itoa(org.ID), nil)), `id="inline-users"`)[1]
+	table := strings.Split(section, "</table>")[0]
+	// "<th " and "<th>", not "<th": that would count the <thead> too.
+	header := strings.Split(table, "</thead>")[0]
+	headerCells := strings.Count(header, "<th ") + strings.Count(header, "<th>")
+	row := strings.Split(strings.Split(table, "<tbody")[1], "</tr>")[0]
+	cells := strings.Split(row, "<td")[1:]
+
+	last := cells[len(cells)-1]
+	if !strings.Contains(last, `href="/admin/users/`+strconv.Itoa(users[0].ID)+`"`) || !strings.Contains(last, ">View</a>") {
+		t.Errorf("expected a trailing View link to the child record, got %s", last)
+	}
+	if strings.Contains(cells[0], "/admin/users/") {
+		t.Errorf("the first value must not be wrapped in the row link: %s", cells[0])
+	}
+	if headerCells != len(cells) {
+		t.Errorf("the header has %d cells, the row %d", headerCells, len(cells))
+	}
+}
+
 func TestInlineCreateAddsRowAndReturnsSectionFragment(t *testing.T) {
 	app, orgAdmin, userAdmin := newInlineTestApp(t, core.InlineLayoutTabular)
 	org, _ := seedOrgWithUsers(orgAdmin, userAdmin)

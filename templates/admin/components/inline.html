@@ -64,7 +64,8 @@
 <table class="min-w-full divide-y divide-border">
   <thead class="bg-muted/50"><tr>
     {{range .Columns}}<th class="{{ui "table" "th-compact"}}">{{.Label}}</th>{{end}}
-    {{if eq .Mode "edit"}}<th></th>{{end}}
+    {{/* Every mode has a trailing column: row actions when editing,
+         the View link when read-only. */}}<th></th>
   </tr></thead>
   <tbody class="divide-y divide-border">
     {{range .Rows}}
