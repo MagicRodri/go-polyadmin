@@ -172,7 +172,18 @@ func body(t *testing.T, resp *http.Response) string {
 	if err != nil {
 		t.Fatalf("read body: %v", err)
 	}
-	return string(data)
+	text := string(data)
+	// Every page any test reads is checked for template syntax that
+	// escaped rendering: a class string built as "{{ui ...}}" in Go and
+	// handed to a template arrives in the HTML verbatim.
+	if strings.HasPrefix(resp.Header.Get(fiber.HeaderContentType), fiber.MIMETextHTML) {
+		for _, marker := range []string{"{{", "{%"} {
+			if strings.Contains(text, marker) {
+				t.Errorf("unrendered template syntax %q reached the page", marker)
+			}
+		}
+	}
+	return text
 }
 
 func TestIndexRedirectsToFirstResource(t *testing.T) {
