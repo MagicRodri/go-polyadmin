@@ -11,7 +11,11 @@
      copy of the nav. Each label sits in an x-show="!collapsed" span
      while the icon stays put -- nav-item's p-2 plus a size-4 icon is
      exactly the 3rem collapsed width, so nothing slides sideways as
-     the width animates. */}}
+     the width animates.
+
+     md:relative, not md:static, undoes the sheet's `fixed`: the rail is
+     absolutely positioned against the aside, and a static aside handed
+     it to the page, parking it on the viewport's right edge. */}}
 {{define "ui/sidebar"}}
 <aside x-cloak
        :class="[
@@ -19,7 +23,7 @@
          collapsed ? '{{ui "sidebar" "collapsed"}}' : '{{ui "sidebar" "expanded"}}'
        ]"
        class="{{ui "sheet" "content"}} {{ui "sheet" "side-left"}} {{ui "sidebar"}}
-              !w-72 md:!w-auto md:static md:!transform-none md:shadow-none">
+              !w-72 md:!w-auto md:relative md:!transform-none md:shadow-none">
 
   {{/* -- SidebarHeader: the block's TeamSwitcher slot -- */}}
   <div class="{{ui "sidebar" "header"}}">
