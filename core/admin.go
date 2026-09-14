@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"io/fs"
+)
 
 // Admin is the root admin application: it owns the ModelAdmin registry.
 // Route registration, template/static configuration, and Mount() are
@@ -26,6 +29,18 @@ type Admin struct {
 	// an unauthenticated request redirect there instead of returning
 	// 401. Nil leaves both behaviours off -- see login.go.
 	LoginBackend LoginBackend
+
+	// Internationalisation -- see core/i18n.go and docs/i18n.md. All
+	// optional: the zero values serve English plus every framework
+	// catalog, resolved per request, with the language switcher shown.
+	DefaultLocale         string
+	Locales               []string
+	LocaleResolver        LocaleResolver
+	Catalogs              []fs.FS
+	Translator            Translator
+	LocaleNames           map[string]string
+	DisableLocaleSwitcher bool
+	PseudoLocale          bool
 
 	registry map[string]ModelAdmin
 	order    []string
@@ -96,6 +111,51 @@ func WithAuthorizer(authorizer Authorizer) Option {
 // the two are two halves of one arrangement. See LoginBackend.
 func WithLoginBackend(backend LoginBackend) Option {
 	return func(a *Admin) { a.LoginBackend = backend }
+}
+
+// WithDefaultLocale sets the locale used when nothing else decides.
+func WithDefaultLocale(locale string) Option {
+	return func(a *Admin) { a.DefaultLocale = locale }
+}
+
+// WithLocales restricts the supported locales, in switcher order.
+func WithLocales(locales ...string) Option {
+	return func(a *Admin) { a.Locales = append(a.Locales, locales...) }
+}
+
+// WithLocaleResolver lets the host choose a request's locale, e.g. from a
+// preference stored on the principal. The switcher cookie still wins.
+func WithLocaleResolver(resolver LocaleResolver) Option {
+	return func(a *Admin) { a.LocaleResolver = resolver }
+}
+
+// WithCatalogs layers host catalogs (one <locale>.json per file, at the
+// filesystem root) over the framework's.
+func WithCatalogs(catalogs ...fs.FS) Option {
+	return func(a *Admin) { a.Catalogs = append(a.Catalogs, catalogs...) }
+}
+
+// WithTranslator replaces the catalog-backed Translator entirely. Pair it
+// with WithLocales: the admin cannot list a foreign translator's locales.
+func WithTranslator(translator Translator) Option {
+	return func(a *Admin) { a.Translator = translator }
+}
+
+// WithLocaleNames names host-added locales in the switcher.
+func WithLocaleNames(names map[string]string) Option {
+	return func(a *Admin) { a.LocaleNames = names }
+}
+
+// WithoutLocaleSwitcher hides the language switcher and unmounts its
+// route -- for hosts that force a locale through a LocaleResolver.
+func WithoutLocaleSwitcher() Option {
+	return func(a *Admin) { a.DisableLocaleSwitcher = true }
+}
+
+// WithPseudoLocale enables en-XA, which renders every translated string
+// accented and bracketed. For tests and development only.
+func WithPseudoLocale() Option {
+	return func(a *Admin) { a.PseudoLocale = true }
 }
 
 // Register adds a ModelAdmin to the registry, keyed by its Slug().
