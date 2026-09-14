@@ -84,6 +84,29 @@ func TestCreateOrganizationPersistsFoundedAndBalance(t *testing.T) {
 	}
 }
 
+func TestCreateOrganizationWithEmptyFoundedAndBalanceSavesZeroValues(t *testing.T) {
+	app, repo := newOrganizationTestApp(t)
+
+	form := url.Values{"Name": {"Acme"}, "Founded": {""}, "Balance": {""}}
+	resp := postOrganizationForm(t, app, "/admin/organizations/create", form)
+	if resp.StatusCode != fiber.StatusSeeOther {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("create: got %d, want %d (redirect); body:\n%s", resp.StatusCode, fiber.StatusSeeOther, body)
+	}
+
+	orgs := repo.List()
+	if len(orgs) != 1 {
+		t.Fatalf("got %d organizations, want 1", len(orgs))
+	}
+	org := orgs[0]
+	if !org.Founded.IsZero() {
+		t.Errorf("Founded = %v, want the zero time", org.Founded)
+	}
+	if org.Balance != 0 {
+		t.Errorf("Balance = %v, want 0", org.Balance)
+	}
+}
+
 func TestCreateOrganizationRejectsGarbageAndPersistsNothing(t *testing.T) {
 	app, repo := newOrganizationTestApp(t)
 
@@ -123,6 +146,25 @@ func TestUpdateOrganizationPersistsFoundedAndBalance(t *testing.T) {
 	}
 	if org.Balance != 500.5 {
 		t.Errorf("Balance = %v, want 500.5", org.Balance)
+	}
+}
+
+func TestUpdateOrganizationWithEmptyFoundedAndBalanceSavesZeroValues(t *testing.T) {
+	app, repo := newOrganizationTestApp(t)
+	org := repo.Create("Acme", time.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC), 100)
+
+	form := url.Values{"Name": {"Acme"}, "Founded": {""}, "Balance": {""}}
+	path := "/admin/organizations/" + strconv.Itoa(org.ID) + "/edit"
+	resp := postOrganizationForm(t, app, path, form)
+	if resp.StatusCode != fiber.StatusSeeOther {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("update: got %d, want %d (redirect); body:\n%s", resp.StatusCode, fiber.StatusSeeOther, body)
+	}
+	if !org.Founded.IsZero() {
+		t.Errorf("Founded = %v, want the zero time", org.Founded)
+	}
+	if org.Balance != 0 {
+		t.Errorf("Balance = %v, want 0", org.Balance)
 	}
 }
 

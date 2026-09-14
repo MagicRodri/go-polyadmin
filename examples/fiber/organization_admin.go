@@ -116,11 +116,15 @@ func validFoundedDate(ctx context.Context, value any) error {
 	return nil
 }
 
-// validBalance rejects a Balance value ParseFormValue could not parse: it
-// returns the raw string unchanged when strconv.ParseFloat fails, a
-// float64 otherwise, so seeing a string here means the input was bad.
+// validBalance rejects a Balance value ParseFormValue could not parse. An
+// absent/empty Balance is fine -- Balance isn't WithRequired(), and
+// ParseFormValue returns nil for raw == "" before it ever reaches
+// FieldTypeDecimal's own parsing, so nil here always means "not
+// submitted". A non-empty string, mirroring validFoundedDate's own
+// empty-string check, means strconv.ParseFloat failed inside
+// ParseFormValue -- a float64 is what a value that parsed becomes.
 func validBalance(ctx context.Context, value any) error {
-	if _, ok := value.(string); ok {
+	if s, ok := value.(string); ok && s != "" {
 		return errors.New("Enter a valid number.")
 	}
 	return nil
