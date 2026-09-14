@@ -43,12 +43,13 @@ func requestedURL(c *fiber.Ctx) string {
 // mounted admin that run without authenticating -- the other is its
 // POST -- since requiring a session to reach the page that creates one
 // is a loop.
-func handleLoginGet(admin *core.Admin, renderer *Renderer, basePath string) fiber.Handler {
+func handleLoginGet(admin *core.Admin, renderers *Renderers, basePath string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		// Already signed in: nothing here to do, so honour ?next= and
 		// send them on rather than showing a form they'd have to
 		// pointlessly fill in.
-		if admin.Authenticator != nil && admin.Authenticator.Authenticate(c) != nil {
+		if authenticate(admin, c) != nil {
 			return c.Redirect(core.SafeNextURL(c.Query(core.NextQueryParam), basePath), fiber.StatusSeeOther)
 		}
 		notice := ""
@@ -63,8 +64,9 @@ func handleLoginGet(admin *core.Admin, renderer *Renderer, basePath string) fibe
 // asks the backend to establish a session. CSRF is already enforced --
 // csrfMiddleware covers every route under the mount, this one included,
 // and the GET above is what mints the cookie the form echoes back.
-func handleLoginPost(admin *core.Admin, renderer *Renderer, basePath string) fiber.Handler {
+func handleLoginPost(admin *core.Admin, renderers *Renderers, basePath string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		identifier := formValue(c, "identifier")
 		password := formValue(c, "password")
 		next := core.SafeNextURL(c.Query(core.NextQueryParam), basePath)

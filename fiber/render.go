@@ -19,6 +19,8 @@ import (
 
 	"github.com/MagicRodri/go-polyadmin/core"
 	coretemplates "github.com/MagicRodri/go-polyadmin/templates"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // navLink is one flat sidebar entry -- either top-level or nested
@@ -234,6 +236,12 @@ func deleteBreadcrumbs(modelAdmin core.ModelAdmin, obj any, basePath string) []b
 type Renderer struct {
 	admin    *core.Admin
 	basePath string
+	// locale is the one locale this Renderer's template sets are bound
+	// to; funcs are those sets' template functions (see localeFuncs).
+	locale string
+	funcs  template.FuncMap
+	// errorPage is the error template for this locale -- see errors.go.
+	errorPage *template.Template
 
 	list      *template.Template
 	detail    *template.Template
@@ -308,41 +316,55 @@ func parseComponents(tmpl *template.Template) (*template.Template, error) {
 
 // buildTemplate parses the shared layout + ui component partials plus
 // the given content files into one set.
-func buildTemplate(contentFiles ...string) (*template.Template, error) {
+func buildTemplate(funcs template.FuncMap, contentFiles ...string) (*template.Template, error) {
 	files := append(append([]string{}, layoutFiles...), contentFiles...)
-	tmpl, err := template.New(path.Base(files[0])).Funcs(templateFuncs).ParseFS(coretemplates.FS, files...)
+	tmpl, err := template.New(path.Base(files[0])).Funcs(funcs).ParseFS(coretemplates.FS, files...)
 	if err != nil {
 		return nil, err
 	}
 	return parseComponents(tmpl)
 }
 
+// NewRenderer builds the Renderer for the admin's default locale. Mount
+// uses NewRenderers; this remains for callers that need one set.
 func NewRenderer(admin *core.Admin, basePath string, templateDirs ...string) (*Renderer, error) {
-	r := &Renderer{admin: admin, basePath: basePath, templateDirs: templateDirs, overrideCache: make(map[string]*template.Template)}
+	i18n, err := core.NewI18n(admin)
+	if err != nil {
+		return nil, err
+	}
+	return newRenderer(admin, i18n, i18n.Default, basePath, templateDirs...)
+}
+
+func newRenderer(admin *core.Admin, i18n *core.I18n, locale, basePath string, templateDirs ...string) (*Renderer, error) {
+	r := &Renderer{
+		admin: admin, basePath: basePath, locale: locale,
+		funcs:        localeFuncs(i18n.Translator, locale, switcherFor(admin, i18n, locale)),
+		templateDirs: templateDirs, overrideCache: make(map[string]*template.Template),
+	}
 	// Fragment-only sets (widgets, lookup, inline) render without the
 	// base layout, so they take the ui partials and funcs but not
 	// layoutFiles.
 	buildFragment := func(files ...string) (*template.Template, error) {
-		tmpl, err := template.New(path.Base(files[0])).Funcs(templateFuncs).ParseFS(coretemplates.FS, files...)
+		tmpl, err := template.New(path.Base(files[0])).Funcs(r.funcs).ParseFS(coretemplates.FS, files...)
 		if err != nil {
 			return nil, err
 		}
 		return parseComponents(tmpl)
 	}
 	var err error
-	if r.list, err = buildTemplate(listPartials...); err != nil {
+	if r.list, err = buildTemplate(r.funcs, listPartials...); err != nil {
 		return nil, err
 	}
-	if r.detail, err = buildTemplate("admin/components/inline.html", "admin/resource/detail.html"); err != nil {
+	if r.detail, err = buildTemplate(r.funcs, "admin/components/inline.html", "admin/resource/detail.html"); err != nil {
 		return nil, err
 	}
-	if r.form, err = buildTemplate("admin/components/inline.html", "admin/components/form_wrapper.html", "admin/resource/form.html"); err != nil {
+	if r.form, err = buildTemplate(r.funcs, "admin/components/inline.html", "admin/components/form_wrapper.html", "admin/resource/form.html"); err != nil {
 		return nil, err
 	}
-	if r.deleteTpl, err = buildTemplate("admin/resource/delete.html"); err != nil {
+	if r.deleteTpl, err = buildTemplate(r.funcs, "admin/resource/delete.html"); err != nil {
 		return nil, err
 	}
-	if r.dashboard, err = buildTemplate("admin/dashboard.html"); err != nil {
+	if r.dashboard, err = buildTemplate(r.funcs, "admin/dashboard.html"); err != nil {
 		return nil, err
 	}
 	// Not a fragment, but not a base.html page either: it needs the
@@ -360,10 +382,65 @@ func NewRenderer(admin *core.Admin, basePath string, templateDirs ...string) (*R
 	if r.inlineFragment, err = buildFragment("admin/components/inline.html", "admin/components/inline_fragment.html"); err != nil {
 		return nil, err
 	}
-	if r.uiSet, err = parseComponents(template.New("ui").Funcs(templateFuncs)); err != nil {
+	if r.errorPage, err = buildFragment("admin/theme.html", "admin/error.html", "admin/components/error_fragment.html"); err != nil {
+		return nil, err
+	}
+	if r.uiSet, err = parseComponents(template.New("ui").Funcs(r.funcs)); err != nil {
 		return nil, err
 	}
 	return r, nil
+}
+
+// switcherFor is the language switcher's data for a Renderer's pages, or
+// nil when the switcher is off: disabled by the host, or one locale only.
+// Task 5 renders it; it is computed here because it is bound into funcs.
+func switcherFor(admin *core.Admin, i18n *core.I18n, locale string) *localeSwitcher {
+	if admin.DisableLocaleSwitcher || len(i18n.Supported) < 2 {
+		return nil
+	}
+	return &localeSwitcher{Options: i18n.Options(), Current: locale}
+}
+
+// t translates a string built in Go for this Renderer's locale.
+func (r *Renderer) t(msgid string, args ...any) string {
+	return r.funcs["t"].(func(string, ...any) string)(msgid, args...)
+}
+
+// tn is t's plural form.
+func (r *Renderer) tn(singular, plural string, n int, args ...any) string {
+	return r.funcs["tn"].(func(string, string, any, ...any) string)(singular, plural, n, args...)
+}
+
+// Renderers holds one Renderer per supported locale: html/template binds
+// functions at parse time, so a per-request locale means per-locale sets.
+type Renderers struct {
+	byLocale map[string]*Renderer
+	fallback *Renderer
+}
+
+func NewRenderers(admin *core.Admin, i18n *core.I18n, basePath string, templateDirs ...string) (*Renderers, error) {
+	rs := &Renderers{byLocale: make(map[string]*Renderer, len(i18n.Supported))}
+	for _, locale := range i18n.Supported {
+		r, err := newRenderer(admin, i18n, locale, basePath, templateDirs...)
+		if err != nil {
+			return nil, err
+		}
+		rs.byLocale[locale] = r
+	}
+	rs.fallback = rs.byLocale[i18n.Default]
+	return rs, nil
+}
+
+func (rs *Renderers) byLocaleOrDefault(locale string) *Renderer {
+	if r, ok := rs.byLocale[locale]; ok {
+		return r
+	}
+	return rs.fallback
+}
+
+// For is the Renderer for the request's resolved locale.
+func (rs *Renderers) For(c *fiber.Ctx) *Renderer {
+	return rs.byLocaleOrDefault(core.Locale(c.Context()))
 }
 
 // uiHTML renders one component partial for the Go-built markup in
@@ -456,7 +533,7 @@ func (r *Renderer) contentTemplate(modelAdmin core.ModelAdmin, view string, fall
 	case "form":
 		baseFiles = append(baseFiles, "admin/components/form_wrapper.html")
 	}
-	tmpl, err := template.New(path.Base(name)).Funcs(templateFuncs).ParseFS(coretemplates.FS, baseFiles...)
+	tmpl, err := template.New(path.Base(name)).Funcs(r.funcs).ParseFS(coretemplates.FS, baseFiles...)
 	if err != nil {
 		return nil, err
 	}
@@ -1393,7 +1470,7 @@ func (r *Renderer) widgetTemplate(name string) (*template.Template, error) {
 		if _, statErr := os.Stat(dir + "/" + name); statErr != nil {
 			continue
 		}
-		tmpl, err := parseComponents(template.New(path.Base(name)).Funcs(templateFuncs))
+		tmpl, err := parseComponents(template.New(path.Base(name)).Funcs(r.funcs))
 		if err != nil {
 			return nil, err
 		}
@@ -1487,7 +1564,7 @@ func (r *Renderer) PageTemplate(templateName string) (*template.Template, error)
 		if _, statErr := os.Stat(dir + "/" + templateName); statErr != nil {
 			continue
 		}
-		tmpl, err := template.New(path.Base(templateName)).Funcs(templateFuncs).
+		tmpl, err := template.New(path.Base(templateName)).Funcs(r.funcs).
 			ParseFS(coretemplates.FS, layoutFiles...)
 		if err != nil {
 			return nil, err

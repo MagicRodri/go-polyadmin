@@ -22,6 +22,10 @@ type PageContext struct {
 
 func (pc *PageContext) IsHTMX() bool { return isHTMXRequest(pc.C) }
 
+// Locale is the request's resolved locale, for a page building its own
+// strings or choosing locale-specific content.
+func (pc *PageContext) Locale() string { return core.Locale(pc.C.Context()) }
+
 // Render renders templateName (an application-supplied template
 // defining a "content" block, resolved via Renderer.PageTemplate)
 // inside the shared admin layout, popping and clearing any pending
@@ -58,7 +62,7 @@ type PageHandler func(pc *PageContext) error
 // a loop variable) to sidestep the classic Go range-closure footgun,
 // matching handleList et al.'s pattern of taking modelAdmin as a
 // parameter.
-func buildPageHandler(admin *core.Admin, page core.AdminPage, renderer *Renderer, basePath string, handler PageHandler) fiber.Handler {
+func buildPageHandler(admin *core.Admin, page core.AdminPage, renderers *Renderers, basePath string, handler PageHandler) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, page.Permission, page)
 		if result != authOK {
@@ -66,7 +70,7 @@ func buildPageHandler(admin *core.Admin, page core.AdminPage, renderer *Renderer
 		}
 		pc := &PageContext{
 			C: c, Admin: admin, Page: page, Principal: principal, BasePath: basePath,
-			renderer: renderer,
+			renderer: renderers.For(c),
 		}
 		return handler(pc)
 	}

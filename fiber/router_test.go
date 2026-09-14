@@ -28,6 +28,8 @@ type testUserAdmin struct {
 	core.BaseModelAdmin
 	store  map[int]*testUser
 	nextID int
+	// onGetObject, when set, is told the locale GetObject's ctx carries.
+	onGetObject func(locale string)
 }
 
 func newTestUserAdmin() *testUserAdmin {
@@ -56,6 +58,9 @@ func (a *testUserAdmin) GetQueryset(ctx context.Context) (any, error) {
 }
 
 func (a *testUserAdmin) GetObject(ctx context.Context, pk any) (any, error) {
+	if a.onGetObject != nil {
+		a.onGetObject(core.Locale(ctx))
+	}
 	id, err := strconv.Atoi(pk.(string))
 	if err != nil {
 		return nil, nil

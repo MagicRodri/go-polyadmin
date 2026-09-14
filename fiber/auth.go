@@ -1,6 +1,10 @@
 package fiber
 
-import "github.com/MagicRodri/go-polyadmin/core"
+import (
+	"github.com/MagicRodri/go-polyadmin/core"
+
+	"github.com/gofiber/fiber/v2"
+)
 
 // authorize returns (principal, true) if the request may proceed, or
 // (nil, false) if it was rejected -- the caller is responsible for
@@ -11,7 +15,11 @@ import "github.com/MagicRodri/go-polyadmin/core"
 func authorize(admin *core.Admin, request any, permission string, resource any) (*core.Principal, authResult) {
 	var principal *core.Principal
 	if admin.Authenticator != nil {
-		principal = admin.Authenticator.Authenticate(request)
+		if c, ok := request.(*fiber.Ctx); ok {
+			principal = authenticate(admin, c)
+		} else {
+			principal = admin.Authenticator.Authenticate(request)
+		}
 		if principal == nil {
 			return nil, authUnauthenticated
 		}

@@ -51,17 +51,24 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		opt(cfg)
 	}
 
+	i18n, err := core.NewI18n(admin)
+	if err != nil {
+		return err
+	}
+	renderers, err := NewRenderers(admin, i18n, basePath, cfg.templateDirs...)
+	if err != nil {
+		return err
+	}
+
+	// Locale first, then CSRF: a CSRF failure page is rendered in the
+	// request's language like every other page.
+	router.Use(localeMiddleware(admin, i18n, renderers))
 	// Before every route, including the static handler and any custom
 	// AdminPage: a mutating custom page has to be covered too.
 	router.Use(csrfMiddleware(admin, basePath))
 
 	if cfg.staticDir != "" {
 		router.Static("/static", cfg.staticDir)
-	}
-
-	renderer, err := NewRenderer(admin, basePath, cfg.templateDirs...)
-	if err != nil {
-		return err
 	}
 
 	// The login routes go on before anything else, and only when the
@@ -72,8 +79,8 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 	// "login". Registering them first is what makes that collision
 	// Fiber's problem rather than a silently unreachable login page.
 	if admin.LoginBackend != nil {
-		router.Get(core.LoginPath, handleLoginGet(admin, renderer, basePath))
-		router.Post(core.LoginPath, handleLoginPost(admin, renderer, basePath))
+		router.Get(core.LoginPath, handleLoginGet(admin, renderers, basePath))
+		router.Post(core.LoginPath, handleLoginPost(admin, renderers, basePath))
 		router.Post(core.LogoutPath, handleLogout(admin, basePath))
 	}
 
@@ -84,7 +91,7 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		}
 		if admin.Dashboard != nil {
 			widgets := admin.Dashboard.VisibleWidgets(principal, admin.Authorizer)
-			html, err := renderer.RenderDashboard(principal, csrfToken(c), *admin.Dashboard, widgets)
+			html, err := renderers.For(c).RenderDashboard(principal, csrfToken(c), *admin.Dashboard, widgets)
 			if err != nil {
 				return err
 			}
@@ -103,29 +110,29 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		prefix := "/" + modelAdmin.Slug()
 
 		if modelAdmin.CanView() {
-			router.Get(prefix, handleList(admin, modelAdmin, renderer, basePath))
+			router.Get(prefix, handleList(admin, modelAdmin, renderers, basePath))
 		}
 		if modelAdmin.CanCreate() {
-			router.Get(prefix+"/create", handleCreateGet(admin, modelAdmin, renderer, basePath))
-			router.Post(prefix+"/create", handleCreatePost(admin, modelAdmin, renderer, basePath))
+			router.Get(prefix+"/create", handleCreateGet(admin, modelAdmin, renderers, basePath))
+			router.Post(prefix+"/create", handleCreatePost(admin, modelAdmin, renderers, basePath))
 		}
 		if modelAdmin.CanExport() {
 			router.Get(prefix+"/export/csv", handleExportCSV(admin, modelAdmin, basePath))
 			router.Get(prefix+"/export/xlsx", handleExportXLSX(admin, modelAdmin, basePath))
 		}
 		if modelAdmin.CanView() {
-			router.Get(prefix+"/lookup", handleLookup(admin, modelAdmin, renderer, basePath))
+			router.Get(prefix+"/lookup", handleLookup(admin, modelAdmin, renderers, basePath))
 			if len(modelAdmin.Actions()) > 0 {
 				router.Post(prefix+"/actions/:name", handleAction(admin, modelAdmin, basePath))
 			}
-			router.Get(prefix+"/:pk", handleDetail(admin, modelAdmin, renderer, basePath))
+			router.Get(prefix+"/:pk", handleDetail(admin, modelAdmin, renderers, basePath))
 		}
 		if modelAdmin.CanUpdate() {
-			router.Get(prefix+"/:pk/edit", handleEditGet(admin, modelAdmin, renderer, basePath))
-			router.Post(prefix+"/:pk/edit", handleEditPost(admin, modelAdmin, renderer, basePath))
+			router.Get(prefix+"/:pk/edit", handleEditGet(admin, modelAdmin, renderers, basePath))
+			router.Post(prefix+"/:pk/edit", handleEditPost(admin, modelAdmin, renderers, basePath))
 		}
 		if modelAdmin.CanDelete() {
-			router.Get(prefix+"/:pk/delete", handleDeleteGet(admin, modelAdmin, renderer, basePath))
+			router.Get(prefix+"/:pk/delete", handleDeleteGet(admin, modelAdmin, renderers, basePath))
 			router.Post(prefix+"/:pk/delete", handleDeletePost(admin, modelAdmin, basePath))
 			router.Delete(prefix+"/:pk/delete", handleDeleteHTMX(admin, modelAdmin, basePath))
 		}
@@ -134,9 +141,9 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 			if err := validateInlines(admin, modelAdmin); err != nil {
 				return err
 			}
-			router.Post(prefix+"/:pk/inlines/:child", handleInlineCreate(admin, modelAdmin, renderer, basePath))
-			router.Post(prefix+"/:pk/inlines/:child/:childPK", handleInlineUpdate(admin, modelAdmin, renderer, basePath))
-			router.Delete(prefix+"/:pk/inlines/:child/:childPK", handleInlineDelete(admin, modelAdmin, renderer, basePath))
+			router.Post(prefix+"/:pk/inlines/:child", handleInlineCreate(admin, modelAdmin, renderers, basePath))
+			router.Post(prefix+"/:pk/inlines/:child/:childPK", handleInlineUpdate(admin, modelAdmin, renderers, basePath))
+			router.Delete(prefix+"/:pk/inlines/:child/:childPK", handleInlineDelete(admin, modelAdmin, renderers, basePath))
 		}
 	}
 
@@ -145,7 +152,7 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		if !ok {
 			return fmt.Errorf("polyadmin: page %q's handler must be a fiberadapter.PageHandler (wrap it: fiberadapter.PageHandler(yourFunc))", page.Path)
 		}
-		fiberHandler := buildPageHandler(admin, page, renderer, basePath, handler)
+		fiberHandler := buildPageHandler(admin, page, renderers, basePath, handler)
 		for _, method := range page.HTTPMethods {
 			router.Add(method, page.Path, fiberHandler)
 		}

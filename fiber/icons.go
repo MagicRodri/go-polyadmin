@@ -60,7 +60,7 @@ var iconPaths = map[string]string{
 
 // iconHTML renders an inline SVG icon by name, used in place of CRUD
 // verbs and for sidebar/dashboard iconography. Registered as the
-// "icon" template func (see NewRenderer) so admin/*.html can call
+// "icon" template func (see baseFuncs) so admin/*.html can call
 // {{icon "edit" "w-4 h-4"}}.
 func iconHTML(name, class string) template.HTML {
 	d := iconPaths[name]
@@ -113,16 +113,4 @@ func siteInitials(value string) string {
 		runes = runes[:2]
 	}
 	return strings.ToUpper(string(runes))
-}
-
-// templateFuncs is the func map every template set in this package is
-// built with: `icon` for inline SVGs, `ui` for shadcn-derived class
-// strings (see ui.go), `siteInitials` for avatar fallbacks, and
-// `dict`/`list` for multi-argument partial calls.
-var templateFuncs = template.FuncMap{
-	"icon":         iconHTML,
-	"ui":           uiClasses,
-	"siteInitials": siteInitials,
-	"dict":         dictValues,
-	"list":         listValues,
 }

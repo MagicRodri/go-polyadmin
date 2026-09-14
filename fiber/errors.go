@@ -8,11 +8,12 @@ package fiber
 // with three words on it, no navigation, and no way back. These render
 // the same failures as an actual page.
 //
-// Deliberately renderer-independent: the page needs the site title and
-// the base path and nothing else, so the five handlers that never took
-// a *Renderer (delete POST, the htmx delete, actions, both exports) and
+// Deliberately takes no *Renderer: the page needs the site title and the
+// base path and nothing else, so the five handlers that never took a
+// *Renderer (delete POST, the htmx delete, actions, both exports) and
 // the CSRF middleware can all report errors without threading one
-// through.
+// through. The request's locale middleware stored its Renderer, whose
+// error set is used (see errorTmpl).
 
 import (
 	"bytes"
@@ -26,24 +27,28 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// Built once: the error page is request-independent apart from the
-// status, the message, and two strings off the Admin.
+// fallbackError is the English error page for a request the
+// locale middleware never reached. Every mounted route has it, so this is
+// a last resort, built lazily.
 var (
-	errorTemplateOnce sync.Once
-	errorTemplate     *template.Template
-	errorTemplateErr  error
+	fallbackErrorOnce sync.Once
+	fallbackError     *template.Template
+	fallbackErrorErr  error
 )
 
-func errorTmpl() (*template.Template, error) {
-	errorTemplateOnce.Do(func() {
+func errorTmpl(c *fiber.Ctx) (*template.Template, error) {
+	if r := requestRenderer(c); r != nil {
+		return r.errorPage, nil
+	}
+	fallbackErrorOnce.Do(func() {
 		tmpl := template.New("error.html").Funcs(templateFuncs)
-		tmpl, errorTemplateErr = tmpl.ParseFS(coretemplates.FS, "admin/theme.html", "admin/error.html", "admin/components/error_fragment.html")
-		if errorTemplateErr != nil {
+		tmpl, fallbackErrorErr = tmpl.ParseFS(coretemplates.FS, "admin/theme.html", "admin/error.html", "admin/components/error_fragment.html")
+		if fallbackErrorErr != nil {
 			return
 		}
-		errorTemplate, errorTemplateErr = parseComponents(tmpl)
+		fallbackError, fallbackErrorErr = parseComponents(tmpl)
 	})
-	return errorTemplate, errorTemplateErr
+	return fallbackError, fallbackErrorErr
 }
 
 type errorData struct {
@@ -73,7 +78,7 @@ func writeError(c *fiber.Ctx, admin *core.Admin, basePath string, status int, ti
 	if isHTMXRequest(c) {
 		name = "errorFragment"
 	}
-	tmpl, err := errorTmpl()
+	tmpl, err := errorTmpl(c)
 	if err != nil {
 		// The error page itself failed to build. Fall back to the plain
 		// body rather than returning nothing at all -- an ugly 403 beats

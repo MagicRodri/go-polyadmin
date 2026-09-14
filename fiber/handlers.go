@@ -103,9 +103,10 @@ func queryset(ctx context.Context, modelAdmin core.ModelAdmin) ([]any, error) {
 	return items, nil
 }
 
-func handleList(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleList(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "list"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
@@ -141,9 +142,10 @@ func handleList(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rendere
 	}
 }
 
-func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "view"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
@@ -243,9 +245,10 @@ func parseFormData(c *fiber.Ctx, modelAdmin core.ModelAdmin, obj any) map[string
 	return data
 }
 
-func handleCreateGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleCreateGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "create"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
@@ -260,9 +263,10 @@ func handleCreateGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Re
 	}
 }
 
-func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "create"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
@@ -306,9 +310,10 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *R
 	}
 }
 
-func handleEditGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleEditGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "update"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
@@ -333,9 +338,10 @@ func handleEditGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Rend
 	}
 }
 
-func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "update"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
@@ -382,9 +388,10 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Ren
 	}
 }
 
-func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "delete"), modelAdmin)
 		if result != authOK {
 			return writeAuthError(c, admin, basePath, result)
@@ -469,9 +476,10 @@ const lookupLimit = 20
 // matching options consumed by another resource's autocomplete combobox.
 // Gated on this resource's own "view" permission, since that is what is
 // being browsed.
-func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		if _, result := authorize(admin, c, core.ResourcePermission(slug, "view"), modelAdmin); result != authOK {
 			return writeAuthError(c, admin, basePath, result)
 		}
@@ -593,9 +601,10 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 // handleInlineCreate serves POST {slug}/{pk}/inlines/:child. The response
 // is the rebuilt inline section alone -- never a redirect, never the whole
 // parent page -- matching the other fragment routes.
-func handleInlineCreate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleInlineCreate(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	parentSlug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		inline, ok := findInline(modelAdmin, c.Params("child"))
 		if !ok {
 			return writeNotFound(c, admin, basePath)
@@ -642,9 +651,10 @@ func handleInlineCreate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 
 // handleInlineUpdate serves POST {slug}/{pk}/inlines/:child/:childPK
 // -- updates one existing inline child row.
-func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	parentSlug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		inline, ok := findInline(modelAdmin, c.Params("child"))
 		if !ok {
 			return writeNotFound(c, admin, basePath)
@@ -699,9 +709,10 @@ func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderer 
 
 // handleInlineDelete serves DELETE {slug}/{pk}/inlines/:child/:childPK
 // -- removes one inline child row.
-func handleInlineDelete(admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, basePath string) fiber.Handler {
+func handleInlineDelete(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	parentSlug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
+		renderer := renderers.For(c)
 		inline, ok := findInline(modelAdmin, c.Params("child"))
 		if !ok {
 			return writeNotFound(c, admin, basePath)
