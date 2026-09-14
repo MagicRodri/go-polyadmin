@@ -32,7 +32,10 @@ func mustTranslator(t *testing.T, catalogs ...map[string]string) *CatalogTransla
 
 func TestMissingTranslationFallsBackToEnglish(t *testing.T) {
 	tr := mustTranslator(t, map[string]string{"fr.json": `{"Save": "Enregistrer"}`})
-	if got := tr.Translate("fr", "Cancel"); got != "Cancel" {
+	// Not a real framework msgid -- unlike "Cancel", "Save" and the like,
+	// it can never collide with an entry the shipped fr.json now carries.
+	const noSuchMsgid = "This msgid does not exist anywhere"
+	if got := tr.Translate("fr", noSuchMsgid); got != noSuchMsgid {
 		t.Errorf("got %q, want the English msgid", got)
 	}
 	if got := tr.Translate("de", "Save"); got != "Save" {
