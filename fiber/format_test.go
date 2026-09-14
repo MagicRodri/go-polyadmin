@@ -44,6 +44,14 @@ func TestDecimalCarriesItsRawValue(t *testing.T) {
 	}
 }
 
+func TestDecimalIsFixedPointNotScientificNotation(t *testing.T) {
+	// fmt.Sprint(1e21) is "1e+21"; the data-value/text must stay
+	// fixed-point so the browser-side formatter can count fraction digits.
+	if got := renderValue(t, core.FieldTypeDecimal, 1e21); got != `<span data-format="decimal" data-value="1000000000000000000000">1000000000000000000000</span>` {
+		t.Errorf("got %s", got)
+	}
+}
+
 func TestIntegersAreNotFormatted(t *testing.T) {
 	if got := renderValue(t, core.FieldTypeInteger, 1234); got != "1234" {
 		t.Errorf("got %s", got)

@@ -5,6 +5,7 @@ import (
 	"html"
 	"html/template"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,10 +95,24 @@ func (r *Renderer) fieldValueHTML(relationPermissions map[string]bool, field cor
 			return template.HTML(`<time datetime="` + iso + `" data-format="datetime">` + iso + `</time>`)
 		}
 	case core.FieldTypeDecimal:
-		raw := html.EscapeString(fmt.Sprint(value))
+		raw := html.EscapeString(decimalText(value))
 		return template.HTML(`<span data-format="decimal" data-value="` + raw + `">` + raw + `</span>`)
 	}
 	return template.HTML(html.EscapeString(fmt.Sprint(value)))
+}
+
+// decimalText renders a decimal value as fixed-point text. fmt.Sprint on
+// a float64 switches to scientific notation past a certain magnitude
+// (1e+21), which the browser-side formatter's fraction-digit count
+// (theme.html's polyadminFormat, counting digits after ".") can't read;
+// strconv.FormatFloat with a negative precision keeps the shortest exact
+// fixed-point form instead, matching what the data-value attribute and
+// its visible fallback text both need to agree on.
+func decimalText(value any) string {
+	if f, ok := value.(float64); ok {
+		return strconv.FormatFloat(f, 'f', -1, 64)
+	}
+	return fmt.Sprint(value)
 }
 
 var (

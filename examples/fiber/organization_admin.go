@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"time"
 
@@ -24,8 +25,8 @@ func NewOrganizationAdmin(repository *OrganizationRepository) *OrganizationAdmin
 			SearchFieldNames: []string{"Name"},
 			DeclaredFields: []core.Field{
 				core.NewField("Name", core.FieldTypeString, core.WithRequired()),
-				core.NewField("Founded", core.FieldTypeDate),
-				core.NewField("Balance", core.FieldTypeDecimal),
+				core.NewField("Founded", core.FieldTypeDate, core.WithValidators(validFoundedDate)),
+				core.NewField("Balance", core.FieldTypeDecimal, core.WithValidators(validBalance)),
 			},
 			// Shows each Organization's Users inline on its own
 			// create/detail/edit pages -- see docs/inlines.md.
@@ -71,11 +72,17 @@ func (a *OrganizationAdmin) Update(ctx context.Context, obj any, data map[string
 	return a.repository.Update(org, name, founded, balance), nil
 }
 
-// parseOrganizationFormFields parses the two fields Task 11 added onto
-// Organization. A date input posts YYYY-MM-DD; an unparseable or absent
-// value falls back to the zero time / zero balance rather than failing
-// the whole submission, matching Founded and Balance not being marked
-// required.
+// parseOrganizationFormFields reads the two fields Task 11 added onto
+// Organization out of the already-validated data map. Create/Update only
+// run once Field.Validate has passed (see validFoundedDate/validBalance
+// below), so a malformed value never reaches here -- but the zero value
+// is still the safe fallback for an absent/optional one.
+//
+// core.Field.ParseFormValue (core/field.go) already coerces FieldTypeDecimal:
+// it hands back a float64 when the raw string parses, and the raw string
+// itself otherwise (only possible here if a validator were removed) --
+// there is no equivalent coercion for FieldTypeDate, so Founded always
+// arrives as the raw YYYY-MM-DD string and is parsed here.
 func parseOrganizationFormFields(data map[string]any) (time.Time, float64) {
 	var founded time.Time
 	if s, _ := data["Founded"].(string); s != "" {
@@ -84,10 +91,37 @@ func parseOrganizationFormFields(data map[string]any) (time.Time, float64) {
 		}
 	}
 	var balance float64
-	if s, _ := data["Balance"].(string); s != "" {
-		if parsed, err := strconv.ParseFloat(s, 64); err == nil {
+	switch v := data["Balance"].(type) {
+	case float64:
+		balance = v
+	case string:
+		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
 			balance = parsed
 		}
 	}
 	return founded, balance
+}
+
+// validFoundedDate rejects a Founded value core couldn't already coerce:
+// ParseFormValue does no date parsing of its own (unlike FieldTypeDecimal),
+// so any non-empty string reaching here has to be checked by hand.
+func validFoundedDate(ctx context.Context, value any) error {
+	s, ok := value.(string)
+	if !ok || s == "" {
+		return nil
+	}
+	if _, err := time.Parse("2006-01-02", s); err != nil {
+		return errors.New("Enter a valid date.")
+	}
+	return nil
+}
+
+// validBalance rejects a Balance value ParseFormValue could not parse: it
+// returns the raw string unchanged when strconv.ParseFloat fails, a
+// float64 otherwise, so seeing a string here means the input was bad.
+func validBalance(ctx context.Context, value any) error {
+	if _, ok := value.(string); ok {
+		return errors.New("Enter a valid number.")
+	}
+	return nil
 }
