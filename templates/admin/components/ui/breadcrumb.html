@@ -6,12 +6,12 @@
 
      Called from base.html with the pageBase context. */}}
 {{define "ui/breadcrumb"}}
-<nav aria-label="Breadcrumb">
+<nav aria-label="{{t "Breadcrumb"}}">
   <ol class="{{ui "breadcrumb"}}">
     <li class="flex items-center">
       <a href="{{.BasePath}}" class="{{ui "breadcrumb" "link"}} p-0.5">
         {{icon "home" "w-4 h-4"}}
-        <span class="sr-only">Dashboard</span>
+        <span class="sr-only">{{t "Dashboard"}}</span>
       </a>
     </li>
     {{range .Breadcrumbs}}

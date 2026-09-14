@@ -77,11 +77,11 @@ type breadcrumb struct {
 
 // categoryBreadcrumb is the category crumb, if any: the first segment
 // after the home crumb, never a link and never active.
-func categoryBreadcrumb(category string) []breadcrumb {
+func (r *Renderer) categoryBreadcrumb(category string) []breadcrumb {
 	if category == "" {
 		return nil
 	}
-	return []breadcrumb{{Label: category}}
+	return []breadcrumb{{Label: r.t(category)}}
 }
 
 type pageBase struct {
@@ -102,10 +102,13 @@ type pageBase struct {
 	CurrentSlug   string
 	CurrentNavKey string
 	NavItems      []navEntry
-	SiteTitle     string
-	SiteLogoURL   string
-	Breadcrumbs   []breadcrumb
-	Messages      []flashMessage
+	// SiteTitle is translated; SiteInitials, the avatar fallback, comes
+	// from the untranslated title, so it stays the site's own mark.
+	SiteTitle    string
+	SiteInitials string
+	SiteLogoURL  string
+	Breadcrumbs  []breadcrumb
+	Messages     []flashMessage
 	// CanSignOut is whether a core.LoginBackend is configured -- i.e.
 	// whether there is a session to end. Without one the admin has no
 	// logout route, so offering the control would be a dead button.
@@ -174,7 +177,8 @@ func (r *Renderer) pageBase(principal *core.Principal, csrfToken, title, header,
 		Principal: principal, CSRFToken: csrfToken,
 		Title: title, Header: header, BasePath: r.basePath,
 		CurrentSlug: currentSlug, CurrentNavKey: navKey, NavItems: r.buildNav(navKey),
-		SiteTitle: siteTitle, SiteLogoURL: r.admin.SiteLogoURL, Breadcrumbs: breadcrumbs, Messages: messages,
+		SiteTitle: r.t(siteTitle), SiteInitials: siteInitials(siteTitle), SiteLogoURL: r.admin.SiteLogoURL,
+		Breadcrumbs: breadcrumbs, Messages: messages,
 		CanSignOut: r.admin.LoginBackend != nil,
 	}
 }
@@ -198,38 +202,40 @@ func objectLabel(modelAdmin core.ModelAdmin, obj any) string {
 	return fmt.Sprint(modelAdmin.GetPK(obj))
 }
 
-func listBreadcrumbs(modelAdmin core.ModelAdmin) []breadcrumb {
-	return append(categoryBreadcrumb(modelAdmin.Category()), breadcrumb{Label: modelAdmin.VerboseName(), Active: true})
+// The breadcrumb builders translate the resource's name and their own
+// literals; the object's label is data and stays as it is.
+func (r *Renderer) listBreadcrumbs(modelAdmin core.ModelAdmin) []breadcrumb {
+	return append(r.categoryBreadcrumb(modelAdmin.Category()), breadcrumb{Label: r.t(modelAdmin.VerboseName()), Active: true})
 }
 
-func detailBreadcrumbs(modelAdmin core.ModelAdmin, obj any, basePath string) []breadcrumb {
-	crumbs := categoryBreadcrumb(modelAdmin.Category())
+func (r *Renderer) detailBreadcrumbs(modelAdmin core.ModelAdmin, obj any) []breadcrumb {
+	crumbs := r.categoryBreadcrumb(modelAdmin.Category())
 	return append(crumbs,
-		breadcrumb{Label: modelAdmin.VerboseName(), URL: fmt.Sprintf("%s/%s", basePath, modelAdmin.Slug())},
+		breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: fmt.Sprintf("%s/%s", r.basePath, modelAdmin.Slug())},
 		breadcrumb{Label: objectLabel(modelAdmin, obj), Active: true},
 	)
 }
 
-func formBreadcrumbs(modelAdmin core.ModelAdmin, obj any, basePath string) []breadcrumb {
-	crumbs := categoryBreadcrumb(modelAdmin.Category())
-	crumbs = append(crumbs, breadcrumb{Label: modelAdmin.VerboseName(), URL: fmt.Sprintf("%s/%s", basePath, modelAdmin.Slug())})
+func (r *Renderer) formBreadcrumbs(modelAdmin core.ModelAdmin, obj any) []breadcrumb {
+	crumbs := r.categoryBreadcrumb(modelAdmin.Category())
+	crumbs = append(crumbs, breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: fmt.Sprintf("%s/%s", r.basePath, modelAdmin.Slug())})
 	if obj != nil {
 		crumbs = append(crumbs,
-			breadcrumb{Label: objectLabel(modelAdmin, obj), URL: fmt.Sprintf("%s/%s/%v", basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))},
-			breadcrumb{Label: "Edit", Active: true},
+			breadcrumb{Label: objectLabel(modelAdmin, obj), URL: fmt.Sprintf("%s/%s/%v", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))},
+			breadcrumb{Label: r.t("Edit"), Active: true},
 		)
 	} else {
-		crumbs = append(crumbs, breadcrumb{Label: "New", Active: true})
+		crumbs = append(crumbs, breadcrumb{Label: r.t("New"), Active: true})
 	}
 	return crumbs
 }
 
-func deleteBreadcrumbs(modelAdmin core.ModelAdmin, obj any, basePath string) []breadcrumb {
-	crumbs := categoryBreadcrumb(modelAdmin.Category())
+func (r *Renderer) deleteBreadcrumbs(modelAdmin core.ModelAdmin, obj any) []breadcrumb {
+	crumbs := r.categoryBreadcrumb(modelAdmin.Category())
 	return append(crumbs,
-		breadcrumb{Label: modelAdmin.VerboseName(), URL: fmt.Sprintf("%s/%s", basePath, modelAdmin.Slug())},
-		breadcrumb{Label: objectLabel(modelAdmin, obj), URL: fmt.Sprintf("%s/%s/%v", basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))},
-		breadcrumb{Label: "Delete", Active: true},
+		breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: fmt.Sprintf("%s/%s", r.basePath, modelAdmin.Slug())},
+		breadcrumb{Label: objectLabel(modelAdmin, obj), URL: fmt.Sprintf("%s/%s/%v", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))},
+		breadcrumb{Label: r.t("Delete"), Active: true},
 	)
 }
 
@@ -784,7 +790,7 @@ func (r *Renderer) buildListData(
 	}
 
 	return listData{
-		pageBase:        r.pageBase(principal, csrfToken, modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+slug, listBreadcrumbs(modelAdmin), messages),
+		pageBase:        r.pageBase(principal, csrfToken, r.t(modelAdmin.VerboseName()), r.t(modelAdmin.VerboseName()), "resource:"+slug, r.listBreadcrumbs(modelAdmin), messages),
 		Slug:            slug,
 		VerboseName:     modelAdmin.VerboseName(),
 		Columns:         columns,
@@ -1033,7 +1039,7 @@ func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, 
 		return "", err
 	}
 	data := detailData{
-		pageBase:       r.pageBase(principal, csrfToken, modelAdmin.VerboseName(), modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), detailBreadcrumbs(modelAdmin, obj, r.basePath), messages),
+		pageBase:       r.pageBase(principal, csrfToken, r.t(modelAdmin.VerboseName()), r.t(modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), r.detailBreadcrumbs(modelAdmin, obj), messages),
 		Slug:           modelAdmin.Slug(),
 		PK:             modelAdmin.GetPK(obj),
 		Fields:         fields,
@@ -1123,9 +1129,9 @@ func (r *Renderer) executeForm(
 	errs map[string][]string,
 	relationOptions map[string]*relationFieldOptions,
 ) (string, error) {
-	verb, action := "Create", fmt.Sprintf("%s/%s/create", r.basePath, modelAdmin.Slug())
+	title, action := r.t("Create %s", r.t(modelAdmin.VerboseName())), fmt.Sprintf("%s/%s/create", r.basePath, modelAdmin.Slug())
 	if obj != nil {
-		verb = "Edit"
+		title = r.t("Edit %s", r.t(modelAdmin.VerboseName()))
 		action = fmt.Sprintf("%s/%s/%v/edit", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))
 	}
 
@@ -1162,7 +1168,7 @@ func (r *Renderer) executeForm(
 	}
 
 	data := formData{
-		pageBase:    r.pageBase(principal, csrfToken, fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), fmt.Sprintf("%s %s", verb, modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), formBreadcrumbs(modelAdmin, obj, r.basePath), nil),
+		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), r.formBreadcrumbs(modelAdmin, obj), nil),
 		VerboseName: modelAdmin.VerboseName(),
 		FormAction:  action,
 		// The edit form offers Delete, so it needs the detail page's permission
@@ -1398,8 +1404,9 @@ type deleteData struct {
 }
 
 func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any) (string, error) {
+	title := r.t("Delete %s", r.t(modelAdmin.VerboseName()))
 	data := deleteData{
-		pageBase:    r.pageBase(principal, csrfToken, "Delete "+modelAdmin.VerboseName(), "Delete "+modelAdmin.VerboseName(), "resource:"+modelAdmin.Slug(), deleteBreadcrumbs(modelAdmin, obj, r.basePath), nil),
+		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), r.deleteBreadcrumbs(modelAdmin, obj), nil),
 		VerboseName: modelAdmin.VerboseName(),
 	}
 	tmpl, err := r.contentTemplate(modelAdmin, "delete", r.deleteTpl)
@@ -1534,6 +1541,7 @@ func (r *Renderer) RenderDashboard(principal *core.Principal, csrfToken string, 
 	if title == "" {
 		title = "Dashboard"
 	}
+	title = r.t(title)
 	// A single active crumb -- since base.html has no separate <h1>,
 	// this is the only page-title element the dashboard gets.
 	data := dashboardData{pageBase: r.pageBase(principal, csrfToken, title, title, "", []breadcrumb{{Label: title, Active: true}}, nil), Widgets: rendered}
@@ -1591,9 +1599,10 @@ func (r *Renderer) RenderPage(principal *core.Principal, csrfToken string, page 
 	if err != nil {
 		return "", err
 	}
-	breadcrumbs := append(categoryBreadcrumb(page.Category), breadcrumb{Label: page.Label, Active: true})
+	label := r.t(page.Label)
+	breadcrumbs := append(r.categoryBreadcrumb(page.Category), breadcrumb{Label: label, Active: true})
 	pd := pageData{
-		pageBase: r.pageBase(principal, csrfToken, page.Label, page.Label, "page:"+page.Path, breadcrumbs, messages),
+		pageBase: r.pageBase(principal, csrfToken, label, label, "page:"+page.Path, breadcrumbs, messages),
 		Page:     page,
 		Data:     data,
 	}
@@ -1626,7 +1635,7 @@ func (r *Renderer) RenderLogin(csrfToken, identifier, errorMessage, notice strin
 	data := loginData{
 		CSRFToken:   csrfToken,
 		BasePath:    r.basePath,
-		SiteTitle:   r.admin.SiteTitle,
+		SiteTitle:   r.t(r.admin.SiteTitle),
 		SiteLogoURL: r.admin.SiteLogoURL,
 		Identifier:  identifier,
 		Error:       errorMessage,

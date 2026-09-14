@@ -32,12 +32,12 @@
         {{if .SiteLogoURL}}
         <img src="{{.SiteLogoURL}}" alt="" class="size-5 rounded object-contain">
         {{else}}
-        <span class="text-xs font-semibold">{{siteInitials .SiteTitle}}</span>
+        <span class="text-xs font-semibold">{{.SiteInitials}}</span>
         {{end}}
       </span>
       <span x-show="!collapsed" class="grid flex-1 text-left leading-tight">
         <span class="truncate font-semibold text-foreground">{{.SiteTitle}}</span>
-        <span class="truncate text-xs text-muted-foreground">Admin</span>
+        <span class="truncate text-xs text-muted-foreground">{{t "Admin"}}</span>
       </span>
     </a>
   </div>
@@ -45,20 +45,20 @@
   {{/* -- SidebarContent: the block's NavMain -- */}}
   <div class="{{ui "sidebar" "content"}}">
     <div class="{{ui "sidebar" "group"}}">
-      <div x-show="!collapsed" class="{{ui "sidebar" "group-label"}}">Platform</div>
+      <div x-show="!collapsed" class="{{ui "sidebar" "group-label"}}">{{t "Platform"}}</div>
       <nav class="{{ui "sidebar" "menu"}}">
-        <a href="{{.BasePath}}" :title="collapsed ? 'Dashboard' : null"
+        <a href="{{.BasePath}}" :title="collapsed ? {{tjs "Dashboard"}} : null"
            class="{{ui "nav-item"}} {{if not .CurrentNavKey}}{{ui "nav-item" "active"}}{{else}}{{ui "nav-item" "inactive"}}{{end}}">
           {{icon "home" "size-4 shrink-0"}}
-          <span x-show="!collapsed" class="truncate">Dashboard</span>
+          <span x-show="!collapsed" class="truncate">{{t "Dashboard"}}</span>
         </a>
         {{range .NavItems}}
           {{if not .IsGroup}}
           {{with .Link}}
-          <a href="{{.URL}}" :title="collapsed ? '{{.Label}}' : null"
+          <a href="{{.URL}}" :title="collapsed ? {{tjs .Label}} : null"
              class="{{ui "nav-item"}} {{if .Active}}{{ui "nav-item" "active"}}{{else}}{{ui "nav-item" "inactive"}}{{end}}">
             {{icon .Icon "size-4 shrink-0"}}
-            <span x-show="!collapsed" class="truncate">{{.Label}}</span>
+            <span x-show="!collapsed" class="truncate">{{t .Label}}</span>
           </a>
           {{end}}
           {{else}}
@@ -68,7 +68,7 @@
           {{with .Group}}
           <div x-data="{ open: {{if .Expanded}}true{{else}}false{{end}} }">
             <a x-show="collapsed" href="{{if .Links}}{{(index .Links 0).URL}}{{else}}#{{end}}"
-               :title="'{{.Label}}'"
+               :title="{{tjs .Label}}"
                class="{{ui "nav-item"}} {{if .Expanded}}{{ui "nav-item" "active"}}{{else}}{{ui "nav-item" "inactive"}}{{end}}">
               {{icon .Icon "size-4 shrink-0"}}
             </a>
@@ -76,7 +76,7 @@
                     :aria-expanded="open ? 'true' : 'false'"
                     class="{{ui "nav-item"}} {{ui "nav-item" "inactive"}}">
               {{icon .Icon "size-4 shrink-0"}}
-              <span class="flex-1 truncate">{{.Label}}</span>
+              <span class="flex-1 truncate">{{t .Label}}</span>
               <span :class="open ? 'rotate-90' : ''" class="ml-auto transition-transform duration-200">
                 {{icon "chevron-right" "size-4"}}
               </span>
@@ -85,7 +85,7 @@
               {{range .Links}}
               <a href="{{.URL}}"
                  class="{{ui "nav-item"}} {{if .Active}}{{ui "nav-item" "active"}}{{else}}{{ui "nav-item" "inactive"}}{{end}}">
-                <span class="truncate">{{.Label}}</span>
+                <span class="truncate">{{t .Label}}</span>
               </a>
               {{end}}
             </div>
@@ -115,7 +115,7 @@
         <span x-show="!collapsed" class="grid flex-1 text-left leading-tight">
           <span class="truncate font-medium text-foreground">{{$name}}</span>
           <span class="truncate text-xs text-muted-foreground">
-            {{if .IsSuperuser}}Superuser{{else}}Signed in{{end}}
+            {{if .IsSuperuser}}{{t "Superuser"}}{{else}}{{t "Signed in"}}{{end}}
           </span>
         </span>
         <span x-show="!collapsed">{{icon "chevrons-up-down" "ml-auto size-4"}}</span>
@@ -136,7 +136,7 @@
           <span class="grid flex-1 leading-tight">
             <span class="truncate font-medium text-foreground">{{$name}}</span>
             <span class="truncate text-xs font-normal text-muted-foreground">
-              {{if .IsSuperuser}}Superuser{{else}}Signed in{{end}}
+              {{if .IsSuperuser}}{{t "Superuser"}}{{else}}{{t "Signed in"}}{{end}}
             </span>
           </span>
         </div>
@@ -150,7 +150,7 @@
           {{template "csrf-field" $csrf}}
           <button type="submit" role="menuitem" class="{{ui "dropdown" "item"}} w-full">
             {{icon "logout" "size-4"}}
-            <span>Sign out</span>
+            <span>{{t "Sign out"}}</span>
           </button>
         </form>
         {{end}}
@@ -160,7 +160,7 @@
   {{end}}
 
   {{/* -- SidebarRail -- */}}
-  <button type="button" @click="toggle()" tabindex="-1" aria-label="Toggle sidebar"
+  <button type="button" @click="toggle()" tabindex="-1" aria-label="{{t "Toggle sidebar"}}"
           class="{{ui "sidebar" "rail"}}"></button>
 </aside>
 {{end}}

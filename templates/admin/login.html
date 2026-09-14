@@ -18,7 +18,7 @@
   {{/* No hx-* on this page, so the token travels as a hidden field
        only -- but the meta tag stays for consistency with base.html. */}}
   <meta name="csrf-token" content="{{.CSRFToken}}">
-  <title>Sign in &middot; {{.SiteTitle}}</title>
+  <title>{{t "Sign in"}} &middot; {{.SiteTitle}}</title>
   {{template "theme" .}}
 </head>
 <body class="relative h-full bg-background text-foreground antialiased">
@@ -33,8 +33,8 @@
           <form method="post" class="{{ui "login" "form"}}">
             <div class="{{ui "login" "stack"}}">
               <div class="{{ui "login" "heading"}}">
-                <h1 class="{{ui "login" "title"}}">Welcome back</h1>
-                <p class="{{ui "login" "subtitle"}}">Sign in to {{.SiteTitle}}</p>
+                <h1 class="{{ui "login" "title"}}">{{t "Welcome back"}}</h1>
+                <p class="{{ui "login" "subtitle"}}">{{t "Sign in to %s" .SiteTitle}}</p>
               </div>
 
               {{/* One message for a bad password and for no such user
@@ -53,24 +53,24 @@
               {{end}}
 
               <div class="{{ui "login" "group"}}">
-                <label for="login-identifier" class="{{ui "label"}}">Email</label>
+                <label for="login-identifier" class="{{ui "label"}}">{{t "Email"}}</label>
                 {{/* The submitted value is echoed back so a typo in the
                      password does not cost the email as well. */}}
                 <input type="email" id="login-identifier" name="identifier"
-                       value="{{.Identifier}}" placeholder="m@example.com"
+                       value="{{.Identifier}}" placeholder="{{t "m@example.com"}}"
                        autocomplete="username" required autofocus
                        class="{{ui "input"}}">
               </div>
 
               <div class="{{ui "login" "group"}}">
-                <label for="login-password" class="{{ui "label"}}">Password</label>
+                <label for="login-password" class="{{ui "label"}}">{{t "Password"}}</label>
                 <input type="password" id="login-password" name="password"
                        autocomplete="current-password" required
                        class="{{ui "input"}}">
               </div>
 
               {{template "csrf-field" .CSRFToken}}
-              <button type="submit" class="{{ui "button"}} w-full">Sign in</button>
+              <button type="submit" class="{{ui "button"}} w-full">{{t "Sign in"}}</button>
             </div>
           </form>
 
