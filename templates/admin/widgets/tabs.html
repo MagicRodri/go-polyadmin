@@ -19,14 +19,14 @@
     <button type="button" role="tab" @click="active = {{$i}}"
             :aria-selected="active === {{$i}}"
             :class="active === {{$i}} ? '{{ui "tabs" "underline-trigger-on"}}' : '{{ui "tabs" "underline-trigger-off"}}'"
-            class="{{ui "tabs" "underline-trigger"}}">{{$panel.Label}}</button>
+            class="{{ui "tabs" "underline-trigger"}}">{{t $panel.Label}}</button>
     {{end}}
   </div>
   {{range $i, $panel := .Panels}}
   <div role="tabpanel" x-show="active === {{$i}}"{{if $i}} x-cloak{{end}}>{{$panel.Body}}</div>
   {{end}}
   {{else}}
-  <p class="text-sm text-muted-foreground">No panels configured.</p>
+  <p class="text-sm text-muted-foreground">{{t "No panels configured."}}</p>
   {{end}}
 </div>
 {{end}}

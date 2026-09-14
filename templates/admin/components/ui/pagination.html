@@ -17,10 +17,10 @@
        checkboxes; with no actions declared there are no checkboxes and
        it degrades to a plain total.
 
-       The sentence is translated whole, plural on M, with {n} left for
-       Alpine to fill in: it rides in on data-selected-text rather than
-       inside the x-text expression, like every string in these
-       components, and the server renders the n = 0 sentence so the
+       The sentence is translated whole, its plural chosen by M, with
+       {n} left for Alpine to fill in. tn yields text rather than a JS
+       literal, so the sentence rides in on data-selected-text for
+       x-text to read, and the server renders the n = 0 sentence so the
        text is right before Alpine runs. */}}
   <p class="{{ui "pagination" "selection"}}"
      {{if .Actions}}

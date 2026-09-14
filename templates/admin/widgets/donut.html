@@ -24,7 +24,7 @@
       <template x-if="active === null">
         <div>
           <p class="text-lg font-semibold text-foreground">{{.Total}}</p>
-          <p class="text-[11px] text-muted-foreground">Total</p>
+          <p class="text-[11px] text-muted-foreground">{{t "Total"}}</p>
         </div>
       </template>
       {{range $i, $slice := .Slices}}
@@ -49,7 +49,7 @@
       <span class="text-muted-foreground">{{$slice.Value}} <span class="text-muted-foreground">&middot; {{$slice.Percent}}%</span></span>
     </li>
     {{end}}
-    {{if not .Slices}}<li class="text-sm text-muted-foreground">No data.</li>{{end}}
+    {{if not .Slices}}<li class="text-sm text-muted-foreground">{{t "No data."}}</li>{{end}}
   </ul>
 </div>
 {{end}}

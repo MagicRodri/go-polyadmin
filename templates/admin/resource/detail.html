@@ -11,7 +11,7 @@
     <dl class="{{ui "card"}} divide-y divide-border">
       {{range .Fields}}
       <div class="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-3 sm:gap-4">
-        <dt class="text-sm font-medium text-muted-foreground">{{.Label}}</dt>
+        <dt class="text-sm font-medium text-muted-foreground">{{t .Label}}</dt>
         <dd class="text-sm text-foreground sm:col-span-2">{{.Value}}</dd>
       </div>
       {{end}}
@@ -21,7 +21,7 @@
          (core.AuditReader) -- a write-only logger records silently. */}}
     {{if .History}}
     <div class="{{ui "history"}}">
-      <h2 class="{{ui "history" "title"}}">History</h2>
+      <h2 class="{{ui "history" "title"}}">{{t "History"}}</h2>
       <ul class="divide-y divide-border">
         {{range .History}}
         <li class="{{ui "history" "row"}}">
@@ -43,7 +43,7 @@
         {{if .Permissions.CanUpdate}}
         <a href="{{.BasePath}}/{{.Slug}}/{{.PK}}/edit"
            class="{{ui "button" "outline"}}">
-          {{icon "edit" "w-4 h-4"}} Edit</a>
+          {{icon "edit" "w-4 h-4"}} {{t "Edit"}}</a>
         {{end}}
         {{range .Actions}}
         {{/* w-full sm:w-auto tracks "actions-primary"'s flex-col ->
@@ -52,13 +52,13 @@
              grandchild -- the stretch stops at the <form> -- and would
              otherwise sit stunted beside a full-width Edit. */}}
         <form method="post" action="{{$.BasePath}}/{{$.Slug}}/actions/{{.Name}}"
-              {{if .Confirm}}data-confirm="{{.Confirm}}"{{end}}
+              {{if .Confirm}}data-confirm="{{t .Confirm}}"{{end}}
               onsubmit="return window.adminConfirmSubmit(event, this, this.dataset.confirm)">
           {{template "csrf-field" $.CSRFToken}}
           <input type="hidden" name="pks" value="{{$.PK}}">
           <button type="submit"
                   class="{{ui "button" "outline"}} w-full sm:w-auto">
-            {{.Label}}</button>
+            {{t .Label}}</button>
         </form>
         {{end}}
       </div>

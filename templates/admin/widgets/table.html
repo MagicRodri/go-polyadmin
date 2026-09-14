@@ -2,7 +2,7 @@
 <div class="overflow-x-auto">
 <table class="min-w-full text-sm">
   <thead>
-    <tr class="border-b border-border">{{range .Columns}}<th class="{{ui "table" "th-compact"}}">{{.}}</th>{{end}}</tr>
+    <tr class="border-b border-border">{{range .Columns}}<th class="{{ui "table" "th-compact"}}">{{t .}}</th>{{end}}</tr>
   </thead>
   <tbody class="divide-y divide-border">
     {{$columns := .Columns}}
@@ -12,6 +12,6 @@
     {{end}}
   </tbody>
 </table>
-{{if not .Rows}}<p class="text-sm text-muted-foreground">No data.</p>{{end}}
+{{if not .Rows}}<p class="text-sm text-muted-foreground">{{t "No data."}}</p>{{end}}
 </div>
 {{end}}

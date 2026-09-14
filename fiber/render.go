@@ -1000,7 +1000,7 @@ func (r *Renderer) historyFor(ctx context.Context, modelAdmin core.ModelAdmin, o
 	}
 	out := make([]historyEntry, 0, len(entries))
 	for _, entry := range entries {
-		who := "system"
+		who := r.t("system")
 		if entry.Principal != nil {
 			if entry.Principal.DisplayName != "" {
 				who = entry.Principal.DisplayName
@@ -1011,10 +1011,26 @@ func (r *Renderer) historyFor(ctx context.Context, modelAdmin core.ModelAdmin, o
 		out = append(out, historyEntry{
 			When: entry.At.Format("2006-01-02 15:04"),
 			Who:  who,
-			What: entry.Action,
+			What: r.auditAction(entry.Action),
 		})
 	}
 	return out
+}
+
+// auditAction is how the History panel names what happened. The
+// framework's own verbs are translated; anything else is the name of the
+// Action that ran, an identifier stored in the log, and stays as it is.
+func (r *Renderer) auditAction(action string) string {
+	switch action {
+	case core.AuditCreate:
+		return r.t("create")
+	case core.AuditUpdate:
+		return r.t("update")
+	case core.AuditDelete:
+		return r.t("delete")
+	default:
+		return action
+	}
 }
 
 // historyLimit caps the detail page's History panel. It is a summary of
@@ -1324,7 +1340,7 @@ func (r *Renderer) buildInlineSections(
 					if inline.Layout == core.InlineLayoutTabular {
 						cells = append(cells, scrollAreaCell(field, valueHTML))
 					} else {
-						cells = append(cells, inlineDetailRowHTML(field.Label, valueHTML))
+						cells = append(cells, inlineDetailRowHTML(r.t(field.Label), valueHTML))
 					}
 				}
 			}

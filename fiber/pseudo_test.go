@@ -19,7 +19,7 @@ var sweepAreas = map[string]bool{
 	"layout": true,
 	"list":   true,
 	"forms":  true,
-	"detail": false,
+	"detail": true,
 	"errors": false,
 }
 
