@@ -141,6 +141,22 @@ func TestPseudoTranslatorOnlyWrapsThePseudoLocale(t *testing.T) {
 	}
 }
 
+// TestPseudoTranslatorDoesNotDoubleWrapAnAlreadyPseudoString guards R5: a
+// handler that translates a static message and then hands the result back
+// through the translator a second time (e.g. fiber's tr(c, message) on an
+// action's already-core.T-translated result) must get the same text back,
+// not a second layer of brackets/accents.
+func TestPseudoTranslatorDoesNotDoubleWrapAnAlreadyPseudoString(t *testing.T) {
+	tr := pseudoTranslator{inner: mustTranslator(t)}
+	already := Pseudo("Deleted 1 record.")
+	if got := tr.Translate(PseudoLocale, already); got != already {
+		t.Errorf("got %q, want %q unchanged", got, already)
+	}
+	if got := tr.TranslatePlural(PseudoLocale, already, already, 1); got != already {
+		t.Errorf("got %q, want %q unchanged", got, already)
+	}
+}
+
 func TestMatchLocale(t *testing.T) {
 	supported := []string{"en", "fr", "ru", PseudoLocale}
 	for candidate, want := range map[string]string{

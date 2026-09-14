@@ -1,9 +1,11 @@
 package fiber
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -71,6 +73,31 @@ func TestBuiltInActionMessagesAreTranslated(t *testing.T) {
 	resp = doPostForm(t, app, "/admin/users/actions/"+core.DeleteSelectedName, url.Values{}, fr)
 	if flash := setCookies(resp); !strings.Contains(flash, "Aucun") {
 		t.Errorf("flash cookie %q", flash)
+	}
+}
+
+// TestDeleteSelectedFlashIsNotDoubleWrappedInPseudoLocale guards R5: the
+// built-in delete action already translates its own result with
+// core.TN, and handleAction's tr(c, message) translates it a second
+// time so a host's own static result gets its turn too (see the
+// comment at that call site). Composing the two passes must stay a
+// no-op -- under the pseudo-locale, a second wrap would nest the
+// brackets, which the sweep's allow-list can't catch since it strips
+// bracket runs rather than counting them.
+func TestDeleteSelectedFlashIsNotDoubleWrappedInPseudoLocale(t *testing.T) {
+	ua := newTestUserAdmin()
+	ua.createUser("a@example.com", true)
+	app := newTestApp(t, core.New(core.WithModelAdmins(ua), core.WithPseudoLocale()))
+	resp := doPseudoPostForm(t, app, "/admin/users/actions/"+core.DeleteSelectedName, url.Values{"pks": {"1"}})
+
+	match := regexp.MustCompile(`"text":"([^"]*)"`).FindStringSubmatch(setCookies(resp))
+	if match == nil {
+		t.Fatalf("no flash text in %q", setCookies(resp))
+	}
+	got := match[1]
+	want := fmt.Sprintf(core.Pseudo("Deleted %d record."), 1)
+	if got != want {
+		t.Errorf("flash text = %q, want %q (single pseudo-wrapped)", got, want)
 	}
 }
 

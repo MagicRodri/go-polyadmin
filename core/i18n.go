@@ -228,6 +228,9 @@ func (p pseudoTranslator) Translate(locale, msgid string, args ...any) string {
 	if msgid == "" {
 		return ""
 	}
+	if isAlreadyPseudo(msgid) {
+		return formatMessage(msgid, args)
+	}
 	return formatMessage(Pseudo(p.inner.Translate(DefaultLocale, msgid)), args)
 }
 
@@ -235,7 +238,26 @@ func (p pseudoTranslator) TranslatePlural(locale, singular, plural string, n int
 	if locale != PseudoLocale {
 		return p.inner.TranslatePlural(locale, singular, plural, n, args...)
 	}
+	if isAlreadyPseudo(singular) {
+		return formatMessage(singular, args)
+	}
 	return formatMessage(Pseudo(p.inner.TranslatePlural(DefaultLocale, singular, plural, n)), args)
+}
+
+// isAlreadyPseudo reports whether s is already in Pseudo's output form.
+// Reached when a msgid handed to Translate/TranslatePlural is itself the
+// result of an earlier translation this same request already
+// pseudo-wrapped -- a host's static action-result message re-translated
+// by the framework (see fiber's tr(c, message)), or a validator error
+// built with core.T and re-translated by Field.Validate. Composing two
+// translation passes is meant to be a no-op when the first one already
+// produced the final text (true of CatalogTranslator, which misses an
+// unknown msgid and returns it unchanged); without this check,
+// pseudoTranslator would instead wrap it a second time, and the sweep's
+// nested-bracket stripping can't tell a legitimately double-translated
+// string from a translated argument nested in a translated sentence.
+func isAlreadyPseudo(s string) bool {
+	return len(s) >= 2 && strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]")
 }
 
 var (
