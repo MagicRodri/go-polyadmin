@@ -35,10 +35,10 @@
   {{end}}
   <span class="{{if $inline}}{{ui "field" "row-text"}}{{else}}contents{{end}}">
   <label for="field-{{.Name}}" class="{{ui "field" "label"}}{{if $inline}} {{ui "field" "row-label"}}{{end}}">
-    {{.Label}}{{if .Required}}<span class="{{ui "field" "required"}}" aria-hidden="true">*</span>{{end}}
+    {{t .Label}}{{if .Required}}<span class="{{ui "field" "required"}}" aria-hidden="true">*</span>{{end}}
   </label>
   {{if $inline}}
-  {{if .HelpText}}<p class="{{ui "field" "description"}}">{{.HelpText}}</p>{{end}}
+  {{if .HelpText}}<p class="{{ui "field" "description"}}">{{t .HelpText}}</p>{{end}}
   {{range .Errors}}<p class="{{ui "field" "message"}}">{{.}}</p>{{end}}
   {{end}}
   </span>
@@ -51,7 +51,7 @@
     <p class="{{ui "field" "readonly"}}">{{if .StringValue}}{{.StringValue}}{{else}}&mdash;{{end}}</p>
 
     {{else if eq .Type "text"}}
-    <textarea id="field-{{.Name}}" name="{{.Name}}" placeholder="{{.Placeholder}}" autocomplete="off"
+    <textarea id="field-{{.Name}}" name="{{.Name}}" placeholder="{{t .Placeholder}}" autocomplete="off"
               {{if .Required}}required{{end}} {{if .ReadOnly}}readonly{{end}} {{if .Disabled}}disabled{{end}}
               class="{{ui "textarea"}}">{{.StringValue}}</textarea>
 
@@ -65,7 +65,7 @@
 
     {{else if eq .Type "enum"}}
     {{template "ui/select" dict
-        "name" .Name "options" .Options "placeholder" "Select…" "disabled" .Disabled}}
+        "name" .Name "options" .Options "placeholder" (t "Select…") "disabled" .Disabled}}
 
     {{else if or (eq .Type "foreignkey") (eq .Type "onetoone")}}
       {{if .Autocomplete}}
@@ -113,7 +113,7 @@
           {{/* role=combobox on the input, not the wrapper: the input is
                what holds focus, so it is what has to advertise the popup
                and name the highlighted option. Mirrors ui/multi-select. */}}
-          <input x-ref="textInput" type="text" autocomplete="off" placeholder="Search&hellip;"
+          <input x-ref="textInput" type="text" autocomplete="off" placeholder="{{t "Search…"}}"
                  value="{{.ComboboxSelectedLabel}}" x-model="query" @focus="open = true"
                  role="combobox" aria-autocomplete="list"
                  :aria-expanded="open ? 'true' : 'false'"
@@ -139,18 +139,18 @@
 
     {{else if eq .Type "manytomany"}}
     {{template "ui/multi-select" dict
-        "name" .Name "options" .Options "placeholder" "Select…" "disabled" .Disabled}}
+        "name" .Name "options" .Options "placeholder" (t "Select…") "disabled" .Disabled}}
 
     {{else}}
     <input type="{{.InputType}}" id="field-{{.Name}}" name="{{.Name}}" value="{{.StringValue}}"
-           placeholder="{{.Placeholder}}" autocomplete="off"
+           placeholder="{{t .Placeholder}}" autocomplete="off"
            {{if .Required}}required{{end}} {{if .ReadOnly}}readonly{{end}} {{if .Disabled}}disabled{{end}}
            class="{{ui "input"}}">
     {{end}}
   </div>
   {{end}}
   {{if not $inline}}
-  {{if .HelpText}}<p class="{{ui "field" "description"}}">{{.HelpText}}</p>{{end}}
+  {{if .HelpText}}<p class="{{ui "field" "description"}}">{{t .HelpText}}</p>{{end}}
   {{range .Errors}}<p class="{{ui "field" "message"}}">{{.}}</p>{{end}}
   {{end}}
 </div>

@@ -266,7 +266,7 @@ func TestManyToManyRendersSearchableMultiSelectNotANativeMultiple(t *testing.T) 
 			t.Errorf("expected option %q in the page", want)
 		}
 	}
-	if !strings.Contains(text, `placeholder="Search&hellip;"`) {
+	if !strings.Contains(text, `placeholder="Search…"`) {
 		t.Error("expected the search box that makes a long list usable")
 	}
 }

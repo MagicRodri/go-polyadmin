@@ -18,7 +18,7 @@ import (
 var sweepAreas = map[string]bool{
 	"layout": true,
 	"list":   true,
-	"forms":  false,
+	"forms":  true,
 	"detail": false,
 	"errors": false,
 }

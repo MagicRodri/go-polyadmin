@@ -64,7 +64,7 @@
          @click="choose($el)"
          class="{{ui "combobox" "item"}}">{{$opt.Label}}</div>
     {{end}}
-    {{if not .options}}<div class="{{ui "combobox" "empty"}}">No options.</div>{{end}}
+    {{if not .options}}<div class="{{ui "combobox" "empty"}}">{{t "No options."}}</div>{{end}}
   </div>
 </div>
 {{end}}

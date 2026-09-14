@@ -25,7 +25,7 @@
            destructive is reserved for buttons, so an error summary does
            not out-shout Save. */}}
       <div role="alert" class="{{ui "alert" "destructive"}} mb-4">
-        <h5 class="{{ui "alert" "title"}}">Couldn't save {{.VerboseName}}</h5>
+        <h5 class="{{ui "alert" "title"}}">{{t "Couldn't save %s" (t .VerboseName)}}</h5>
         <div class="{{ui "alert" "description"}}">
           {{range .NonFieldErrors}}<p>{{.}}</p>{{end}}
         </div>
@@ -42,10 +42,10 @@
         <button type="button" @click="open = !open"
                 :aria-expanded="open ? 'true' : 'false'" :aria-controls="$id('fieldset-body')"
                 class="{{ui "fieldset" "trigger"}}">
-          <span class="{{ui "fieldset" "title"}}">{{.Title}}</span>
+          <span class="{{ui "fieldset" "title"}}">{{t .Title}}</span>
           {{icon "chevron-down" (printf "%s" (ui "fieldset" "icon"))}}
         </button>
-        {{if .Description}}<p class="{{ui "fieldset" "description"}}">{{.Description}}</p>{{end}}
+        {{if .Description}}<p class="{{ui "fieldset" "description"}}">{{t .Description}}</p>{{end}}
         <div x-show="open" x-collapse :id="$id('fieldset-body')" class="{{ui "fieldset" "body"}}">
           {{range .Inputs}}{{.}}{{end}}
         </div>
@@ -80,26 +80,26 @@
       {{if and .PK .Permissions.CanDelete}}
       <a href="{{.BasePath}}/{{.Slug}}/{{.PK}}/delete"
          class="{{ui "button" "destructive-outline"}}">
-        {{icon "delete" "w-4 h-4"}} Delete</a>
+        {{icon "delete" "w-4 h-4"}} {{t "Delete"}}</a>
       {{end}}
       <div class="{{ui "page" "actions-primary"}}">
         <button type="submit" form="resource-form"
                 class="{{ui "button"}}">
-          {{icon "check" "w-4 h-4"}} Save</button>
+          {{icon "check" "w-4 h-4"}} {{t "Save"}}</button>
         <button type="submit" form="resource-form" name="_continue" value="1"
                 class="{{ui "button" "outline"}}">
-          {{icon "edit" "w-4 h-4"}} Save and continue editing</button>
+          {{icon "edit" "w-4 h-4"}} {{t "Save and continue editing"}}</button>
         {{/* Only where adding another makes sense -- offering it on a
              form the principal may not create from would be a button
              that 403s. */}}
         {{if .Permissions.CanCreate}}
         <button type="submit" form="resource-form" name="_addanother" value="1"
                 class="{{ui "button" "outline"}}">
-          {{icon "plus" "w-4 h-4"}} Save and add another</button>
+          {{icon "plus" "w-4 h-4"}} {{t "Save and add another"}}</button>
         {{end}}
         <a href="{{.BasePath}}/{{.CurrentSlug}}"
            class="{{ui "button" "ghost-muted"}}">
-          Cancel</a>
+          {{t "Cancel"}}</a>
       </div>
     </div>
   </div>

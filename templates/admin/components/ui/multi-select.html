@@ -50,7 +50,7 @@
       <template x-for="item in selected" :key="item.value">
         <span class="{{ui "badge" "secondary"}} {{ui "multi-select" "chip"}}">
           <span x-text="item.label"></span>
-          <span role="button" tabindex="0" :aria-label="'Remove ' + item.label"
+          <span role="button" tabindex="0" :aria-label="{{tjs "Remove %s"}}.replace('%s', item.label)"
                 @click.stop="remove(item.value)" @keydown.enter.stop.prevent="remove(item.value)"
                 @keydown.space.stop.prevent="remove(item.value)"
                 class="{{ui "multi-select" "chip-remove"}}">
@@ -73,7 +73,7 @@
       {{/* role=combobox on the input, not the wrapper: the input is
            what holds focus, so it is what has to advertise the popup
            and name the highlighted option. */}}
-      <input type="text" x-ref="search" x-model="query" autocomplete="off" placeholder="Search&hellip;"
+      <input type="text" x-ref="search" x-model="query" autocomplete="off" placeholder="{{t "Search…"}}"
              role="combobox" aria-autocomplete="list" :aria-expanded="open ? 'true' : 'false'"
              :aria-controls="$id('ms-listbox')" :aria-activedescendant="activeId || null"
              @keydown.escape.stop="closeToTrigger()"
@@ -100,7 +100,7 @@
       {{/* Two different emptinesses, and saying "No matches" for the
            second one would be a lie. */}}
       <div x-show="!availableCount()" x-cloak class="{{ui "combobox" "empty"}}"
-           x-text="query.trim() ? 'No matches.' : 'Everything is selected.'"></div>
+           x-text="query.trim() ? {{tjs "No matches."}} : {{tjs "Everything is selected."}}"></div>
     </div>
   </div>
 </div>

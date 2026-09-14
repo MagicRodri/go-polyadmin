@@ -6,10 +6,10 @@
 
 {{define "inlineSection"}}
 <div id="inline-{{.Slug}}" class="mt-8">
-  <h3 class="{{ui "text" "heading"}}">{{.Label}}</h3>
+  <h3 class="{{ui "text" "heading"}}">{{t .Label}}</h3>
   {{if eq .Mode "placeholder"}}
   <div class="{{ui "panel" "dashed"}}">
-    Save to add {{.Label}}.
+    {{t "Save to add %s." (t .Label)}}
   </div>
   {{else if eq .Layout "tabular"}}
     {{template "inlineTable" .}}
@@ -29,13 +29,13 @@
     {{if $.CanChange}}
     <button type="submit"
             class="{{ui "button" "size-xs"}}">
-      {{icon "check" "w-3.5 h-3.5"}} Save</button>
+      {{icon "check" "w-3.5 h-3.5"}} {{t "Save"}}</button>
     {{end}}
     {{if $.CanDelete}}
     <button type="button" hx-delete="{{.DeleteURL}}" hx-target="#inline-{{$slug}}"
-            hx-swap="outerHTML swap:0.2s" hx-confirm="Remove this {{$.Label}}?"
+            hx-swap="outerHTML swap:0.2s" hx-confirm="{{t "Remove this %s?" (t $.Label)}}"
             class="{{ui "button" "ghost-destructive" "size-xs"}}">
-      {{icon "delete" "w-3.5 h-3.5"}} Remove</button>
+      {{icon "delete" "w-3.5 h-3.5"}} {{t "Remove"}}</button>
     {{end}}
   </div>
 </form>
@@ -46,11 +46,11 @@
   {{range .AddRow.Cells}}{{.}}{{end}}
   <button type="submit"
           class="{{ui "button" "outline" "size-xs"}}">
-    {{icon "plus" "w-3.5 h-3.5"}} Add</button>
+    {{icon "plus" "w-3.5 h-3.5"}} {{t "Add"}}</button>
 </form>
 {{end}}
 {{if and (not .Rows) (not .AddRow)}}
-<p class="text-sm text-muted-foreground">No {{.Label}}.</p>
+<p class="text-sm text-muted-foreground">{{t "No %s." (t .Label)}}</p>
 {{end}}
 {{end}}
 
@@ -63,7 +63,7 @@
 <div class="{{ui "table" "scroll"}}">
 <table class="min-w-full divide-y divide-border">
   <thead class="bg-muted/50"><tr>
-    {{range .Columns}}<th class="{{ui "table" "th-compact"}}">{{.Label}}</th>{{end}}
+    {{range .Columns}}<th class="{{ui "table" "th-compact"}}">{{t .Label}}</th>{{end}}
     {{/* Every mode has a trailing column: row actions when editing,
          the View link when read-only. */}}<th></th>
   </tr></thead>
@@ -77,18 +77,18 @@
         <button type="button" hx-post="{{.UpdateURL}}" hx-include="closest tr"
                 hx-target="#inline-{{$slug}}" hx-swap="outerHTML"
                 class="{{ui "button" "ghost-muted" "size-icon-sm"}}">
-          {{icon "check" "w-4 h-4"}}<span class="sr-only">Save</span></button>
+          {{icon "check" "w-4 h-4"}}<span class="sr-only">{{t "Save"}}</span></button>
         {{end}}
         {{if $.CanDelete}}
         <button type="button" hx-delete="{{.DeleteURL}}" hx-target="#inline-{{$slug}}"
-                hx-swap="outerHTML swap:0.2s" hx-confirm="Remove this {{$.Label}}?"
+                hx-swap="outerHTML swap:0.2s" hx-confirm="{{t "Remove this %s?" (t $.Label)}}"
                 class="{{ui "button" "ghost-destructive" "size-icon-sm"}}">
-          {{icon "delete" "w-4 h-4"}}<span class="sr-only">Remove</span></button>
+          {{icon "delete" "w-4 h-4"}}<span class="sr-only">{{t "Remove"}}</span></button>
         {{end}}
       </td>
       {{else}}
       <td class="px-3 py-2 text-right whitespace-nowrap">
-        <a href="{{.DetailURL}}" class="{{ui "text" "link"}}">View</a>
+        <a href="{{.DetailURL}}" class="{{ui "text" "link"}}">{{t "View"}}</a>
       </td>
       {{end}}
     </tr>
@@ -100,7 +100,7 @@
         <button type="button" hx-post="{{.AddRow.CreateURL}}" hx-include="closest tr"
                 hx-target="#inline-{{$slug}}" hx-swap="outerHTML"
                 class="{{ui "button" "ghost-muted" "size-icon-sm"}}">
-          {{icon "plus" "w-4 h-4"}}<span class="sr-only">Add</span></button>
+          {{icon "plus" "w-4 h-4"}}<span class="sr-only">{{t "Add"}}</span></button>
       </td>
     </tr>
     {{end}}
@@ -110,7 +110,7 @@
 {{/* The empty state sits outside the scroller: there is nothing to
      scroll, and a centred message inside a scrolling box drifts. */}}
 {{if and (not .Rows) (not .AddRow)}}
-<p class="{{ui "table" "empty"}}">No {{.Label}}.</p>
+<p class="{{ui "table" "empty"}}">{{t "No %s." (t .Label)}}</p>
 {{end}}
 </div>
 {{end}}
