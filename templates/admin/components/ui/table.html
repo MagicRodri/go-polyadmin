@@ -48,20 +48,20 @@
 {{/* Only worth offering when there is more to select than is on screen. */}}
 <div x-show="pageTicked && total > onPage" x-cloak class="{{ui "table" "select-all"}}">
   <span x-show="!allMatching">
-    All <span x-text="onPage"></span> on this page are selected.
+    {{tn "The %d on this page is selected." "All %d on this page are selected." (len $.Rows) (len $.Rows)}}
   </span>
   <button type="button" x-show="!allMatching"
           @click="allMatching = true; setFlag()"
           class="{{ui "table" "select-all-action"}}">
-    Select all <span x-text="total"></span> matching
+    {{tn "Select the %d matching" "Select all %d matching" $.Page.TotalCount $.Page.TotalCount}}
   </button>
   <span x-show="allMatching" x-cloak>
-    All <span x-text="total"></span> matching this filter are selected.
+    {{tn "The %d matching this filter is selected." "All %d matching this filter are selected." $.Page.TotalCount $.Page.TotalCount}}
   </span>
   <button type="button" x-show="allMatching" x-cloak
           @click="allMatching = false; setFlag()"
           class="{{ui "table" "select-all-action"}}">
-    Clear selection
+    {{t "Clear selection"}}
   </button>
 </div>
 {{end}}
@@ -72,7 +72,7 @@
         {{if $.Reorderable}}<th scope="col" class="w-8"></th>{{end}}
         {{if $.Actions}}
         <th scope="col" class="w-10 px-4 py-2.5">
-          <input type="checkbox" title="Select all"
+          <input type="checkbox" title="{{t "Select all"}}"
                  @change="tickPage($event.target.checked)"
                  class="{{ui "checkbox"}}">
         </th>
@@ -89,7 +89,7 @@
             <button type="button" x-ref="sort{{$i}}" @click="open = !open"
                     :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu"
                     class="-ml-3 h-8 gap-1 {{ui "button" "ghost-muted" "size-xs"}}">
-              {{$col.Label}}
+              {{t $col.Label}}
               {{if eq $col.Direction "asc"}}{{icon "arrow-up" "size-3.5"}}
               {{else if eq $col.Direction "desc"}}{{icon "arrow-down" "size-3.5"}}
               {{else}}{{icon "chevrons-up-down" "size-3.5 opacity-50"}}{{end}}
@@ -104,12 +104,12 @@
                  hx-get="{{$col.AscURL}}" hx-target="#resource-list" hx-select="#resource-list"
                  hx-swap="outerHTML" hx-push-url="true"
                  class="{{ui "dropdown" "item"}} {{if eq $col.Direction "asc"}}font-medium text-foreground{{end}}">
-                {{icon "arrow-up" "size-4 shrink-0 text-muted-foreground"}}<span class="truncate">Asc</span></a>
+                {{icon "arrow-up" "size-4 shrink-0 text-muted-foreground"}}<span class="truncate">{{t "Asc"}}</span></a>
               <a href="{{$col.DescURL}}" role="menuitem" @click="open = false"
                  hx-get="{{$col.DescURL}}" hx-target="#resource-list" hx-select="#resource-list"
                  hx-swap="outerHTML" hx-push-url="true"
                  class="{{ui "dropdown" "item"}} {{if eq $col.Direction "desc"}}font-medium text-foreground{{end}}">
-                {{icon "arrow-down" "size-4 shrink-0 text-muted-foreground"}}<span class="truncate">Desc</span></a>
+                {{icon "arrow-down" "size-4 shrink-0 text-muted-foreground"}}<span class="truncate">{{t "Desc"}}</span></a>
             </div>
           </div>
         </th>
@@ -123,14 +123,14 @@
       <tr id="row-{{.PK}}" class="{{ui "table" "row"}}">
         {{if $.Reorderable}}
         <td class="px-2 py-2.5">
-          <button type="button" tabindex="-1" title="Drag to reorder (not saved)"
+          <button type="button" tabindex="-1" title="{{t "Drag to reorder (not saved)"}}"
                   class="drag-handle cursor-grab {{ui "button" "ghost-muted" "size-icon-xs"}}">
-            {{icon "menu" "w-3.5 h-3.5"}}<span class="sr-only">Drag to reorder</span></button>
+            {{icon "menu" "w-3.5 h-3.5"}}<span class="sr-only">{{t "Drag to reorder"}}</span></button>
         </td>
         {{end}}
         {{if $.Actions}}
         <td class="px-4 py-2.5">
-          <input type="checkbox" name="pks" value="{{.PK}}" form="bulk-actions-form" title="Select row"
+          <input type="checkbox" name="pks" value="{{.PK}}" form="bulk-actions-form" title="{{t "Select row"}}"
                  @change="if (!$event.target.checked) { pageTicked = false; allMatching = false; setFlag(); }"
                  class="row-checkbox {{ui "checkbox"}}">
         </td>
@@ -140,7 +140,7 @@
           {{if or $.Permissions.CanView $.Permissions.CanUpdate $.Permissions.CanDelete}}
           <div class="relative inline-flex" x-data="{ open: false }" @keydown.escape="open = false" @click.outside="open = false">
             <button type="button" x-ref="trigger" @click="open = !open"
-                    :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu" aria-label="Open menu"
+                    :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu" aria-label="{{t "Open menu"}}"
                     :class="open ? 'bg-accent text-accent-foreground' : ''"
                     class="{{ui "button" "ghost-muted" "size-icon-sm"}}">
               {{icon "dots-vertical" "w-4 h-4"}}
@@ -156,18 +156,18 @@
                  class="{{ui "dropdown" "content"}} w-32">
               {{if $.Permissions.CanView}}
               <a href="{{$.BasePath}}/{{$.Slug}}/{{.PK}}" role="menuitem" class="{{ui "dropdown" "item"}}">
-                {{icon "view" "w-4 h-4 shrink-0"}}<span class="truncate">View</span></a>
+                {{icon "view" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "View"}}</span></a>
               {{end}}
               {{if $.Permissions.CanUpdate}}
               <a href="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/edit" role="menuitem" class="{{ui "dropdown" "item"}}">
-                {{icon "edit" "w-4 h-4 shrink-0"}}<span class="truncate">Edit</span></a>
+                {{icon "edit" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "Edit"}}</span></a>
               {{end}}
               {{if $.Permissions.CanDelete}}
               <button type="button" role="menuitem" @click="open = false"
                       class="{{ui "dropdown" "item"}} text-destructive hover:bg-destructive/10"
                       hx-delete="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/delete" hx-target="#row-{{.PK}}"
-                      hx-swap="outerHTML swap:0.2s" hx-confirm="Delete this {{$.VerboseName}}?">
-                {{icon "delete" "w-4 h-4 shrink-0"}}<span class="truncate">Delete</span></button>
+                      hx-swap="outerHTML swap:0.2s" hx-confirm="{{t "Delete this %s?" (t $.VerboseName)}}">
+                {{icon "delete" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "Delete"}}</span></button>
               {{end}}
             </div>
           </div>
@@ -177,7 +177,7 @@
       {{end}}
     </tbody>
   </table>
-  {{if not .Rows}}<p class="{{ui "table" "empty"}}">No records.</p>{{end}}
+  {{if not .Rows}}<p class="{{ui "table" "empty"}}">{{t "No records."}}</p>{{end}}
 </div>
 </div>
 {{end}}

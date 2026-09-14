@@ -17,7 +17,7 @@ import (
 // except "errors", which Task 9 turns on.
 var sweepAreas = map[string]bool{
 	"layout": true,
-	"list":   false,
+	"list":   true,
 	"forms":  false,
 	"detail": false,
 	"errors": false,

@@ -49,7 +49,7 @@ func isBlank(value any) bool {
 // a template so every dynamic string goes through html.EscapeString
 // explicitly: template.HTML bypasses html/template's auto-escaping, so
 // this is the one place that has to get escaping right by hand.
-func fieldValueHTML(admin *core.Admin, basePath string, relationPermissions map[string]bool, field core.Field, value any, emptyValue string) template.HTML {
+func (r *Renderer) fieldValueHTML(relationPermissions map[string]bool, field core.Field, value any, emptyValue string) template.HTML {
 	if emptyValue == "" {
 		emptyValue = core.DefaultEmptyValue
 	}
@@ -66,13 +66,13 @@ func fieldValueHTML(admin *core.Admin, basePath string, relationPermissions map[
 			// No shadcn "success" token to defer to, so this picks an
 			// emerald pair that clears contrast against bg-card in both
 			// themes.
-			return boolIconHTML("check", "text-emerald-600 dark:text-emerald-400", "Yes")
+			return boolIconHTML("check", "text-emerald-600 dark:text-emerald-400", r.t("Yes"))
 		}
-		return boolIconHTML("close", classPlaceholder, "No")
+		return boolIconHTML("close", classPlaceholder, r.t("No"))
 	case core.FieldTypePassword:
 		return template.HTML(`<span class="` + classPlaceholder + `">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>`)
 	case core.FieldTypeForeignKey, core.FieldTypeOneToOne:
-		return relatedLinkHTML(admin, basePath, relationPermissions, field.Relation, value)
+		return relatedLinkHTML(r.admin, r.basePath, relationPermissions, field.Relation, value)
 	case core.FieldTypeManyToMany:
 		items, _ := value.([]any)
 		if len(items) == 0 {
@@ -80,7 +80,7 @@ func fieldValueHTML(admin *core.Admin, basePath string, relationPermissions map[
 		}
 		parts := make([]string, len(items))
 		for i, item := range items {
-			parts[i] = string(relatedLinkHTML(admin, basePath, relationPermissions, field.Relation, item))
+			parts[i] = string(relatedLinkHTML(r.admin, r.basePath, relationPermissions, field.Relation, item))
 		}
 		return template.HTML(strings.Join(parts, ", "))
 	default:
@@ -92,12 +92,12 @@ func fieldValueHTML(admin *core.Admin, basePath string, relationPermissions map[
 // "Yes"/"No": a glyph reads as a shape at a glance where two similar-
 // length words have to be read. The word stays as an sr-only label, so
 // nothing depends on the icon alone. Exports stringify through
-// core/exporter.go and are untouched. `class` and `label` are package
-// constants, never field data, so neither needs escaping.
+// core/exporter.go and are untouched. `class` is a package constant;
+// `label` is translated, and a catalog is not markup, so it is escaped.
 func boolIconHTML(icon, class, label string) template.HTML {
 	return template.HTML(`<span class="inline-flex items-center ` + class + `">` +
 		string(iconHTML(icon, "size-4")) +
-		`<span class="sr-only">` + label + `</span></span>`)
+		`<span class="sr-only">` + html.EscapeString(label) + `</span></span>`)
 }
 
 func relatedLinkHTML(admin *core.Admin, basePath string, relationPermissions map[string]bool, relation *core.Relation, value any) template.HTML {

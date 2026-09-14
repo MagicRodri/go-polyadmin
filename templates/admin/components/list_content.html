@@ -24,19 +24,19 @@
       {{/* One DropdownMenu instead of a button per format: the row of
            export buttons grew with every format added. */}}
       {{template "ui/dropdown-menu" dict
-        "label" "Export"
+        "label" (t "Export")
         "icon" "download"
-        "text" "Export"
+        "text" (t "Export")
         "fullWidth" true
         "items" (list
-          (dict "Label" "CSV" "URL" (printf "%s/%s/export/csv%s" .BasePath .Slug .ExportQuery))
-          (dict "Label" "XLSX" "URL" (printf "%s/%s/export/xlsx%s" .BasePath .Slug .ExportQuery)))}}
+          (dict "Label" (t "CSV") "URL" (printf "%s/%s/export/csv%s" .BasePath .Slug .ExportQuery))
+          (dict "Label" (t "XLSX") "URL" (printf "%s/%s/export/xlsx%s" .BasePath .Slug .ExportQuery)))}}
       {{end}}
       {{if .Permissions.CanCreate}}
       <a href="{{.BasePath}}/{{.Slug}}/create"
          class="{{ui "button"}} {{ui "button" "size-sm"}} {{ui "toolbar" "item"}}">
         {{icon "plus" (printf "size-4 %s" (ui "toolbar" "item-icon"))}}
-        <span class="{{ui "toolbar" "item-label"}}">New</span></a>
+        <span class="{{ui "toolbar" "item-label"}}">{{t "New"}}</span></a>
       {{end}}
     </div>
   </div>

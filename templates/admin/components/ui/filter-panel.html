@@ -29,7 +29,7 @@
           :aria-expanded="open ? 'true' : 'false'" aria-haspopup="dialog"
           class="{{ui "button" "outline" "size-sm"}} {{ui "toolbar" "item"}}">
     {{icon "filter" (printf "size-4 shrink-0 %s" (ui "toolbar" "item-icon"))}}
-    <span class="{{ui "toolbar" "item-label"}}">Filters</span>
+    <span class="{{ui "toolbar" "item-label"}}">{{t "Filters"}}</span>
     {{if .ActiveFilterCount}}
     <span class="{{ui "separator" "vertical"}} mx-1 !h-4"></span>
     <span class="{{ui "badge" "secondary"}} {{ui "filter-panel" "count"}}">{{.ActiveFilterCount}}</span>
@@ -47,7 +47,7 @@
        drawer claims to be modal while Tab walks straight out into the
        page behind the overlay. It also moves focus into the panel on
        open and back to the trigger on close. */}}
-  <div x-show="open" x-cloak x-trap="open" role="dialog" aria-modal="true" aria-label="Filters"
+  <div x-show="open" x-cloak x-trap="open" role="dialog" aria-modal="true" aria-label="{{t "Filters"}}"
        x-transition:enter="transition ease-in-out duration-300"
        x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
        x-transition:leave="transition ease-in-out duration-300"
@@ -55,8 +55,8 @@
        class="{{ui "sheet" "content"}} {{ui "sheet" "side-right"}} {{ui "sheet" "panel"}}
               {{ui "sheet" "width-panel"}} flex flex-col">
     <div class="{{ui "filter-panel" "header"}}">
-      <h2 class="{{ui "filter-panel" "title"}}">Filters</h2>
-      <button type="button" @click="open = false" aria-label="Close filters"
+      <h2 class="{{ui "filter-panel" "title"}}">{{t "Filters"}}</h2>
+      <button type="button" @click="open = false" aria-label="{{t "Close filters"}}"
               class="{{ui "button" "ghost-muted" "size-icon-sm"}}">
         {{icon "close" "size-4"}}</button>
     </div>
@@ -64,7 +64,7 @@
     <div class="{{ui "filter-panel" "body"}}">
       {{range .FilterControls}}
       <div>
-        <h3 class="{{ui "filter-panel" "group-label"}}">{{.Label}}</h3>
+        <h3 class="{{ui "filter-panel" "group-label"}}">{{t .Label}}</h3>
         <ul>
           {{range .Choices}}
           <li>
@@ -75,7 +75,7 @@
                       {{if .Selected}}{{ui "filter-panel" "choice-active"}}{{else}}{{ui "filter-panel" "choice-inactive"}}{{end}}">
               <span class="flex size-4 shrink-0 items-center justify-center">
                 {{if .Selected}}{{icon "check" "size-4"}}{{end}}</span>
-              <span class="truncate">{{.Label}}</span>
+              <span class="truncate">{{t .Label}}</span>
             </a>
           </li>
           {{end}}
@@ -90,7 +90,7 @@
          hx-get="{{.ResetURL}}" hx-target="#resource-list" hx-select="#resource-list"
          hx-swap="outerHTML" hx-push-url="true"
          class="{{ui "button" "ghost-muted" "size-sm"}} w-full">
-        {{icon "close" "size-4"}} Clear all</a>
+        {{icon "close" "size-4"}} {{t "Clear all"}}</a>
     </div>
     {{end}}
   </div>

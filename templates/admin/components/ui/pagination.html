@@ -15,19 +15,27 @@
   {{/* The example shows "N of M row(s) selected". Selection is client
        side, so the count is filled in by Alpine from the row
        checkboxes; with no actions declared there are no checkboxes and
-       it degrades to a plain total. */}}
+       it degrades to a plain total.
+
+       The sentence is translated whole, plural on M, with {n} left for
+       Alpine to fill in: it rides in on data-selected-text rather than
+       inside the x-text expression, like every string in these
+       components, and the server renders the n = 0 sentence so the
+       text is right before Alpine runs. */}}
   <p class="{{ui "pagination" "selection"}}"
      {{if .Actions}}
      x-data="{ n: 0 }"
      x-init="$el.closest('#resource-list').addEventListener('change', () => {
                n = $el.closest('#resource-list').querySelectorAll('.row-checkbox:checked').length })"
+     data-selected-text="{{tn "%s of %d row selected" "%s of %d rows selected" .Page.TotalCount "{n}" .Page.TotalCount}}"
+     x-text="$el.dataset.selectedText.replace('{n}', n)"
      {{end}}>
-    {{if .Actions}}<span x-text="n">0</span> of {{end}}{{.Page.TotalCount}} row(s){{if .Actions}} selected{{end}}
+    {{if .Actions}}{{tn "%s of %d row selected" "%s of %d rows selected" .Page.TotalCount "0" .Page.TotalCount}}{{else}}{{tn "%d row" "%d rows" .Page.TotalCount .Page.TotalCount}}{{end}}
   </p>
 
   <div class="{{ui "pagination" "controls"}}">
     <div class="{{ui "pagination" "rows-per-page"}}">
-      <span class="hidden sm:inline">Rows per page</span>
+      <span class="hidden sm:inline">{{t "Rows per page"}}</span>
       <div class="relative" x-data="{ open: false }" @keydown.escape="open = false" @click.outside="open = false">
         <button type="button" x-ref="sizeTrigger" @click="open = !open"
                 :aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu"
@@ -49,14 +57,14 @@
     </div>
 
     <div class="{{ui "pagination" "page-indicator"}}">
-      Page {{.Page.Number}} of {{if .Page.NumPages}}{{.Page.NumPages}}{{else}}1{{end}}
+      {{$pages := .Page.NumPages}}{{if not $pages}}{{$pages = 1}}{{end}}{{t "Page %d of %d" .Page.Number $pages}}
     </div>
 
     <div class="{{ui "pagination" "jumps"}}">
-      {{template "pageJump" dict "URL" .PageURLs.First    "Enabled" .Page.HasPrevious "Icon" "chevron-double-left"  "Label" "First page"    "Edge" true}}
-      {{template "pageJump" dict "URL" .PageURLs.Previous "Enabled" .Page.HasPrevious "Icon" "chevron-left"         "Label" "Previous page" "Edge" false}}
-      {{template "pageJump" dict "URL" .PageURLs.Next     "Enabled" .Page.HasNext     "Icon" "chevron-right"        "Label" "Next page"     "Edge" false}}
-      {{template "pageJump" dict "URL" .PageURLs.Last     "Enabled" .Page.HasNext     "Icon" "chevron-double-right" "Label" "Last page"     "Edge" true}}
+      {{template "pageJump" dict "URL" .PageURLs.First    "Enabled" .Page.HasPrevious "Icon" "chevron-double-left"  "Label" (t "First page")    "Edge" true}}
+      {{template "pageJump" dict "URL" .PageURLs.Previous "Enabled" .Page.HasPrevious "Icon" "chevron-left"         "Label" (t "Previous page") "Edge" false}}
+      {{template "pageJump" dict "URL" .PageURLs.Next     "Enabled" .Page.HasNext     "Icon" "chevron-right"        "Label" (t "Next page")     "Edge" false}}
+      {{template "pageJump" dict "URL" .PageURLs.Last     "Enabled" .Page.HasNext     "Icon" "chevron-double-right" "Label" (t "Last page")     "Edge" true}}
     </div>
   </div>
 </nav>

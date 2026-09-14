@@ -711,7 +711,7 @@ func (r *Renderer) buildListData(
 		cells := make([]template.HTML, 0, len(modelAdmin.ListDisplay()))
 		for _, name := range modelAdmin.ListDisplay() {
 			field, _ := modelAdmin.Field(name)
-			cells = append(cells, fieldValueHTML(r.admin, r.basePath, relationPermissions, field, field.GetValue(obj), modelAdmin.EmptyValue()))
+			cells = append(cells, r.fieldValueHTML(relationPermissions, field, field.GetValue(obj), modelAdmin.EmptyValue()))
 		}
 		rows = append(rows, listRow{PK: modelAdmin.GetPK(obj), Cells: cells})
 	}
@@ -1031,7 +1031,7 @@ func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, 
 		field, _ := modelAdmin.Field(name)
 		fields = append(fields, detailField{
 			Label: field.Label,
-			Value: fieldValueHTML(r.admin, r.basePath, relationPermissions, field, field.GetValue(obj), modelAdmin.EmptyValue()),
+			Value: r.fieldValueHTML(relationPermissions, field, field.GetValue(obj), modelAdmin.EmptyValue()),
 		})
 	}
 	inlineSections, err := r.buildInlineSections(principal, modelAdmin, obj, "readonly", "", nil, nil, nil)
@@ -1320,7 +1320,7 @@ func (r *Renderer) buildInlineSections(
 			} else {
 				for _, name := range detailNames {
 					field, _ := childAdmin.Field(name)
-					valueHTML := fieldValueHTML(r.admin, r.basePath, relPerms, field, field.GetValue(child), childAdmin.EmptyValue())
+					valueHTML := r.fieldValueHTML(relPerms, field, field.GetValue(child), childAdmin.EmptyValue())
 					if inline.Layout == core.InlineLayoutTabular {
 						cells = append(cells, scrollAreaCell(field, valueHTML))
 					} else {

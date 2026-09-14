@@ -10,7 +10,7 @@
   {{range $name, $value := .Filters}}
   <input type="hidden" name="filter[{{$name}}]" value="{{$value}}">
   {{end}}
-  <input type="search" id="search" name="search" value="{{.Search}}" placeholder="Search..."
+  <input type="search" id="search" name="search" value="{{.Search}}" placeholder="{{t "Search..."}}"
          class="{{ui "input"}} lg:w-64">
 </form>
 {{end}}
