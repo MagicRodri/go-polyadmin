@@ -1,12 +1,12 @@
 module github.com/MagicRodri/go-polyadmin
 
-go 1.26.0
+go 1.25.0
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.15
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
 	github.com/xuri/excelize/v2 v2.11.0
-	golang.org/x/text v0.42.0
+	golang.org/x/text v0.41.0
 )
 
 require (
