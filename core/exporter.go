@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 
@@ -21,7 +22,7 @@ type Exporter interface {
 	Format() string
 	ContentType() string
 	FileExtension() string
-	Write(w RowWriter, admin *Admin, modelAdmin ModelAdmin, objects []any, columns []string) error
+	Write(ctx context.Context, w RowWriter, admin *Admin, modelAdmin ModelAdmin, objects []any, columns []string) error
 }
 
 // RowWriter is the sink an Exporter writes rows to -- an io.Writer
@@ -79,13 +80,13 @@ func CellValue(admin *Admin, field Field, obj any) string {
 // XLSXExporter use -- they differ only in what RowWriter they're
 // handed and how that writer eventually turns into bytes, not in how
 // rows get built.
-func writeRows(w RowWriter, admin *Admin, modelAdmin ModelAdmin, objects []any, columns []string, format string) error {
+func writeRows(ctx context.Context, w RowWriter, admin *Admin, modelAdmin ModelAdmin, objects []any, columns []string, format string) error {
 	fields := make([]Field, len(columns))
 	header := make([]string, len(columns))
 	for i, name := range columns {
 		field, _ := modelAdmin.Field(name)
 		fields[i] = field
-		header[i] = field.Label
+		header[i] = T(ctx, field.Label)
 	}
 	if err := w.Write(header); err != nil {
 		return fmt.Errorf("polyadmin: writing %s header: %w", format, err)
@@ -109,8 +110,8 @@ func (CSVExporter) Format() string        { return "csv" }
 func (CSVExporter) ContentType() string   { return "text/csv" }
 func (CSVExporter) FileExtension() string { return "csv" }
 
-func (CSVExporter) Write(w RowWriter, admin *Admin, modelAdmin ModelAdmin, objects []any, columns []string) error {
-	return writeRows(w, admin, modelAdmin, objects, columns, "csv")
+func (CSVExporter) Write(ctx context.Context, w RowWriter, admin *Admin, modelAdmin ModelAdmin, objects []any, columns []string) error {
+	return writeRows(ctx, w, admin, modelAdmin, objects, columns, "csv")
 }
 
 // csvRowWriter adapts encoding/csv.Writer to RowWriter.
@@ -138,8 +139,8 @@ func (XLSXExporter) ContentType() string {
 }
 func (XLSXExporter) FileExtension() string { return "xlsx" }
 
-func (XLSXExporter) Write(w RowWriter, admin *Admin, modelAdmin ModelAdmin, objects []any, columns []string) error {
-	return writeRows(w, admin, modelAdmin, objects, columns, "xlsx")
+func (XLSXExporter) Write(ctx context.Context, w RowWriter, admin *Admin, modelAdmin ModelAdmin, objects []any, columns []string) error {
+	return writeRows(ctx, w, admin, modelAdmin, objects, columns, "xlsx")
 }
 
 // XLSXRowWriter adapts an excelize.File to RowWriter. Unlike CSV,

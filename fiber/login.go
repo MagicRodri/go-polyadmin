@@ -14,9 +14,9 @@ import (
 // password": telling them apart turns the form into an account
 // enumerator. core.LoginBackend asks implementations not to
 // distinguish them either, for the same reason.
-const (
-	invalidCredentialsMessage = "That email and password don't match an account."
-	signedOutMessage          = "You have been signed out."
+var (
+	invalidCredentialsMessage = core.N_("That email and password don't match an account.")
+	signedOutMessage          = core.N_("You have been signed out.")
 )
 
 // loginURL builds the path an unauthenticated visitor is sent to,
@@ -54,7 +54,7 @@ func handleLoginGet(admin *core.Admin, renderers *Renderers, basePath string) fi
 		}
 		notice := ""
 		if c.Query("signedout") == "1" {
-			notice = signedOutMessage
+			notice = tr(c, signedOutMessage)
 		}
 		return sendLoginPage(c, renderer, "", "", notice, fiber.StatusOK)
 	}
@@ -76,14 +76,14 @@ func handleLoginPost(admin *core.Admin, renderers *Renderers, basePath string) f
 			// 401, not 200: a failed sign-in is a failed sign-in, and
 			// the status is what a log or a rate limiter in front of
 			// this reads. The body is still the form.
-			return sendLoginPage(c, renderer, identifier, invalidCredentialsMessage, "", fiber.StatusUnauthorized)
+			return sendLoginPage(c, renderer, identifier, tr(c, invalidCredentialsMessage), "", fiber.StatusUnauthorized)
 		}
 		if err := admin.LoginBackend.BeginSession(c, principal); err != nil {
 			// The credentials were right but the session could not be
 			// stored, so the visitor is not signed in and must not be
 			// told they are. Logged for the operator, generic on screen.
 			log.Printf("polyadmin: BeginSession failed for %v: %v", principal.ID, err)
-			return sendLoginPage(c, renderer, identifier, "Sign-in could not be completed. Please try again.", "", fiber.StatusInternalServerError)
+			return sendLoginPage(c, renderer, identifier, tr(c, "Sign-in could not be completed. Please try again."), "", fiber.StatusInternalServerError)
 		}
 		return c.Redirect(next, fiber.StatusSeeOther)
 	}

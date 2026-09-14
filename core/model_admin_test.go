@@ -213,7 +213,7 @@ func TestUnimplementedCRUDReturnsError(t *testing.T) {
 
 func TestValidateRequiredField(t *testing.T) {
 	admin := newInMemoryUserAdmin()
-	errs := admin.Validate(map[string]any{"Email": ""})
+	errs := admin.Validate(context.Background(), map[string]any{"Email": ""})
 	if _, ok := errs["Email"]; !ok {
 		t.Fatalf("got %v, want an Email error", errs)
 	}

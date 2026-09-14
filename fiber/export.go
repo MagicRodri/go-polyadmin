@@ -1,6 +1,7 @@
 package fiber
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -31,7 +32,7 @@ func handleExportCSV(admin *core.Admin, modelAdmin core.ModelAdmin, basePath str
 
 		c.Set(fiber.HeaderContentType, "text/csv")
 		c.Set(fiber.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s.csv"`, slug))
-		return c.SendStream(csvStream(admin, modelAdmin, objects))
+		return c.SendStream(csvStream(c.Context(), admin, modelAdmin, objects))
 	}
 }
 
@@ -39,11 +40,11 @@ func handleExportCSV(admin *core.Admin, modelAdmin core.ModelAdmin, basePath str
 // they're produced, so an exported dataset never has to be fully
 // buffered in memory before the response starts sending -- the same
 // streaming guarantee the Python CSV exporter makes.
-func csvStream(admin *core.Admin, modelAdmin core.ModelAdmin, objects []any) io.Reader {
+func csvStream(ctx context.Context, admin *core.Admin, modelAdmin core.ModelAdmin, objects []any) io.Reader {
 	pr, pw := io.Pipe()
 	go func() {
 		writer := csv.NewWriter(pw)
-		err := (core.CSVExporter{}).Write(core.NewCSVRowWriter(writer), admin, modelAdmin, objects, modelAdmin.ListDisplay())
+		err := (core.CSVExporter{}).Write(ctx, core.NewCSVRowWriter(writer), admin, modelAdmin, objects, modelAdmin.ListDisplay())
 		pw.CloseWithError(err)
 	}()
 	return pr
@@ -72,7 +73,7 @@ func handleExportXLSX(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 		}
 
 		writer := core.NewXLSXRowWriter(modelAdmin.VerboseName())
-		if err := (core.XLSXExporter{}).Write(writer, admin, modelAdmin, objects, modelAdmin.ListDisplay()); err != nil {
+		if err := (core.XLSXExporter{}).Write(c.Context(), writer, admin, modelAdmin, objects, modelAdmin.ListDisplay()); err != nil {
 			return err
 		}
 		data, err := writer.Bytes()

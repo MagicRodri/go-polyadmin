@@ -2,6 +2,9 @@ package fiber
 
 import (
 	"html"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -20,7 +23,7 @@ var sweepAreas = map[string]bool{
 	"list":   true,
 	"forms":  true,
 	"detail": true,
-	"errors": false,
+	"errors": true,
 }
 
 var (
@@ -88,8 +91,13 @@ var localeNames = []string{"English", "Français", "Русский", "Pseudo (en
 
 type sweepPage struct {
 	area, name, path string
-	headers          map[string]string
-	app              func(t *testing.T) (*fiber.App, []string)
+	// method defaults to GET when empty. A POST carries form and is sent
+	// with its own CSRF pair rather than pseudoCookie's Cookie header,
+	// which would otherwise clobber the CSRF cookie doPostForm needs.
+	method  string
+	form    url.Values
+	headers map[string]string
+	app     func(t *testing.T) (*fiber.App, []string)
 }
 
 func pseudoCookie(extra map[string]string) map[string]string {
@@ -139,6 +147,39 @@ func sweepInlineApp(t *testing.T) (*fiber.App, []string) {
 	return app, append([]string{"a@example.com", "Acme", "PO"}, localeNames...)
 }
 
+// sweepLoginApp is the login page, in the pseudo-locale, backed by the
+// same fakeLoginBackend the login tests use as both Authenticator and
+// LoginBackend.
+func sweepLoginApp(t *testing.T) (*fiber.App, []string) {
+	backend := &fakeLoginBackend{password: "x"}
+	admin := core.New(
+		core.WithModelAdmins(newTestUserAdmin()),
+		core.WithAuthenticator(backend),
+		core.WithLoginBackend(backend),
+		core.WithPseudoLocale(),
+	)
+	return newTestApp(t, admin), localeNames
+}
+
+// doPseudoPostForm POSTs form in the pseudo-locale. It can't reuse
+// doPostForm with pseudoCookie's headers: doPostForm sets its own
+// Cookie header for the CSRF pair, and a caller-supplied Cookie header
+// would overwrite rather than join it. So the locale and CSRF cookies
+// are combined into one Cookie header up front instead.
+func doPseudoPostForm(t *testing.T, app *fiber.App, path string, form url.Values) *http.Response {
+	t.Helper()
+	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	token := core.NewCSRFToken()
+	req.Header.Set("Cookie", core.CSRFCookieName+"="+token+"; "+localeCookieName+"="+core.PseudoLocale)
+	req.Header.Set(core.CSRFHeaderName, token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	return resp
+}
+
 var sweepPages = []sweepPage{
 	{area: "layout", name: "shell", path: "/admin/hello", app: sweepMainApp},
 	{area: "list", name: "list", path: "/admin/users", app: sweepMainApp},
@@ -151,6 +192,9 @@ var sweepPages = []sweepPage{
 	{area: "detail", name: "inline detail", path: "/admin/organizations/1", app: sweepInlineApp},
 	{area: "detail", name: "dashboard", path: "/admin/", app: sweepMainApp},
 	{area: "errors", name: "not found", path: "/admin/users/999", app: sweepMainApp},
+	{area: "layout", name: "login", path: "/admin/login", app: sweepLoginApp},
+	{area: "errors", name: "failed login", path: "/admin/login", method: "POST",
+		form: url.Values{"identifier": {"nobody@example.com"}, "password": {"wrong"}}, app: sweepLoginApp},
 }
 
 func TestPseudoLocaleSweep(t *testing.T) {
@@ -160,7 +204,12 @@ func TestPseudoLocaleSweep(t *testing.T) {
 				t.Skipf("area %q not converted yet", p.area)
 			}
 			app, allow := p.app(t)
-			resp := doGet(t, app, p.path, pseudoCookie(p.headers))
+			var resp *http.Response
+			if p.method == "POST" {
+				resp = doPseudoPostForm(t, app, p.path, p.form)
+			} else {
+				resp = doGet(t, app, p.path, pseudoCookie(p.headers))
+			}
 			if resp.StatusCode >= 500 {
 				t.Fatalf("got %d", resp.StatusCode)
 			}

@@ -69,7 +69,7 @@ func writeError(c *fiber.Ctx, admin *core.Admin, basePath string, status int, ti
 	if siteTitle == "" {
 		siteTitle = "PolyAdmin"
 	}
-	data := errorData{SiteTitle: siteTitle, Status: status, Title: title, Message: message}
+	data := errorData{SiteTitle: tr(c, siteTitle), Status: status, Title: title, Message: message}
 	if status != fiber.StatusUnauthorized {
 		data.HomeURL = basePath
 	}
@@ -97,24 +97,24 @@ func writeError(c *fiber.Ctx, admin *core.Admin, basePath string, status int, ti
 // happened rather than naming the status code twice.
 func writeForbidden(c *fiber.Ctx, admin *core.Admin, basePath string) error {
 	return writeError(c, admin, basePath, http.StatusForbidden,
-		"Permission denied",
-		"Your account doesn't have permission to do that.")
+		tr(c, "Permission denied"),
+		tr(c, "Your account doesn't have permission to do that."))
 }
 
 func writeNotFound(c *fiber.Ctx, admin *core.Admin, basePath string) error {
 	return writeError(c, admin, basePath, http.StatusNotFound,
-		"Not found",
-		"That record doesn't exist, or it was deleted.")
+		tr(c, "Not found"),
+		tr(c, "That record doesn't exist, or it was deleted."))
 }
 
 func writeUnauthenticated(c *fiber.Ctx, admin *core.Admin, basePath string) error {
 	return writeError(c, admin, basePath, http.StatusUnauthorized,
-		"Sign-in required",
-		"You need to be signed in to view this page.")
+		tr(c, "Sign-in required"),
+		tr(c, "You need to be signed in to view this page."))
 }
 
 func writeCSRFFailure(c *fiber.Ctx, admin *core.Admin, basePath string) error {
 	return writeError(c, admin, basePath, http.StatusForbidden,
-		"Security check failed",
-		"This page expired before the form was submitted. Reload and try again.")
+		tr(c, "Security check failed"),
+		tr(c, "This page expired before the form was submitted. Reload and try again."))
 }

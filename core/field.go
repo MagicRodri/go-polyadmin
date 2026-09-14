@@ -5,6 +5,7 @@
 package core
 
 import (
+	"context"
 	"reflect"
 	"strconv"
 	"strings"
@@ -38,8 +39,10 @@ const (
 	FieldTypeManyToMany FieldType = "manytomany"
 )
 
-// Validator returns a non-nil error when value is invalid.
-type Validator func(value any) error
+// Validator checks one field value. ctx carries the request's locale:
+// translate a message with core.T(ctx, ...), or return a static English
+// message and let the framework translate it from the host's catalog.
+type Validator func(ctx context.Context, value any) error
 
 // Field represents a model property plus its admin presentation; it is
 // not merely an HTML input.
@@ -262,16 +265,15 @@ func structFieldOrMapValue(obj any, name string) (any, bool) {
 }
 
 // Validate runs the Required check and any configured Validators,
-// returning human-readable error messages.
-func (f Field) Validate(value any) []string {
+// returning messages in the request's locale.
+func (f Field) Validate(ctx context.Context, value any) []string {
 	var errs []string
 	if f.Required && isZero(value) {
-		errs = append(errs, f.Label+" is required.")
-		return errs
+		return append(errs, T(ctx, "%s is required.", T(ctx, f.Label)))
 	}
 	for _, validator := range f.Validators {
-		if err := validator(value); err != nil {
-			errs = append(errs, err.Error())
+		if err := validator(ctx, value); err != nil {
+			errs = append(errs, T(ctx, err.Error()))
 		}
 	}
 	return errs

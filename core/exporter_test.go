@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"strings"
 	"testing"
@@ -11,7 +12,7 @@ func exportCSV(t *testing.T, admin *Admin, modelAdmin ModelAdmin, objects []any,
 	t.Helper()
 	var buf bytes.Buffer
 	writer := NewCSVRowWriter(csv.NewWriter(&buf))
-	if err := (CSVExporter{}).Write(writer, admin, modelAdmin, objects, columns); err != nil {
+	if err := (CSVExporter{}).Write(context.Background(), writer, admin, modelAdmin, objects, columns); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	return buf.String()

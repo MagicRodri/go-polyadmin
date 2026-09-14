@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -60,27 +61,29 @@ func TestDefaultLabelFromName(t *testing.T) {
 }
 
 func TestRequiredValidation(t *testing.T) {
+	ctx := context.Background()
 	f := NewField("IsActive", FieldTypeBoolean, WithRequired())
-	if errs := f.Validate(nil); !reflect.DeepEqual(errs, []string{"Is Active is required."}) {
+	if errs := f.Validate(ctx, nil); !reflect.DeepEqual(errs, []string{"Is Active is required."}) {
 		t.Fatalf("got %v", errs)
 	}
-	if errs := f.Validate(true); errs != nil {
+	if errs := f.Validate(ctx, true); errs != nil {
 		t.Fatalf("got %v, want none", errs)
 	}
 }
 
 func TestCustomValidator(t *testing.T) {
-	notAdmin := func(value any) error {
+	ctx := context.Background()
+	notAdmin := func(ctx context.Context, value any) error {
 		if value == "admin" {
 			return errors.New("reserved username.")
 		}
 		return nil
 	}
 	f := NewField("Username", FieldTypeString, WithValidators(notAdmin))
-	if errs := f.Validate("admin"); !reflect.DeepEqual(errs, []string{"reserved username."}) {
+	if errs := f.Validate(ctx, "admin"); !reflect.DeepEqual(errs, []string{"reserved username."}) {
 		t.Fatalf("got %v", errs)
 	}
-	if errs := f.Validate("john"); errs != nil {
+	if errs := f.Validate(ctx, "john"); errs != nil {
 		t.Fatalf("got %v, want none", errs)
 	}
 }

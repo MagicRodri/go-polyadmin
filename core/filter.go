@@ -41,7 +41,7 @@ func NewBooleanFilter(name string, opts ...func(*string)) BooleanFilter {
 }
 
 func (f BooleanFilter) ChoicesWithLabels() [][2]string {
-	return [][2]string{{"", "All"}, {"true", "Yes"}, {"false", "No"}}
+	return [][2]string{{"", N_("All")}, {"true", N_("Yes")}, {"false", N_("No")}}
 }
 
 func (f BooleanFilter) Apply(objects []any, raw string, modelAdmin ModelAdmin) []any {
@@ -80,7 +80,7 @@ func NewChoiceFilter(name string, choices []string) ChoiceFilter {
 
 func (f ChoiceFilter) ChoicesWithLabels() [][2]string {
 	pairs := make([][2]string, 0, len(f.Choices)+1)
-	pairs = append(pairs, [2]string{"", "All"})
+	pairs = append(pairs, [2]string{"", N_("All")})
 	for _, choice := range f.Choices {
 		pairs = append(pairs, [2]string{choice, choice})
 	}

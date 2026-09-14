@@ -179,8 +179,8 @@ func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Rend
 // would otherwise fail every save: the value is not missing, it is simply
 // not the form's to send. Wrapping rather than changing Validate leaves an
 // application's own override unaffected.
-func validateWritable(modelAdmin core.ModelAdmin, data map[string]any, obj any) map[string][]string {
-	errs := modelAdmin.Validate(data)
+func validateWritable(ctx context.Context, modelAdmin core.ModelAdmin, data map[string]any, obj any) map[string][]string {
+	errs := modelAdmin.Validate(ctx, data)
 	for name := range errs {
 		if modelAdmin.IsReadOnly(name, obj) {
 			delete(errs, name)
@@ -272,7 +272,7 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *
 			return writeAuthError(c, admin, basePath, result)
 		}
 		data := parseFormData(c, modelAdmin, nil)
-		errs := validateWritable(modelAdmin, data, nil)
+		errs := validateWritable(c.Context(), modelAdmin, data, nil)
 		if len(errs) > 0 {
 			relOptions := computeRelationOptions(admin, modelAdmin, nil)
 			var html string
@@ -295,7 +295,9 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *
 		if err != nil {
 			return err
 		}
-		setFlash(c, "success", modelAdmin.VerboseName()+" created.")
+		// Translators: %s is the model's name. French and Russian nouns
+		// carry gender, so phrase around agreement.
+		setFlash(c, "success", tr(c, "%s created.", tr(c, modelAdmin.VerboseName())))
 		// "Save and add another" goes back to an empty form, which is the
 		// whole point when entering records in a batch -- checked before
 		// building the record's own URL, since it never uses one.
@@ -357,7 +359,7 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Re
 			return writeForbidden(c, admin, basePath)
 		}
 		data := parseFormData(c, modelAdmin, obj)
-		errs := validateWritable(modelAdmin, data, obj)
+		errs := validateWritable(c.Context(), modelAdmin, data, obj)
 		if len(errs) > 0 {
 			relOptions := computeRelationOptions(admin, modelAdmin, obj)
 			var html string
@@ -376,7 +378,7 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Re
 			return err
 		}
 		recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditUpdate, obj)
-		setFlash(c, "success", modelAdmin.VerboseName()+" updated.")
+		setFlash(c, "success", tr(c, "%s updated.", tr(c, modelAdmin.VerboseName())))
 		if c.FormValue(saveAddAnotherField) != "" {
 			return redirectTo(c, basePath+"/"+slug+"/create")
 		}
@@ -434,7 +436,7 @@ func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 				return err
 			}
 			recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditDelete, obj)
-			setFlash(c, "success", modelAdmin.VerboseName()+" deleted.")
+			setFlash(c, "success", tr(c, "%s deleted.", tr(c, modelAdmin.VerboseName())))
 		}
 		return redirectTo(c, basePath+"/"+slug)
 	}
@@ -551,7 +553,7 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 		// side from the same query the list was showing.
 		selectAll := c.FormValue(selectAllField) != ""
 		if !selectAll && len(raw) == 0 {
-			setFlash(c, "warning", "No items selected.")
+			setFlash(c, "warning", tr(c, "No items selected."))
 			return redirectTo(c, redirectTarget)
 		}
 
@@ -577,7 +579,7 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 			}
 		}
 		if len(objects) == 0 {
-			setFlash(c, "warning", "No items selected.")
+			setFlash(c, "warning", tr(c, "No items selected."))
 			return redirectTo(c, redirectTarget)
 		}
 		message, err := action.Handler(c.Context(), modelAdmin, objects, principal)
@@ -591,7 +593,11 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 			recordAudit(c.Context(), admin, principal, modelAdmin, action.Name, obj)
 		}
 		if message == "" {
-			message = fmt.Sprintf("%s applied to %d record(s).", action.Label, len(objects))
+			message = trn(c, "%s applied to %d record.", "%s applied to %d records.", len(objects), tr(c, action.Label), len(objects))
+		} else {
+			// A host's static message translates from its catalog; one it
+			// already translated with core.T misses and passes through.
+			message = tr(c, message)
 		}
 		setFlash(c, "success", message)
 		return redirectTo(c, redirectTarget)
@@ -627,7 +633,7 @@ func handleInlineCreate(admin *core.Admin, modelAdmin core.ModelAdmin, renderers
 
 		data := parseFormData(c, childAdmin, nil)
 		data[inline.FKField] = stringOrEmpty(modelAdmin.GetPK(parentObj))
-		errs := childAdmin.Validate(data)
+		errs := childAdmin.Validate(c.Context(), data)
 		if len(errs) > 0 {
 			html, err := renderer.RenderInlineFragment(principal, modelAdmin, parentObj, inline, nil, data, errs)
 			if err != nil {
@@ -685,7 +691,7 @@ func handleInlineUpdate(admin *core.Admin, modelAdmin core.ModelAdmin, renderers
 
 		data := parseFormData(c, childAdmin, nil)
 		data[inline.FKField] = stringOrEmpty(modelAdmin.GetPK(parentObj))
-		errs := childAdmin.Validate(data)
+		errs := childAdmin.Validate(c.Context(), data)
 		if len(errs) > 0 {
 			html, err := renderer.RenderInlineFragment(principal, modelAdmin, parentObj, inline, childPK, data, errs)
 			if err != nil {

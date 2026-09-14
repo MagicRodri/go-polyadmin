@@ -65,7 +65,7 @@ type ModelAdmin interface {
 	Reorderable() bool
 
 	ListDisplayValues(obj any) map[string]any
-	Validate(data map[string]any) map[string][]string
+	Validate(ctx context.Context, data map[string]any) map[string][]string
 
 	GetQueryset(ctx context.Context) (any, error)
 	GetObject(ctx context.Context, pk any) (any, error)
@@ -336,11 +336,11 @@ func (b BaseModelAdmin) ListDisplayValues(obj any) map[string]any {
 	return values
 }
 
-func (b BaseModelAdmin) Validate(data map[string]any) map[string][]string {
+func (b BaseModelAdmin) Validate(ctx context.Context, data map[string]any) map[string][]string {
 	fields := b.Fields()
 	errs := make(map[string][]string)
 	for _, name := range b.FormFieldNames {
-		if fieldErrs := fields[name].Validate(data[name]); len(fieldErrs) > 0 {
+		if fieldErrs := fields[name].Validate(ctx, data[name]); len(fieldErrs) > 0 {
 			errs[name] = fieldErrs
 		}
 	}

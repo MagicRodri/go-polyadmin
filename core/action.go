@@ -73,8 +73,8 @@ const DeleteSelectedName = "delete_selected"
 func NewDeleteSelectedAction() Action {
 	return Action{
 		Name:       DeleteSelectedName,
-		Label:      "Delete selected",
-		Confirm:    "Delete the selected records? This cannot be undone.",
+		Label:      N_("Delete selected"),
+		Confirm:    N_("Delete the selected records? This cannot be undone."),
 		Permission: "delete",
 		Handler: func(ctx context.Context, modelAdmin ModelAdmin, objects []any, principal *Principal) (string, error) {
 			deleted := 0
@@ -87,7 +87,7 @@ func NewDeleteSelectedAction() Action {
 				}
 				deleted++
 			}
-			return fmt.Sprintf("Deleted %d record(s).", deleted), nil
+			return TN(ctx, "Deleted %d record.", "Deleted %d records.", deleted, deleted), nil
 		},
 	}
 }
