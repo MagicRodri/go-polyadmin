@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"html"
 	"html/template"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/MagicRodri/go-polyadmin/core"
 )
@@ -83,9 +85,49 @@ func (r *Renderer) fieldValueHTML(relationPermissions map[string]bool, field cor
 			parts[i] = string(relatedLinkHTML(r.admin, r.basePath, relationPermissions, field.Relation, item))
 		}
 		return template.HTML(strings.Join(parts, ", "))
-	default:
-		return template.HTML(html.EscapeString(fmt.Sprint(value)))
+	case core.FieldTypeDate:
+		if iso, ok := isoDate(value); ok {
+			return template.HTML(`<time datetime="` + iso + `" data-format="date">` + iso + `</time>`)
+		}
+	case core.FieldTypeDateTime:
+		if iso, ok := isoDateTime(value); ok {
+			return template.HTML(`<time datetime="` + iso + `" data-format="datetime">` + iso + `</time>`)
+		}
+	case core.FieldTypeDecimal:
+		raw := html.EscapeString(fmt.Sprint(value))
+		return template.HTML(`<span data-format="decimal" data-value="` + raw + `">` + raw + `</span>`)
 	}
+	return template.HTML(html.EscapeString(fmt.Sprint(value)))
+}
+
+var (
+	isoDatePattern     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	isoDateTimePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$`)
+)
+
+// isoDate returns a date as YYYY-MM-DD, the only form the browser-side
+// formatter reads for a date-only value.
+func isoDate(value any) (string, bool) {
+	switch v := value.(type) {
+	case time.Time:
+		return v.Format("2006-01-02"), true
+	case string:
+		return v, isoDatePattern.MatchString(v)
+	}
+	return "", false
+}
+
+// isoDateTime returns RFC 3339. A time.Time always knows its zone, so it
+// always carries an offset; a string without one is naive and is shown as
+// wall-clock time, unconverted.
+func isoDateTime(value any) (string, bool) {
+	switch v := value.(type) {
+	case time.Time:
+		return v.Format(time.RFC3339), true
+	case string:
+		return v, isoDateTimePattern.MatchString(v)
+	}
+	return "", false
 }
 
 // boolIconHTML renders a boolean as a check or a cross rather than

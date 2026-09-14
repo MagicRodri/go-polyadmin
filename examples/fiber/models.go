@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 // In-memory Organization/User models + repositories for the reference
 // app. A real application would back these with GORM, sqlx, Bun, or a
 // repository over its own database -- the admin core
@@ -8,8 +10,10 @@ package main
 // an ORM.
 
 type Organization struct {
-	ID   int
-	Name string
+	ID      int
+	Name    string
+	Founded time.Time
+	Balance float64
 }
 
 type OrganizationRepository struct {
@@ -33,10 +37,17 @@ func (r *OrganizationRepository) Get(pk int) *Organization {
 	return r.organizations[pk]
 }
 
-func (r *OrganizationRepository) Create(name string) *Organization {
-	o := &Organization{ID: r.nextID, Name: name}
+func (r *OrganizationRepository) Create(name string, founded time.Time, balance float64) *Organization {
+	o := &Organization{ID: r.nextID, Name: name, Founded: founded, Balance: balance}
 	r.organizations[o.ID] = o
 	r.nextID++
+	return o
+}
+
+func (r *OrganizationRepository) Update(o *Organization, name string, founded time.Time, balance float64) *Organization {
+	o.Name = name
+	o.Founded = founded
+	o.Balance = balance
 	return o
 }
 
@@ -141,10 +152,14 @@ func (r *UserRepository) Delete(u *User) {
 }
 
 func seed(users *UserRepository, organizations *OrganizationRepository, roles *RoleRepository) {
-	acme := organizations.Create("Acme Corp")
-	widgets := organizations.Create("Widgets Inc")
-	globex := organizations.Create("Globex Corporation")
-	initech := organizations.Create("Initech")
+	// Founded in the same month for every organization: Task 15's browser
+	// test checks that this date renders with a French month name under
+	// the fr locale, and it doesn't matter which organization it looks at.
+	founded := time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC)
+	acme := organizations.Create("Acme Corp", founded, 1234.5)
+	widgets := organizations.Create("Widgets Inc", founded, 1234.5)
+	globex := organizations.Create("Globex Corporation", founded, 1234.5)
+	initech := organizations.Create("Initech", founded, 1234.5)
 
 	// Enough roles that the multi-select's search box has something to
 	// do -- the control only earns its keep past the point where
