@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/MagicRodri/go-polyadmin/core"
 
@@ -268,6 +269,30 @@ func TestManyToManyRendersSearchableMultiSelectNotANativeMultiple(t *testing.T) 
 	}
 	if !strings.Contains(text, `placeholder="Search…"`) {
 		t.Error("expected the search box that makes a long list usable")
+	}
+}
+
+// The chip's "Remove <label>" is formatted on the server, so a
+// translation that reorders its verb (%[1]s) still places the label:
+// Alpine only swaps the {label} marker Sprintf put there for the chip's
+// own label, read off the element rather than quoted into the expression.
+func TestMultiSelectRemoveLabelIsFormattedOnTheServer(t *testing.T) {
+	catalog := fstest.MapFS{"fr.json": &fstest.MapFile{Data: []byte(`{"Remove %s": "Retirer %[1]s"}`)}}
+	userAdmin, orgAdmin := newRelUserAdmin(), newTestOrgAdmin()
+	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
+	app := newTestApp(t, core.New(core.WithModelAdmins(userAdmin, orgAdmin), core.WithCatalogs(catalog)))
+
+	for _, tc := range []struct{ lang, want string }{
+		{"en", `data-remove-label="Remove {label}"`},
+		{"fr", `data-remove-label="Retirer {label}"`},
+	} {
+		ms := multiSelectMarkup(t, body(t, doGet(t, app, "/admin/users/create", map[string]string{"Accept-Language": tc.lang})))
+		if !strings.Contains(ms, tc.want) {
+			t.Errorf("%s: want %s in %s", tc.lang, tc.want, ms)
+		}
+		if want := `:aria-label="$el.dataset.removeLabel.replace('{label}', item.label)"`; !strings.Contains(ms, want) {
+			t.Errorf("%s: want %s in %s", tc.lang, want, ms)
+		}
 	}
 }
 
