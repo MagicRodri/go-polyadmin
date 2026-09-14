@@ -62,6 +62,7 @@
         <div class="min-w-0 flex-1">
           {{if .Breadcrumbs}}{{template "ui/breadcrumb" .}}{{end}}
         </div>
+        {{with localeSwitcher}}{{template "ui/locale-switcher" dict "switcher" . "basePath" $.BasePath "csrf" $.CSRFToken}}{{end}}
         {{template "ui/theme-toggle" .}}
       </header>
       {{/* overflow-y-auto is explicit, not inherited from

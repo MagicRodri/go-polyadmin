@@ -84,6 +84,13 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		router.Post(core.LogoutPath, handleLogout(admin, basePath))
 	}
 
+	// Mounted before any ModelAdmin route, for the same reason as the
+	// login routes above: a slug of "locale" must not be able to shadow
+	// it. Present only when the switcher itself would render something.
+	if switcherFor(admin, i18n, i18n.Default) != nil {
+		router.Post(core.LocalePath, handleLocalePost(i18n, basePath))
+	}
+
 	router.Get("/", func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.DashboardView, nil)
 		if result != authOK {

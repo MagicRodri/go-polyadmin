@@ -41,6 +41,9 @@ const (
 	LogoutPath = "/logout"
 )
 
+// LocalePath is the language switcher's route, relative to the mount.
+const LocalePath = "/locale"
+
 // NextQueryParam carries the URL an unauthenticated visitor was trying
 // to reach, so signing in returns them there instead of dumping them on
 // the dashboard.

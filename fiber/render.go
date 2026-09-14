@@ -393,7 +393,8 @@ func newRenderer(admin *core.Admin, i18n *core.I18n, locale, basePath string, te
 
 // switcherFor is the language switcher's data for a Renderer's pages, or
 // nil when the switcher is off: disabled by the host, or one locale only.
-// Task 5 renders it; it is computed here because it is bound into funcs.
+// Rendered by ui/locale-switcher via the {{localeSwitcher}} func; computed
+// here because it is bound into funcs at parse time (see localeFuncs).
 func switcherFor(admin *core.Admin, i18n *core.I18n, locale string) *localeSwitcher {
 	if admin.DisableLocaleSwitcher || len(i18n.Supported) < 2 {
 		return nil
@@ -1608,6 +1609,7 @@ func (r *Renderer) RenderPage(principal *core.Principal, csrfToken string, page 
 // nav to build, and no breadcrumb trail to sit in.
 type loginData struct {
 	CSRFToken   string
+	BasePath    string
 	SiteTitle   string
 	SiteLogoURL string
 	// Identifier is echoed back after a failed attempt so a mistyped
@@ -1623,6 +1625,7 @@ func (r *Renderer) RenderLogin(csrfToken, identifier, errorMessage, notice strin
 	var buf bytes.Buffer
 	data := loginData{
 		CSRFToken:   csrfToken,
+		BasePath:    r.basePath,
 		SiteTitle:   r.admin.SiteTitle,
 		SiteLogoURL: r.admin.SiteLogoURL,
 		Identifier:  identifier,

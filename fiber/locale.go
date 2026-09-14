@@ -59,6 +59,36 @@ func requestRenderer(c *fiber.Ctx) *Renderer {
 	return r
 }
 
+// handleLocalePost stores the switcher's choice and sends the user back
+// where they were. An unsupported value is ignored rather than refused:
+// the redirect is the same either way, and there is nothing to explain.
+func handleLocalePost(i18n *core.I18n, basePath string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if locale := i18n.Match(formValue(c, localeFormField)); locale != "" {
+			c.Cookie(&fiber.Cookie{
+				Name:     localeCookieName,
+				Value:    locale,
+				Path:     cookiePath(basePath),
+				MaxAge:   localeCookieMaxAge,
+				HTTPOnly: true,
+				Secure:   c.Protocol() == "https",
+				SameSite: fiber.CookieSameSiteLaxMode,
+			})
+		}
+		// The Referer is attacker-controlled -- see core.SafeRedirectPath.
+		return redirectTo(c, core.SafeRedirectPath(c.Get("Referer"), string(c.Request().Host()), basePath, basePath))
+	}
+}
+
+// cookiePath is the switcher cookie's Path: the admin mount, or the site
+// root when mounted at the root itself.
+func cookiePath(basePath string) string {
+	if basePath == "" {
+		return "/"
+	}
+	return basePath
+}
+
 // tr translates a framework string built in a handler.
 func tr(c *fiber.Ctx, msgid string, args ...any) string {
 	return core.T(c.Context(), msgid, args...)
