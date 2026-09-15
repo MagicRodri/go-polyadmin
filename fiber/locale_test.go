@@ -50,6 +50,24 @@ func TestLocaleCookieBeatsAcceptLanguage(t *testing.T) {
 	}
 }
 
+// Ruling R7: with the switcher off there is no way to change the cookie
+// from the admin, so a leftover one (it lives a year) must not beat the
+// resolver or the browser's language.
+func TestSwitcherOffIgnoresTheLocaleCookie(t *testing.T) {
+	forced := core.WithLocaleResolver(func(any, *core.Principal) string { return "fr" })
+	admin, dir := helloPageAdmin(t, core.WithoutLocaleSwitcher(), forced)
+	page := body(t, doGet(t, mountPageApp(t, admin, dir), "/admin/hello", map[string]string{"Cookie": "admin_locale=ru"}))
+	if !strings.Contains(page, `<html lang="fr"`) || !strings.Contains(page, "Bonjour") {
+		t.Errorf("the resolver's fr must beat a stale ru cookie when the switcher is off, got %s", page)
+	}
+
+	admin, dir = helloPageAdmin(t, core.WithoutLocaleSwitcher())
+	page = body(t, doGet(t, mountPageApp(t, admin, dir), "/admin/hello", map[string]string{"Cookie": "admin_locale=ru", "Accept-Language": "fr"}))
+	if !strings.Contains(page, `<html lang="fr"`) {
+		t.Errorf("Accept-Language must beat a stale cookie when the switcher is off, got %s", page)
+	}
+}
+
 type countingAuthenticator struct{ calls int }
 
 func (a *countingAuthenticator) Authenticate(request any) *core.Principal {

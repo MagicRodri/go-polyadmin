@@ -96,4 +96,23 @@ func TestNoSwitcherWhenDisabled(t *testing.T) {
 	if page := body(t, doGet(t, app, "/admin/users", nil)); strings.Contains(page, `action="/admin/locale"`) {
 		t.Error("disabled: no switcher")
 	}
+	resp := doPostForm(t, app, "/admin/locale", url.Values{"locale": {"fr"}}, nil)
+	if resp.StatusCode != 404 && resp.StatusCode != 405 {
+		t.Errorf("disabled: no route, got %d", resp.StatusCode)
+	}
+	if strings.Contains(resp.Header.Get("Set-Cookie"), "admin_locale") {
+		t.Error("disabled: nothing may set the locale cookie")
+	}
+}
+
+func TestLocaleCookieIsSecureOverHTTPS(t *testing.T) {
+	app := switcherApp(t)
+	resp := doPostForm(t, app, "/admin/locale", url.Values{"locale": {"fr"}}, map[string]string{"X-Forwarded-Proto": "https"})
+	if cookie := resp.Header.Get("Set-Cookie"); !strings.Contains(strings.ToLower(cookie), "secure") {
+		t.Errorf("over HTTPS the cookie must be Secure, got %q", cookie)
+	}
+	resp = doPostForm(t, app, "/admin/locale", url.Values{"locale": {"fr"}}, nil)
+	if cookie := resp.Header.Get("Set-Cookie"); strings.Contains(strings.ToLower(cookie), "secure") {
+		t.Errorf("over plain HTTP the cookie must not be Secure, got %q", cookie)
+	}
 }

@@ -24,13 +24,22 @@ type principalCache struct{ principal *core.Principal }
 // localeMiddleware resolves the request's locale before any handler runs
 // -- CSRF failures included, so even that page is localised -- and stores
 // it where core.Locale(c.Context()) finds it.
+//
+// The admin_locale cookie counts only while the switcher is on (its route
+// mounted): with it off nothing in the admin can change the cookie, so a
+// leftover one must not override the resolver or the browser.
 func localeMiddleware(admin *core.Admin, i18n *core.I18n, renderers *Renderers) fiber.Handler {
+	switcherOn := switcherFor(admin, i18n, i18n.Default) != nil
 	return func(c *fiber.Ctx) error {
 		var resolver func() string
 		if admin.LocaleResolver != nil {
 			resolver = func() string { return admin.LocaleResolver(c, authenticate(admin, c)) }
 		}
-		locale := i18n.Resolve(c.Cookies(localeCookieName), resolver, c.Get(fiber.HeaderAcceptLanguage))
+		cookie := ""
+		if switcherOn {
+			cookie = c.Cookies(localeCookieName)
+		}
+		locale := i18n.Resolve(cookie, resolver, c.Get(fiber.HeaderAcceptLanguage))
 		c.Locals(core.LocaleContextKey, &core.LocaleContext{Locale: locale, Translator: i18n.Translator})
 		c.Locals(rendererKey{}, renderers.byLocaleOrDefault(locale))
 		return c.Next()
