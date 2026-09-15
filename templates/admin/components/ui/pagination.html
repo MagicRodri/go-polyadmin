@@ -28,7 +28,7 @@
      x-init="$el.closest('#resource-list').addEventListener('change', () => {
                n = $el.closest('#resource-list').querySelectorAll('.row-checkbox:checked').length })"
      data-selected-text="{{tn "%s of %d row selected" "%s of %d rows selected" .Page.TotalCount "{n}" .Page.TotalCount}}"
-     x-text="$el.dataset.selectedText.replace('{n}', n)"
+     x-text="$el.dataset.selectedText.replace('{n}', () => n)"
      {{end}}>
     {{if .Actions}}{{tn "%s of %d row selected" "%s of %d rows selected" .Page.TotalCount "0" .Page.TotalCount}}{{else}}{{tn "%d row" "%d rows" .Page.TotalCount .Page.TotalCount}}{{end}}
   </p>

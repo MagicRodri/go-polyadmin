@@ -2,11 +2,14 @@ package fiber
 
 import (
 	"context"
+	"io/fs"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/MagicRodri/go-polyadmin/core"
+	coretemplates "github.com/MagicRodri/go-polyadmin/templates"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -628,5 +631,35 @@ func TestFieldWithoutADescriptionRendersNone(t *testing.T) {
 	// Three fields, one of which has help text.
 	if got := strings.Count(page, desc); got != 1 {
 		t.Errorf("expected exactly one description on the form, got %d", got)
+	}
+}
+
+// String.replace with a string replacement expands "$&", "$1" and the
+// like, so a record label containing "$&" would come out mangled. Every
+// client-side fill of a {marker} in the templates must pass a function.
+func TestMarkerFillsUseAFunctionReplacement(t *testing.T) {
+	stringReplacement := regexp.MustCompile(`\.replace\('\{\w+\}',\s*([^,]*?)\)"`)
+	found := 0
+	err := fs.WalkDir(coretemplates.FS, "admin", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		src, err := fs.ReadFile(coretemplates.FS, p)
+		if err != nil {
+			return err
+		}
+		for _, m := range stringReplacement.FindAllStringSubmatch(string(src), -1) {
+			found++
+			if !strings.HasPrefix(strings.TrimSpace(m[1]), "() =>") {
+				t.Errorf("%s: %s replaces with a string, which expands $& in record data", p, m[0])
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found < 2 {
+		t.Errorf("found %d marker fills, want the multi-select's and the pagination's", found)
 	}
 }

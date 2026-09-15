@@ -290,7 +290,7 @@ func TestMultiSelectRemoveLabelIsFormattedOnTheServer(t *testing.T) {
 		if !strings.Contains(ms, tc.want) {
 			t.Errorf("%s: want %s in %s", tc.lang, tc.want, ms)
 		}
-		if want := `:aria-label="$el.dataset.removeLabel.replace('{label}', item.label)"`; !strings.Contains(ms, want) {
+		if want := `:aria-label="$el.dataset.removeLabel.replace('{label}', () => item.label)"`; !strings.Contains(ms, want) {
 			t.Errorf("%s: want %s in %s", tc.lang, want, ms)
 		}
 	}
