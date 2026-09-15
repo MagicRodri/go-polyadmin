@@ -108,3 +108,24 @@ func TestExportHeadersAreTranslated(t *testing.T) {
 		t.Errorf("CSV header %q", first)
 	}
 }
+
+// The framework's own fallback strings -- a root page's default label,
+// AllowAllAuthenticator's default display name, the empty admin's notice
+// -- are framework strings like any other and come out translated.
+func TestFrameworkDefaultsAreTranslated(t *testing.T) {
+	ru := map[string]string{"Cookie": localeCookieName + "=ru"}
+
+	admin := core.New(core.WithModelAdmins(newTestUserAdmin()), core.WithAuthenticator(core.NewAllowAllAuthenticator(nil)))
+	admin.Route("/", PageHandler(func(pc *PageContext) error { return nil }))
+	page := body(t, doGet(t, newTestApp(t, admin), "/admin/users", ru))
+	for _, want := range []string{`class="truncate">Страница</span>`, "Аноним"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the Russian page lacks %q", want)
+		}
+	}
+
+	empty := body(t, doGet(t, newTestApp(t, core.New()), "/admin", ru))
+	if !strings.Contains(empty, "Нет зарегистрированных ресурсов.") {
+		t.Errorf("the empty admin's notice is not translated: %q", empty)
+	}
+}

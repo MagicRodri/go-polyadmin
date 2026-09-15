@@ -2,6 +2,7 @@ package fiber
 
 import (
 	"fmt"
+	"html"
 
 	"github.com/MagicRodri/go-polyadmin/core"
 
@@ -114,7 +115,7 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 				return c.Redirect(basePath+"/"+modelAdmin.Slug(), fiber.StatusTemporaryRedirect)
 			}
 		}
-		return c.SendString("<p>No resources registered.</p>")
+		return c.SendString("<p>" + html.EscapeString(tr(c, "No resources registered.")) + "</p>")
 	})
 
 	for _, modelAdmin := range admin.ModelAdmins() {

@@ -83,7 +83,7 @@ func NewAdminPage(path string, handler any, opts ...PageOption) AdminPage {
 func defaultPageLabel(path string) string {
 	trimmed := strings.Trim(path, "/")
 	if trimmed == "" {
-		return "Page"
+		return N_("Page")
 	}
 	parts := strings.Split(trimmed, "/")
 	last := strings.ReplaceAll(strings.ReplaceAll(parts[len(parts)-1], "-", " "), "_", " ")

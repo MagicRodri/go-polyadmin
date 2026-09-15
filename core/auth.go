@@ -24,7 +24,9 @@ type AllowAllAuthenticator struct {
 
 func NewAllowAllAuthenticator(principal *Principal) AllowAllAuthenticator {
 	if principal == nil {
-		principal = &Principal{ID: "anonymous", DisplayName: "Anonymous", IsSuperuser: true}
+		// N_: the sidebar translates this default name (and only this
+		// one -- a principal's own name is never translated).
+		principal = &Principal{ID: "anonymous", DisplayName: N_("Anonymous"), IsSuperuser: true}
 	}
 	return AllowAllAuthenticator{Principal: principal}
 }

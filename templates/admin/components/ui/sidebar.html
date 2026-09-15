@@ -102,7 +102,9 @@
        Principal. */}}
   {{$canSignOut := .CanSignOut}}{{$logoutURL := printf "%s/logout" .BasePath}}{{$csrf := .CSRFToken}}
   {{with .Principal}}
-  {{$name := .DisplayName}}{{if not $name}}{{$name = .ID}}{{end}}
+  {{/* Principal names are never translated, except the framework's own
+       default (core.NewAllowAllAuthenticator's "Anonymous"). */}}
+  {{$name := .DisplayName}}{{if not $name}}{{$name = .ID}}{{else if eq $name "Anonymous"}}{{$name = t $name}}{{end}}
   <div class="{{ui "sidebar" "footer"}}">
     <div class="relative" x-data="{ open: false }" @keydown.escape="open = false" @click.outside="open = false">
       <button type="button" x-ref="userTrigger" @click="open = !open"
