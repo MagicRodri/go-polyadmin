@@ -1,6 +1,7 @@
 package fiber
 
 import (
+	"encoding/base64"
 	"encoding/json"
 
 	"github.com/gofiber/fiber/v2"
@@ -15,6 +16,11 @@ type flashMessage struct {
 
 const flashCookieName = "admin_messages"
 
+// The cookie carries the messages as base64url-encoded JSON: a cookie
+// value must be ASCII, and a translated message rarely is. Only the
+// server reads it (it is HttpOnly), so nothing else needs to decode it.
+var flashEncoding = base64.RawURLEncoding
+
 func setFlash(c *fiber.Ctx, level, text string) {
 	raw, err := json.Marshal([]flashMessage{{Level: level, Text: text}})
 	if err != nil {
@@ -22,7 +28,7 @@ func setFlash(c *fiber.Ctx, level, text string) {
 	}
 	c.Cookie(&fiber.Cookie{
 		Name:     flashCookieName,
-		Value:    string(raw),
+		Value:    flashEncoding.EncodeToString(raw),
 		MaxAge:   10,
 		HTTPOnly: true,
 		SameSite: fiber.CookieSameSiteLaxMode,
@@ -33,12 +39,16 @@ func setFlash(c *fiber.Ctx, level, text string) {
 // callers should call clearFlash on whichever response they end up
 // sending, once they know they've consumed the messages.
 func popFlash(c *fiber.Ctx) []flashMessage {
-	raw := c.Cookies(flashCookieName)
-	if raw == "" {
+	encoded := c.Cookies(flashCookieName)
+	if encoded == "" {
+		return nil
+	}
+	raw, err := flashEncoding.DecodeString(encoded)
+	if err != nil {
 		return nil
 	}
 	var messages []flashMessage
-	if err := json.Unmarshal([]byte(raw), &messages); err != nil {
+	if err := json.Unmarshal(raw, &messages); err != nil {
 		return nil
 	}
 	return messages

@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -42,9 +41,9 @@ func setCookies(resp *http.Response) string {
 func TestFlashIsTranslated(t *testing.T) {
 	app, _ := frenchApp(t)
 	resp := doPostForm(t, app, "/admin/users/create", url.Values{"Email": {"a@example.com"}}, fr)
-	flash := setCookies(resp)
+	flash := flashText(t, resp)
 	if !strings.Contains(flash, "Utilisateur") || !strings.Contains(flash, "enregistrement cr") {
-		t.Errorf("flash cookie %q is not in French", flash)
+		t.Errorf("flash %q is not in French", flash)
 	}
 }
 
@@ -67,12 +66,12 @@ func TestBuiltInActionMessagesAreTranslated(t *testing.T) {
 	app, ua := frenchApp(t)
 	ua.createUser("a@example.com", true)
 	resp := doPostForm(t, app, "/admin/users/actions/"+core.DeleteSelectedName, url.Values{"pks": {"1"}}, fr)
-	if flash := setCookies(resp); !strings.Contains(flash, "1 enregistrement supprim") {
-		t.Errorf("flash cookie %q", flash)
+	if flash := flashText(t, resp); !strings.Contains(flash, "1 enregistrement supprim") {
+		t.Errorf("flash %q", flash)
 	}
 	resp = doPostForm(t, app, "/admin/users/actions/"+core.DeleteSelectedName, url.Values{}, fr)
-	if flash := setCookies(resp); !strings.Contains(flash, "Aucun") {
-		t.Errorf("flash cookie %q", flash)
+	if flash := flashText(t, resp); !strings.Contains(flash, "Aucun") {
+		t.Errorf("flash %q", flash)
 	}
 }
 
@@ -90,11 +89,10 @@ func TestDeleteSelectedFlashIsNotDoubleWrappedInPseudoLocale(t *testing.T) {
 	app := newTestApp(t, core.New(core.WithModelAdmins(ua), core.WithPseudoLocale()))
 	resp := doPseudoPostForm(t, app, "/admin/users/actions/"+core.DeleteSelectedName, url.Values{"pks": {"1"}})
 
-	match := regexp.MustCompile(`"text":"([^"]*)"`).FindStringSubmatch(setCookies(resp))
-	if match == nil {
+	got := flashText(t, resp)
+	if got == "" {
 		t.Fatalf("no flash text in %q", setCookies(resp))
 	}
-	got := match[1]
 	want := fmt.Sprintf(core.Pseudo("Deleted %d record."), 1)
 	if got != want {
 		t.Errorf("flash text = %q, want %q (single pseudo-wrapped)", got, want)
