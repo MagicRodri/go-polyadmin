@@ -127,7 +127,7 @@ func main() {
 	// permissions, the audit log's principal -- was ever exercised
 	// against an identity anyone actually proved.
 	sessions := NewCookieSessionBackend()
-	admin := core.New(
+	options := []core.Option{
 		core.WithModelAdmins(NewUserAdmin(users, organizations, roles), NewOrganizationAdmin(organizations), NewRoleAdmin(roles)),
 		core.WithDashboard(dashboard),
 		core.WithAuthenticator(sessions),
@@ -135,7 +135,23 @@ func main() {
 		// Not core.SuperuserAuthorizer: that would deny the viewer
 		// account every permission, dashboard included. See session.go.
 		core.WithAuthorizer(ReadOnlyForNonSuperusers{}),
-	)
+		// amelie@example.com carries "fr" in Principal.Extra (session.go);
+		// everyone else resolves through the switcher cookie and
+		// Accept-Language instead.
+		core.WithLocaleResolver(func(request any, p *core.Principal) string {
+			if p == nil {
+				return ""
+			}
+			locale, _ := p.Extra["locale"].(string)
+			return locale
+		}),
+	}
+	// en-XA, bracketed and accented, so a page can be swept for text that
+	// never went through the translator -- see browsertests/test_i18n.py.
+	if os.Getenv("POLYADMIN_PSEUDO_LOCALE") == "1" {
+		options = append(options, core.WithPseudoLocale())
+	}
+	admin := core.New(options...)
 	registerPages(admin, users)
 
 	app := fiber.New()

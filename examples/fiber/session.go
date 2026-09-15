@@ -52,16 +52,21 @@ type demoAccount struct {
 
 	displayName string
 	isSuperuser bool
+	locale      string
 }
 
-// Two accounts, not one, so the difference between a superuser and an
-// ordinary signed-in user is visible in the admin.
+// Three accounts, not two, so the difference between a superuser and an
+// ordinary signed-in user is visible in the admin, and so is a principal
+// whose preferred locale the host resolver -- not the switcher cookie or
+// Accept-Language -- decides.
 var demoCredentials = []struct {
 	email, password, displayName string
 	isSuperuser                  bool
+	locale                       string
 }{
-	{"admin@example.com", "polyadmin", "Demo Admin", true},
-	{"viewer@example.com", "polyadmin", "Demo Viewer", false},
+	{"admin@example.com", "polyadmin", "Demo Admin", true, ""},
+	{"viewer@example.com", "polyadmin", "Demo Viewer", false, ""},
+	{"amelie@example.com", "polyadmin", "Amélie", true, "fr"},
 }
 
 // ReadOnlyForNonSuperusers grants reads to anyone signed in and reserves
@@ -120,7 +125,7 @@ func NewCookieSessionBackend() *CookieSessionBackend {
 		}
 		b.accounts[c.email] = demoAccount{
 			email: c.email, salt: salt, hash: hash,
-			displayName: c.displayName, isSuperuser: c.isSuperuser,
+			displayName: c.displayName, isSuperuser: c.isSuperuser, locale: c.locale,
 		}
 	}
 	return b
@@ -164,6 +169,7 @@ func (b *CookieSessionBackend) VerifyCredentials(request any, identifier, passwo
 		ID:          account.email,
 		DisplayName: account.displayName,
 		IsSuperuser: account.isSuperuser,
+		Extra:       map[string]any{"locale": account.locale},
 	}
 }
 
@@ -218,6 +224,7 @@ func (b *CookieSessionBackend) Authenticate(request any) *core.Principal {
 		ID:          account.email,
 		DisplayName: account.displayName,
 		IsSuperuser: account.isSuperuser,
+		Extra:       map[string]any{"locale": account.locale},
 	}
 }
 
