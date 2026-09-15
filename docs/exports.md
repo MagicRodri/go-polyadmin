@@ -54,6 +54,8 @@ a custom format is just another implementation. Route registration in
 `Mount` wires in CSV and XLSX only, so a third format isn't picked up
 automatically; add your own route by hand outside `Mount`.
 
-Column headers are translated (`core.T(ctx, ...)`) before `Write` is
-called; a custom `Exporter` translating its own strings uses the same
-`ctx`. See [`i18n.md`](i18n.md).
+`CSVExporter` and `XLSXExporter` translate each column's header
+(`core.T(ctx, field.Label)`) themselves, inside their own `Write` — a
+custom `Exporter` gets bare column names and builds (and translates)
+its own header the same way, with the `ctx` `Write` is called with.
+See [`i18n.md`](i18n.md).
