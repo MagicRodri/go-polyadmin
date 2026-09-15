@@ -62,7 +62,11 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 
 	// Locale first, then CSRF: a CSRF failure page is rendered in the
 	// request's language like every other page.
-	router.Use(localeMiddleware(admin, i18n, renderers))
+	staticPrefix := ""
+	if cfg.staticDir != "" {
+		staticPrefix = basePath + "/static/"
+	}
+	router.Use(localeMiddleware(admin, i18n, renderers, staticPrefix))
 	// Before every route, including the static handler and any custom
 	// AdminPage: a mutating custom page has to be covered too.
 	router.Use(csrfMiddleware(admin, basePath))

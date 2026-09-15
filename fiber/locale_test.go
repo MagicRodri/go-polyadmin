@@ -1,11 +1,15 @@
 package fiber
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/MagicRodri/go-polyadmin/core"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // A host catalog, so the tests do not depend on the framework catalogs'
@@ -160,5 +164,31 @@ func TestModelAdminContextCarriesTheLocale(t *testing.T) {
 	doGet(t, app, "/admin/users/1", map[string]string{"Accept-Language": "ru"})
 	if seen != "ru" {
 		t.Errorf("core.Locale(ctx) inside GetObject = %q", seen)
+	}
+}
+
+// Static files are not admin pages: resolving their locale would run the
+// LocaleResolver, and so authenticate, on every CSS and JS request.
+func TestStaticFilesSkipLocaleResolution(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "custom.css"), []byte("body{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	auth := &countingAuthenticator{}
+	resolved := 0
+	admin := core.New(core.WithAuthenticator(auth), core.WithLocaleResolver(func(any, *core.Principal) string {
+		resolved++
+		return ""
+	}))
+	app := fiber.New()
+	if err := Mount(app.Group("/admin"), admin, "/admin", WithStaticDir(dir)); err != nil {
+		t.Fatal(err)
+	}
+	resp := doGet(t, app, "/admin/static/custom.css", nil)
+	if resp.StatusCode != 200 {
+		t.Fatalf("got %d", resp.StatusCode)
+	}
+	if resolved != 0 || auth.calls != 0 {
+		t.Errorf("a static file ran the resolver %d and the authenticator %d times", resolved, auth.calls)
 	}
 }

@@ -1,6 +1,8 @@
 package fiber
 
 import (
+	"strings"
+
 	"github.com/MagicRodri/go-polyadmin/core"
 
 	"github.com/gofiber/fiber/v2"
@@ -28,9 +30,16 @@ type principalCache struct{ principal *core.Principal }
 // The admin_locale cookie counts only while the switcher is on (its route
 // mounted): with it off nothing in the admin can change the cookie, so a
 // leftover one must not override the resolver or the browser.
-func localeMiddleware(admin *core.Admin, i18n *core.I18n, renderers *Renderers) fiber.Handler {
+//
+// Requests under staticPrefix (the WithStaticDir files; "" for none) are
+// passed straight through: a stylesheet has no locale, and resolving one
+// would run the LocaleResolver -- and so authenticate -- on every asset.
+func localeMiddleware(admin *core.Admin, i18n *core.I18n, renderers *Renderers, staticPrefix string) fiber.Handler {
 	switcherOn := switcherFor(admin, i18n, i18n.Default) != nil
 	return func(c *fiber.Ctx) error {
+		if staticPrefix != "" && strings.HasPrefix(c.Path(), staticPrefix) {
+			return c.Next()
+		}
 		var resolver func() string
 		if admin.LocaleResolver != nil {
 			resolver = func() string { return admin.LocaleResolver(c, authenticate(admin, c)) }
