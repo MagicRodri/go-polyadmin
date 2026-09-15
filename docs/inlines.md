@@ -49,8 +49,9 @@ An inline row always shows *all* of the child's own
 context — never rendered as its own input, auto-set to the parent's
 primary key on every create/update). There's no way to show a curated
 subset in this version: a subset would desync from the child's own
-`Validate()`, which iterates every one of `FormFieldNames` and would
-flag a field excluded from the inline row as spuriously missing.
+`Validate(ctx, data)`, which iterates every one of `FormFieldNames`
+and would flag a field excluded from the inline row as spuriously
+missing.
 
 ## Generated routes
 

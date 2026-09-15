@@ -49,7 +49,11 @@ column and its on-screen equivalent always agree.
 ## Adding a custom format
 
 `core.Exporter` is an interface — `Format()`, `ContentType()`,
-`FileExtension()`, `Write(w RowWriter, ...)` — so a custom format is
-just another implementation. Route registration in `Mount` wires in CSV
-and XLSX only, so a third format isn't picked up automatically; add
-your own route by hand outside `Mount`.
+`FileExtension()`, `Write(ctx context.Context, w RowWriter, ...)` — so
+a custom format is just another implementation. Route registration in
+`Mount` wires in CSV and XLSX only, so a third format isn't picked up
+automatically; add your own route by hand outside `Mount`.
+
+Column headers are translated (`core.T(ctx, ...)`) before `Write` is
+called; a custom `Exporter` translating its own strings uses the same
+`ctx`. See [`i18n.md`](i18n.md).

@@ -49,6 +49,12 @@ around it:
 
 `listContent`, `search` and `formWrapper` are all available this way.
 
+An override translates its own text the same way the framework's own
+templates do — `{{t "Save"}}`, `{{t .Label}}` — and gets `{{tn}}`/
+`{{tjs}}`/`{{locale}}` for free: every template set's functions are
+bound to that set's locale, override files included, so there's
+nothing extra to wire up. See [`i18n.md`](i18n.md#in-templates).
+
 Custom dashboard widgets get the same treatment through the same
 option: a widget whose `Template()` name isn't one of the built-ins is
 looked up across the `WithTemplateDirs` directories the same way, and

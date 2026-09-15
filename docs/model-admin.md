@@ -239,12 +239,17 @@ boolean field's as `bool`, and so on).
 
 ## Validation
 
-`Validate(data)` runs every form field's own validators (required-ness
-first, then any custom per-field checks) and returns a
-`map[string][]string` of field name → error messages. A non-empty
-result re-renders the form with those errors instead of calling
-`Create`/`Update` — those are only ever called with data that already
-passed validation.
+`Validate(ctx, data)` runs every form field's own validators
+(required-ness first, then any custom per-field checks) and returns a
+`map[string][]string` of field name → error messages, already
+translated into the request's locale. A non-empty result re-renders
+the form with those errors instead of calling `Create`/`Update` —
+those are only ever called with data that already passed validation.
+
+A field's own `Validator func(ctx context.Context, value any) error`
+receives the same `ctx`: translate a message with `core.T(ctx, ...)`,
+or return a static English message and let the framework translate it
+from a host catalog entry. See [`i18n.md`](i18n.md#in-code).
 
 ## Search, filters, ordering
 

@@ -33,7 +33,13 @@ admin := core.New(
 
 `Principal.Extra` is a free-form bag for whatever your own `Authorizer`
 needs beyond `IsSuperuser` (roles, team IDs, scopes, ...) — core never
-reads it itself.
+reads it itself. A `core.LocaleResolver` (see
+[`i18n.md`](i18n.md#how-a-requests-locale-is-chosen)) can read it too —
+a per-user language preference stashed in `Extra` is a common use —
+since it receives the same `*Principal` `Authenticate` produced for
+this request. Authentication still runs at most once per request even
+when both the locale resolver and the route's own authorization need
+it: whichever asks first caches the result for the other.
 
 ## Built-in implementations
 
