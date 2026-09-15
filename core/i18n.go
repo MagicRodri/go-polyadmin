@@ -289,43 +289,31 @@ func Pseudo(s string) string {
 // variant maps onto its base language (fr-CA -> fr) but one language is
 // never mapped onto another. The pseudo-locale matches only exactly.
 func MatchLocale(supported []string, candidate string) string {
-	candidate = strings.ReplaceAll(strings.TrimSpace(candidate), "_", "-")
-	if candidate == "" {
-		return ""
-	}
-	for _, s := range supported {
-		if strings.EqualFold(s, candidate) {
-			return s
-		}
-	}
-	tag, err := language.Parse(candidate)
-	if err != nil {
-		return ""
-	}
-	return matchTag(supported, tag)
+	return newLocaleMatcher(supported).match(candidate)
 }
 
 // MatchAcceptLanguage returns the best supported locale for an
 // Accept-Language header, or "". Tags are tried one at a time in q order,
 // so a supported second choice beats a distant guess at the first.
 func MatchAcceptLanguage(supported []string, header string) string {
-	tags, weights, err := language.ParseAcceptLanguage(header)
-	if err != nil {
-		return ""
-	}
-	for i, tag := range tags {
-		if weights[i] <= 0 || tag == language.Und {
-			continue
-		}
-		if s := matchTag(supported, tag); s != "" {
-			return s
-		}
-	}
-	return ""
+	return newLocaleMatcher(supported).matchAcceptLanguage(header)
 }
 
-func matchTag(supported []string, desired language.Tag) string {
-	var names []string
+// localeMatcher is MatchLocale and MatchAcceptLanguage over one fixed
+// set of supported locales, with the language.Matcher built once: NewI18n
+// keeps one for the life of the admin, where building it on every request
+// (once per Accept-Language tag, even) was most of locale resolution's
+// cost. Safe for concurrent use: nothing in it changes after construction.
+type localeMatcher struct {
+	supported []string
+	// names[i] is the locale behind the matcher's tag i; the pseudo-locale
+	// and unparseable names are left out.
+	names   []string
+	matcher language.Matcher
+}
+
+func newLocaleMatcher(supported []string) *localeMatcher {
+	m := &localeMatcher{supported: supported}
 	var tags []language.Tag
 	for _, s := range supported {
 		if s == PseudoLocale {
@@ -335,16 +323,56 @@ func matchTag(supported []string, desired language.Tag) string {
 		if err != nil {
 			continue
 		}
-		names, tags = append(names, s), append(tags, tag)
+		m.names, tags = append(m.names, s), append(tags, tag)
 	}
-	if len(tags) == 0 {
+	if len(tags) > 0 {
+		m.matcher = language.NewMatcher(tags)
+	}
+	return m
+}
+
+func (m *localeMatcher) match(candidate string) string {
+	candidate = strings.ReplaceAll(strings.TrimSpace(candidate), "_", "-")
+	if candidate == "" {
 		return ""
 	}
-	_, index, confidence := language.NewMatcher(tags).Match(desired)
+	for _, s := range m.supported {
+		if strings.EqualFold(s, candidate) {
+			return s
+		}
+	}
+	tag, err := language.Parse(candidate)
+	if err != nil {
+		return ""
+	}
+	return m.matchTag(tag)
+}
+
+func (m *localeMatcher) matchAcceptLanguage(header string) string {
+	tags, weights, err := language.ParseAcceptLanguage(header)
+	if err != nil {
+		return ""
+	}
+	for i, tag := range tags {
+		if weights[i] <= 0 || tag == language.Und {
+			continue
+		}
+		if s := m.matchTag(tag); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func (m *localeMatcher) matchTag(desired language.Tag) string {
+	if m.matcher == nil {
+		return ""
+	}
+	_, index, confidence := m.matcher.Match(desired)
 	if confidence < language.High {
 		return ""
 	}
-	return names[index]
+	return m.names[index]
 }
 
 // LocaleOption is one entry in the language switcher.
@@ -368,6 +396,8 @@ type I18n struct {
 	// catalogs list it, then the rest, with PseudoLocale last if enabled.
 	Supported []string
 	names     map[string]string
+	// matcher is built once from Supported by NewI18n.
+	matcher *localeMatcher
 }
 
 // NewI18n resolves an Admin's i18n options into the translator and the
@@ -407,26 +437,36 @@ func NewI18n(a *Admin) (*I18n, error) {
 	}
 	names := maps.Clone(builtinLocaleNames)
 	maps.Copy(names, a.LocaleNames)
-	return &I18n{Translator: translator, Default: def, Supported: supported, names: names}, nil
+	return &I18n{Translator: translator, Default: def, Supported: supported, names: names, matcher: newLocaleMatcher(supported)}, nil
+}
+
+// localeMatcher is the matcher NewI18n built, or a fresh one for an I18n
+// assembled by hand.
+func (i *I18n) localeMatcher() *localeMatcher {
+	if i.matcher != nil {
+		return i.matcher
+	}
+	return newLocaleMatcher(i.Supported)
 }
 
 // Match returns the supported locale candidate names, or "".
-func (i *I18n) Match(candidate string) string { return MatchLocale(i.Supported, candidate) }
+func (i *I18n) Match(candidate string) string { return i.localeMatcher().match(candidate) }
 
 // Resolve applies the resolution order: the switcher cookie, then the
 // host's resolver, then Accept-Language, then the default. resolver is a
 // thunk so that a request whose cookie already decides it never pays for
 // authentication.
 func (i *I18n) Resolve(cookie string, resolver func() string, acceptLanguage string) string {
-	if locale := i.Match(cookie); locale != "" {
+	m := i.localeMatcher()
+	if locale := m.match(cookie); locale != "" {
 		return locale
 	}
 	if resolver != nil {
-		if locale := i.Match(resolver()); locale != "" {
+		if locale := m.match(resolver()); locale != "" {
 			return locale
 		}
 	}
-	if locale := MatchAcceptLanguage(i.Supported, acceptLanguage); locale != "" {
+	if locale := m.matchAcceptLanguage(acceptLanguage); locale != "" {
 		return locale
 	}
 	return i.Default

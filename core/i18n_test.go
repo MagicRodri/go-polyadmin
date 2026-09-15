@@ -190,6 +190,23 @@ func TestMatchAcceptLanguage(t *testing.T) {
 	}
 }
 
+// Resolving a request's Accept-Language must not rebuild the language
+// matcher: NewI18n builds it once. Rebuilding it per tag cost over a
+// thousand allocations for a four-tag header.
+func TestResolveReusesTheMatcher(t *testing.T) {
+	i, err := NewI18n(New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	header := "de-DE,de;q=0.9,es;q=0.8,fr-CA;q=0.7"
+	if got := i.Resolve("", nil, header); got != "fr" {
+		t.Fatalf("Resolve = %q, want fr", got)
+	}
+	if allocs := testing.AllocsPerRun(50, func() { i.Resolve("", nil, header) }); allocs > 200 {
+		t.Errorf("Resolve allocated %v times per call; the matcher is being rebuilt", allocs)
+	}
+}
+
 func TestResolvePrecedence(t *testing.T) {
 	i := &I18n{Default: "en", Supported: []string{"en", "fr", "ru"}}
 	calls := 0
