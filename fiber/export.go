@@ -32,8 +32,16 @@ func handleExportCSV(admin *core.Admin, modelAdmin core.ModelAdmin, basePath str
 
 		c.Set(fiber.HeaderContentType, "text/csv")
 		c.Set(fiber.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s.csv"`, slug))
-		return c.SendStream(csvStream(c.Context(), admin, modelAdmin, objects))
+		return c.SendStream(csvStream(exportContext(c.Context()), admin, modelAdmin, objects))
 	}
+}
+
+// exportContext is the context the CSV goroutine writes under: a fresh
+// one carrying only the request's locale. The goroutine outlives the
+// handler, and c.Context() is a pooled *fasthttp.RequestCtx that Fiber
+// hands to the next request once this one is done.
+func exportContext(request context.Context) context.Context {
+	return core.WithLocaleContext(context.Background(), core.LocaleContextOf(request))
 }
 
 // csvStream returns an io.Reader fed by a pipe that writes CSV rows as
