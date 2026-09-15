@@ -28,7 +28,10 @@ var sweepAreas = map[string]bool{
 
 var (
 	sweepStrip   = regexp.MustCompile(`(?is)<script\b.*?</script>|<style\b.*?</style>|<svg\b.*?</svg>|<!--.*?-->`)
-	sweepVisible = regexp.MustCompile(`\s(?:placeholder|aria-label|title|alt|hx-confirm)="([^"]*)"`)
+	sweepVisible = regexp.MustCompile(`\s(?:placeholder|aria-label|title|alt|hx-confirm|data-text|data-confirm|data-selected-text|data-remove-label)="([^"]*)"`)
+	// The markers Alpine fills in client-side (the selection count, a
+	// removed option's label): not English, whether bracketed or not.
+	sweepMarker  = regexp.MustCompile(`\{(?:n|label)\}`)
 	sweepAttrVal = regexp.MustCompile(`=(?:"[^"]*"|'[^']*')`)
 	sweepTag     = regexp.MustCompile(`<[^>]*>`)
 	sweepPseudo  = regexp.MustCompile(`\[[^\[\]]*\]`)
@@ -37,7 +40,8 @@ var (
 
 // untranslated returns the visible strings on a page rendered in the
 // pseudo-locale that are not in pseudo form. Visible means text nodes
-// plus the attributes a user reads or hears. allow lists strings that are
+// plus the attributes a user reads or hears -- including the data-*
+// attributes whose text Alpine puts on screen. allow lists strings that are
 // deliberately untranslated: data values and locale names.
 func untranslated(page string, allow ...string) []string {
 	page = sweepStrip.ReplaceAllString(page, " ")
@@ -66,6 +70,7 @@ func untranslated(page string, allow ...string) []string {
 		for _, a := range allow {
 			rest = strings.ReplaceAll(rest, a, "")
 		}
+		rest = sweepMarker.ReplaceAllString(rest, "")
 		if sweepLetter.MatchString(rest) {
 			out = append(out, text)
 		}
@@ -79,6 +84,18 @@ func TestUntranslatedHelper(t *testing.T) {
 <span>[Délété [Üšér]]</span><button aria-label="[Çlöšé]"></button></body></html>`
 	got := untranslated(page, "a@example.com")
 	want := []string{"Search", "Save"}
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	// Text Alpine shows from data-* attributes counts too; its {n} and
+	// {label} markers are filled in client-side and are not English.
+	page = `<div data-text="Copied" data-confirm="[Déléţé?]" data-selected-text="{n} of 3 selected"
+data-remove-label="[Rémövé {label}]"></div><p data-selected-text="[{n} öf 3]">{label}</p>`
+	got = untranslated(page)
+	want = []string{"Copied", "{n} of 3 selected"}
 	slices.Sort(got)
 	slices.Sort(want)
 	if !slices.Equal(got, want) {
