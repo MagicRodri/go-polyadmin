@@ -2,15 +2,18 @@ package fiber
 
 import (
 	"encoding/json"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -317,6 +320,114 @@ func TestLocaleRenderingHasNoFormatErrors(t *testing.T) {
 					t.Errorf("fmt error rendering %s in %s:\n%s", p.path, locale, page)
 				}
 			})
+		}
+	}
+}
+
+// fmtVerb matches one fmt directive: an optional explicit argument index,
+// flags, width and precision, then the verb. "%%" matches too and is
+// skipped by fmtVerbs, being a literal percent sign rather than a verb.
+var fmtVerb = regexp.MustCompile(`%(?:\[(\d+)\])?[-+# 0]*\d*(?:\.\d*)?([a-zA-Z%])`)
+
+// fmtVerbs is the multiset of s's fmt verbs, each keyed by the argument
+// it formats: "1:s", "2:d". An explicit index %[n]s names argument n, and
+// the directives after it continue from n+1, as fmt does -- so a
+// translation may reorder its arguments with %[2]s ... %[1]s and still
+// match the msgid's %s ... %s.
+func fmtVerbs(s string) map[string]int {
+	out := map[string]int{}
+	arg := 1
+	for _, m := range fmtVerb.FindAllStringSubmatch(s, -1) {
+		if m[2] == "%" {
+			continue
+		}
+		if m[1] != "" {
+			arg, _ = strconv.Atoi(m[1])
+		}
+		out[strconv.Itoa(arg)+":"+m[2]]++
+		arg++
+	}
+	return out
+}
+
+// verbMismatches compares a catalog entry's translations with the msgid
+// they translate: a plain entry with the msgid; a plural entry's "one"
+// form with the singular msgid and every other form with the plural. A
+// translation that drops, adds or retypes an argument formats as
+// "%!d(MISSING)" or "%!(EXTRA ...)" at runtime.
+func verbMismatches(singular, plural string, entry json.RawMessage) []string {
+	var problems []string
+	check := func(form, msgid, text string) {
+		if want, got := fmtVerbs(msgid), fmtVerbs(text); !maps.Equal(want, got) {
+			problems = append(problems, fmt.Sprintf("%q [%s] %q: verbs %v, want %v", singular, form, text, got, want))
+		}
+	}
+	var text string
+	if json.Unmarshal(entry, &text) == nil {
+		check("", singular, text)
+		return problems
+	}
+	var forms map[string]string
+	if json.Unmarshal(entry, &forms) != nil {
+		return []string{fmt.Sprintf("%q: neither a string nor plural forms", singular)}
+	}
+	if plural == "" {
+		plural = singular
+	}
+	for form, text := range forms {
+		if form == "one" {
+			check(form, singular, text)
+		} else {
+			check(form, plural, text)
+		}
+	}
+	return problems
+}
+
+func TestCatalogTranslationsKeepEveryVerb(t *testing.T) {
+	used := msgids{}
+	templateMsgids(t, used)
+	codeMsgids(t, used)
+	for locale := range requiredPluralForms {
+		raw, err := fs.ReadFile(locales.FS, locale+".json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var catalog map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &catalog); err != nil {
+			t.Fatalf("%s.json: %v", locale, err)
+		}
+		for msgid, entry := range catalog {
+			for _, problem := range verbMismatches(msgid, used[msgid], entry) {
+				t.Errorf("%s: %s", locale, problem)
+			}
+		}
+	}
+}
+
+// Proof the parity check bites, on hand-built entries.
+func TestVerbParityCheckerCatchesBadEntries(t *testing.T) {
+	bad := map[string]struct{ singular, plural, entry string }{
+		"dropped verb":     {"Deleted %d record.", "Deleted %d records.", `{"one": "Un enregistrement supprimé.", "other": "%d enregistrements supprimés."}`},
+		"retyped verb":     {"%s applied", "", `"%d appliqué"`},
+		"extra verb":       {"Save", "", `"Enregistrer %s"`},
+		"wrong index":      {"%s of %d", "", `"%[1]s sur %[1]d"`},
+		"plural form lost": {"%d row", "%d rows", `{"one": "%d ligne", "other": "lignes"}`},
+	}
+	for name, c := range bad {
+		if len(verbMismatches(c.singular, c.plural, json.RawMessage(c.entry))) == 0 {
+			t.Errorf("%s: not flagged", name)
+		}
+	}
+	good := map[string]struct{ singular, plural, entry string }{
+		"same verbs":      {"%s of %d", "", `"%s sur %d"`},
+		"reordered":       {"%s of %d", "", `"%[2]d : %[1]s"`},
+		"literal percent": {"100%% done", "", `"100 %% fait"`},
+		"plural":          {"%d row", "%d rows", `{"one": "%d ligne", "other": "%d lignes"}`},
+	}
+	for name, c := range good {
+		if problems := verbMismatches(c.singular, c.plural, json.RawMessage(c.entry)); len(problems) != 0 {
+			t.Errorf("%s: wrongly flagged: %v", name, problems)
 		}
 	}
 }
