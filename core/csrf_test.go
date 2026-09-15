@@ -71,4 +71,18 @@ func TestSafeRedirectPath(t *testing.T) {
 			t.Errorf("%s: SafeRedirectPath(%q) = %q, want %q", tc.name, tc.referer, got, tc.want)
 		}
 	}
+
+	// Mounted at the root every path is "under" the base, so a path that
+	// a browser reads as protocol-relative ("//host", or "/\host", as
+	// browsers treat "\" like "/") must be refused on its own.
+	for referer, want := range map[string]string{
+		"https://admin.example.com//evil.example/x":  "/",
+		"https://admin.example.com/\\evil.example/x": "/",
+		"/\\evil.example/x":                          "/",
+		"https://admin.example.com/users?page=2":     "/users?page=2",
+	} {
+		if got := SafeRedirectPath(referer, host, "", "/"); got != want {
+			t.Errorf("root mount: SafeRedirectPath(%q) = %q, want %q", referer, got, want)
+		}
+	}
 }

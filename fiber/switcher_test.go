@@ -116,3 +116,20 @@ func TestLocaleCookieIsSecureOverHTTPS(t *testing.T) {
 		t.Errorf("over plain HTTP the cookie must not be Secure, got %q", cookie)
 	}
 }
+
+// Mounted at the site root, a same-host Referer whose path starts with
+// "//" would otherwise redirect the browser off-site.
+func TestLocaleSwitchAtTheRootRefusesAProtocolRelativePath(t *testing.T) {
+	ua := newTestUserAdmin()
+	app := fiber.New()
+	if err := Mount(app, core.New(core.WithModelAdmins(ua)), ""); err != nil {
+		t.Fatal(err)
+	}
+	resp := doPostForm(t, app, "/locale", url.Values{"locale": {"fr"}}, map[string]string{"Referer": "http://example.com//evil.example/x"})
+	if resp.StatusCode != 303 {
+		t.Fatalf("got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Location"); got != "/" {
+		t.Errorf("Location = %q, want the admin root", got)
+	}
+}

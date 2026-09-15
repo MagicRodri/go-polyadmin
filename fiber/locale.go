@@ -94,7 +94,9 @@ func handleLocalePost(i18n *core.I18n, basePath string) fiber.Handler {
 			})
 		}
 		// The Referer is attacker-controlled -- see core.SafeRedirectPath.
-		return redirectTo(c, core.SafeRedirectPath(c.Get("Referer"), string(c.Request().Host()), basePath, basePath))
+		// The fallback is the admin root: "/" when mounted at the site root.
+		root := cookiePath(basePath)
+		return redirectTo(c, core.SafeRedirectPath(c.Get("Referer"), string(c.Request().Host()), basePath, root))
 	}
 }
 

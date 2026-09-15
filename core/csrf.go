@@ -71,6 +71,12 @@ func SafeRedirectPath(referer, host, basePath, fallback string) string {
 	if parsed.Host != "" && parsed.Host != host {
 		return fallback
 	}
+	// A path a browser reads as protocol-relative: "//evil.example/x", or
+	// "/\\evil.example/x" (browsers treat "\\" like "/"). Under a root
+	// mount every path passes the base check below, so refuse these first.
+	if strings.HasPrefix(parsed.Path, "//") || strings.HasPrefix(parsed.Path, "/\\") {
+		return fallback
+	}
 	// Exact match, or a child path -- "/adminX" must not pass for "/admin".
 	if parsed.Path != basePath && !strings.HasPrefix(parsed.Path, basePath+"/") {
 		return fallback
