@@ -63,3 +63,54 @@ func TestUnparseableDateFallsBackToText(t *testing.T) {
 		t.Errorf("got %s", got)
 	}
 }
+
+func renderInput(t *testing.T, fieldType core.FieldType, value any) string {
+	t.Helper()
+	r, err := NewRenderer(core.New(), "/admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.formInputHTML("/admin", core.NewField("X", fieldType), value, nil, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(got)
+}
+
+// A date or datetime-local input discards any value that isn't its own
+// ISO form, so a time.Time must be filled in as exactly that -- and the
+// zero time, which no host means as a real date, as empty.
+func TestDateInputsAreFilledWithTheirISOForm(t *testing.T) {
+	loc := time.FixedZone("x", 2*60*60)
+	cases := []struct {
+		fieldType core.FieldType
+		value     any
+		want      string
+	}{
+		{core.FieldTypeDate, time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC), `value="2019-03-01"`},
+		{core.FieldTypeDateTime, time.Date(2019, 3, 1, 9, 5, 30, 0, loc), `value="2019-03-01T09:05"`},
+		{core.FieldTypeDate, time.Time{}, `value=""`},
+		{core.FieldTypeDateTime, time.Time{}, `value=""`},
+		{core.FieldTypeDate, "2019-03-01", `value="2019-03-01"`},
+	}
+	for _, c := range cases {
+		if got := renderInput(t, c.fieldType, c.value); !strings.Contains(got, c.want) {
+			t.Errorf("%s %v: want %s in\n%s", c.fieldType, c.value, c.want, got)
+		}
+	}
+}
+
+func TestZeroTimeRendersAsEmpty(t *testing.T) {
+	for _, fieldType := range []core.FieldType{core.FieldTypeDate, core.FieldTypeDateTime} {
+		if got := renderValue(t, fieldType, time.Time{}); strings.Contains(got, "0001") || !strings.Contains(got, core.DefaultEmptyValue) {
+			t.Errorf("%s: the zero time should show as empty, got %s", fieldType, got)
+		}
+	}
+}
+
+func TestInlineDateCellIsFilledWithItsISOForm(t *testing.T) {
+	got := string(inlineTableCellHTML("/admin", core.NewField("X", core.FieldTypeDate), time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC), nil, nil))
+	if !strings.Contains(got, `value="2019-03-01"`) {
+		t.Errorf("got %s", got)
+	}
+}

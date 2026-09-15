@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -191,5 +192,85 @@ func TestUpdateOrganizationRejectsGarbageAndKeepsOriginalValues(t *testing.T) {
 	}
 	if !org.Founded.Equal(original) || org.Balance != 100 {
 		t.Errorf("a rejected update must not change the record, got Founded=%v Balance=%v", org.Founded, org.Balance)
+	}
+}
+
+// getOrganizationPage GETs an admin page and returns its body.
+func getOrganizationPage(t *testing.T, app *fiber.App, path string) string {
+	t.Helper()
+	resp, err := app.Test(httptest.NewRequest("GET", path, nil), -1)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("GET %s: got %d, want 200", path, resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	return string(body)
+}
+
+var foundedInputValue = regexp.MustCompile(`name="Founded"\s+value="([^"]*)"`)
+
+// foundedFormValue is what the edit form's Founded input would post back
+// untouched: the value its <input type="date"> was filled with.
+func foundedFormValue(t *testing.T, body string) string {
+	t.Helper()
+	m := foundedInputValue.FindStringSubmatch(body)
+	if m == nil {
+		t.Fatalf("the edit form has no Founded input:\n%s", body)
+	}
+	return m[1]
+}
+
+func TestEditFormFillsFoundedWithAnISODate(t *testing.T) {
+	app, repo := newOrganizationTestApp(t)
+	org := repo.Create("Acme", time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC), 100)
+
+	body := getOrganizationPage(t, app, "/admin/organizations/"+strconv.Itoa(org.ID)+"/edit")
+	if !strings.Contains(body, `value="2019-03-01"`) {
+		t.Errorf("an <input type=date> only accepts YYYY-MM-DD; got Founded=%q", foundedFormValue(t, body))
+	}
+}
+
+func TestEditingWithoutTouchingFoundedKeepsIt(t *testing.T) {
+	app, repo := newOrganizationTestApp(t)
+	founded := time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC)
+	org := repo.Create("Acme", founded, 100)
+	path := "/admin/organizations/" + strconv.Itoa(org.ID) + "/edit"
+
+	form := url.Values{"Name": {"Acme Renamed"}, "Founded": {foundedFormValue(t, getOrganizationPage(t, app, path))}, "Balance": {"100"}}
+	resp := postOrganizationForm(t, app, path, form)
+	if resp.StatusCode != fiber.StatusSeeOther {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("update: got %d, want %d (redirect); body:\n%s", resp.StatusCode, fiber.StatusSeeOther, body)
+	}
+	if !org.Founded.Equal(founded) {
+		t.Errorf("Founded = %v, want it kept at %v", org.Founded, founded)
+	}
+}
+
+func TestZeroFoundedShowsAndRoundTripsAsEmpty(t *testing.T) {
+	app, repo := newOrganizationTestApp(t)
+	org := repo.Create("Acme", time.Time{}, 100)
+	id := strconv.Itoa(org.ID)
+
+	for _, path := range []string{"/admin/organizations", "/admin/organizations/" + id} {
+		if body := getOrganizationPage(t, app, path); strings.Contains(body, "0001-01-01") {
+			t.Errorf("%s shows the zero time as a date", path)
+		}
+	}
+	edit := "/admin/organizations/" + id + "/edit"
+	if got := foundedFormValue(t, getOrganizationPage(t, app, edit)); got != "" {
+		t.Errorf("edit form Founded = %q, want empty", got)
+	}
+	form := url.Values{"Name": {"Acme"}, "Founded": {""}, "Balance": {"100"}}
+	if resp := postOrganizationForm(t, app, edit, form); resp.StatusCode != fiber.StatusSeeOther {
+		t.Fatalf("update: got %d, want %d (redirect)", resp.StatusCode, fiber.StatusSeeOther)
+	}
+	if !org.Founded.IsZero() {
+		t.Errorf("Founded = %v, want it still empty", org.Founded)
 	}
 }

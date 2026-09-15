@@ -150,7 +150,7 @@ func inlineTableCellHTML(basePath string, field core.Field, value any, errs []st
 
 	default:
 		fmt.Fprintf(&b, `<input type="%s" name="%s" value="%s" autocomplete="off" class="%s">`,
-			inputTypeFor(field.Type), name, html.EscapeString(stringOrEmpty(value)), fieldClasses)
+			inputTypeFor(field.Type), name, html.EscapeString(inputValue(field.Type, value)), fieldClasses)
 	}
 	for _, e := range errs {
 		fmt.Fprintf(&b, `<p class="mt-0.5 %s">%s</p>`, classTextError, html.EscapeString(e))

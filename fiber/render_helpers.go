@@ -39,12 +39,18 @@ var (
 	classLink        = mustUI("text", "link")
 )
 
-// isBlank reports whether a value is an empty string. Only strings:
-// a zero int or a false bool are real values, and showing a dash for
-// them would be a lie.
+// isBlank reports whether a value is an empty string or the zero
+// time.Time. A zero int or a false bool are real values, and showing a
+// dash for them would be a lie; the zero time (0001-01-01) is how a
+// non-pointer time.Time field says "not set", never a real date.
 func isBlank(value any) bool {
-	str, ok := value.(string)
-	return ok && strings.TrimSpace(str) == ""
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v) == ""
+	case time.Time:
+		return v.IsZero()
+	}
+	return false
 }
 
 // fieldValueHTML renders a field's read-only value for list and detail,
@@ -255,7 +261,7 @@ func (r *Renderer) formInputHTML(basePath string, field core.Field, value any, e
 		"HelpText":      field.HelpText,
 		"Type":          string(field.Type),
 		"InputType":     inputTypeFor(field.Type),
-		"StringValue":   stringOrEmpty(value),
+		"StringValue":   inputValue(field.Type, value),
 		"Errors":        errs,
 		"BasePath":      basePath,
 	}
@@ -314,6 +320,25 @@ func (r *Renderer) formInputHTML(basePath string, field core.Field, value any, e
 	}
 
 	return r.uiHTML("ui/field", data)
+}
+
+// inputValue is a field's value as its form control's value attribute.
+// A date or datetime-local input discards anything but its own ISO form
+// (and fmt.Sprint of a time.Time is not that), so a time.Time is written
+// as YYYY-MM-DD or YYYY-MM-DDTHH:MM in its own zone -- the wall-clock
+// time, as the input shows it -- and the zero time as empty.
+func inputValue(fieldType core.FieldType, value any) string {
+	if v, ok := value.(time.Time); ok {
+		switch {
+		case v.IsZero():
+			return ""
+		case fieldType == core.FieldTypeDate:
+			return v.Format("2006-01-02")
+		case fieldType == core.FieldTypeDateTime:
+			return v.Format("2006-01-02T15:04")
+		}
+	}
+	return stringOrEmpty(value)
 }
 
 func stringOrEmpty(value any) string {
