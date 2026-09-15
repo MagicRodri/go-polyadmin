@@ -147,7 +147,8 @@ func WithLocaleNames(names map[string]string) Option {
 }
 
 // WithoutLocaleSwitcher hides the language switcher and unmounts its
-// route -- for hosts that force a locale through a LocaleResolver.
+// route -- for hosts that force a locale through a LocaleResolver. With
+// it, a leftover admin_locale cookie no longer affects the locale.
 func WithoutLocaleSwitcher() Option {
 	return func(a *Admin) { a.DisableLocaleSwitcher = true }
 }

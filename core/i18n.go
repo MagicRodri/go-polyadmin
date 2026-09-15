@@ -34,7 +34,9 @@ type Translator interface {
 }
 
 // LocaleResolver lets the host pick a request's locale -- from a stored
-// user preference, say. principal is nil on the login and error pages.
+// user preference, say. principal is the request's authenticated
+// principal on every page, the login and error pages included; it is nil
+// only when the request has no session or no Authenticator is configured.
 // An empty or unsupported result falls through to Accept-Language.
 type LocaleResolver func(request any, principal *Principal) string
 

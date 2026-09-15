@@ -174,6 +174,21 @@ actions, a dashboard, exports), see
 theming, [`docs/components.md`](docs/components.md); and for the rest,
 [`docs/`](docs/).
 
+## Languages
+
+French and Russian are **on by default** next to English: a visitor
+whose browser asks for either gets the admin's own text in it, and the
+language switcher appears in the header. Their catalogs are **drafts,
+awaiting review by native speakers** — corrections are welcome. To keep
+an admin English-only, restrict the supported set:
+
+```go
+admin := core.New(core.WithLocales("en"), /* ... */)
+```
+
+See [`docs/i18n.md`](docs/i18n.md) for the rest: translating your own
+strings, the switcher, and how a request's language is chosen.
+
 ## Upgrading: CSRF protection
 
 Every mutating route now requires a CSRF token, on by default. The
