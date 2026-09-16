@@ -28,6 +28,8 @@ permissions) and you get:
   records that point back at it, Django-admin style
 - Record and bulk Actions, with a shadcn/ui Dialog confirmation step for
   destructive ones
+- Delete previews: the confirmation page says what else a delete takes
+  with it, and protected records block it
 - Authentication/authorization hooks gating every route *and* every
   control the templates render
 - CSV and XLSX export
