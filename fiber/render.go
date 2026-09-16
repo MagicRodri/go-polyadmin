@@ -249,11 +249,12 @@ type Renderer struct {
 	// errorPage is the error template for this locale -- see errors.go.
 	errorPage *template.Template
 
-	list      *template.Template
-	detail    *template.Template
-	form      *template.Template
-	deleteTpl *template.Template
-	dashboard *template.Template
+	list              *template.Template
+	detail            *template.Template
+	form              *template.Template
+	deleteTpl         *template.Template
+	deleteSelectedTpl *template.Template
+	dashboard         *template.Template
 	// login renders without layoutFiles: it is the one full page that
 	// is not framed by the admin shell -- see admin/login.html.
 	login          *template.Template
@@ -368,6 +369,9 @@ func newRenderer(admin *core.Admin, i18n *core.I18n, locale, basePath string, te
 		return nil, err
 	}
 	if r.deleteTpl, err = buildTemplate(r.funcs, "admin/resource/delete.html"); err != nil {
+		return nil, err
+	}
+	if r.deleteSelectedTpl, err = buildTemplate(r.funcs, "admin/resource/delete_selected.html"); err != nil {
 		return nil, err
 	}
 	if r.dashboard, err = buildTemplate(r.funcs, "admin/dashboard.html"); err != nil {
@@ -628,13 +632,21 @@ type actionInfo struct {
 	Name    string
 	Label   string
 	Confirm string
+	// Preview is set on delete_selected when the ModelAdmin previews
+	// deletes: the server's confirmation page replaces the modal.
+	Preview bool
 }
 
 func actionInfos(modelAdmin core.ModelAdmin) []actionInfo {
+	previews := core.PreviewsDeletes(modelAdmin)
 	actions := modelAdmin.Actions()
 	out := make([]actionInfo, 0, len(actions))
 	for _, a := range actions {
-		out = append(out, actionInfo{Name: a.Name, Label: a.Label, Confirm: a.Confirm})
+		info := actionInfo{Name: a.Name, Label: a.Label, Confirm: a.Confirm}
+		if previews && a.Name == core.DeleteSelectedName {
+			info.Confirm, info.Preview = "", true
+		}
+		out = append(out, info)
 	}
 	return out
 }

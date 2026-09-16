@@ -234,6 +234,8 @@ var sweepPages = []sweepPage{
 	{area: "detail", name: "detail", path: "/admin/users/1", app: sweepMainApp},
 	{area: "detail", name: "delete", path: "/admin/users/1/delete", app: sweepMainApp},
 	{area: "detail", name: "delete preview", path: "/admin/users/1/delete", app: sweepPreviewApp},
+	{area: "detail", name: "delete_selected confirmation", path: "/admin/users/actions/delete_selected", method: "POST",
+		form: url.Values{"pks": {"1"}}, app: sweepPreviewApp},
 	{area: "detail", name: "inline detail", path: "/admin/organizations/1", app: sweepInlineApp},
 	{area: "detail", name: "dashboard", path: "/admin/", app: sweepMainApp},
 	{area: "errors", name: "not found", path: "/admin/users/999", app: sweepMainApp},

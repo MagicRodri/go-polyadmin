@@ -17,10 +17,11 @@ func TestTemplateTreeMatchesThePythonImplementationPathForPath(t *testing.T) {
 		"admin/dashboard.html": true,
 		"admin/error.html":     true,
 
-		"admin/resource/list.html":   true,
-		"admin/resource/detail.html": true,
-		"admin/resource/form.html":   true,
-		"admin/resource/delete.html": true,
+		"admin/resource/list.html":            true,
+		"admin/resource/detail.html":          true,
+		"admin/resource/form.html":            true,
+		"admin/resource/delete_selected.html": true,
+		"admin/resource/delete.html":          true,
 
 		"admin/components/list_content.html":         true,
 		"admin/components/search.html":               true,

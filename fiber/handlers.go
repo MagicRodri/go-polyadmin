@@ -547,7 +547,7 @@ func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Rend
 // the objects named by the "pks" form field. One route for both entry
 // points: the list's bulk-select form posts every checked row, a detail
 // page's action button posts a single-item "pks".
-func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string) fiber.Handler {
+func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
 	slug := modelAdmin.Slug()
 	return func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.ResourcePermission(slug, "view"), modelAdmin)
@@ -565,10 +565,16 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 		}
 
 		raw := c.Context().PostArgs().PeekMulti("pks")
-		// The Referer is attacker-controlled, so it is validated before
-		// being used as a redirect target -- see core.SafeRedirectPath.
-		redirectTarget := core.SafeRedirectPath(
-			c.Get("Referer"), string(c.Request().Host()), basePath, basePath+"/"+slug)
+		// The Referer is attacker-controlled, so it is validated before being
+		// used as a redirect target -- see core.SafeRedirectPath. A confirmed
+		// delete_selected posts from its own confirmation page, so it carries
+		// the original target in _return instead (validated the same way).
+		host := string(c.Request().Host())
+		fallback := basePath + "/" + slug
+		redirectTarget := core.SafeRedirectPath(c.Get("Referer"), host, basePath, fallback)
+		if back := formValue(c, returnField); back != "" {
+			redirectTarget = core.SafeRedirectPath(back, host, basePath, fallback)
+		}
 
 		// "Select all N matching" posts the filters instead of the pks: a
 		// checkbox only reaches the rows on screen. The set is resolved server-
@@ -603,6 +609,12 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string
 		if len(objects) == 0 {
 			setFlash(c, "warning", tr(c, "No items selected."))
 			return redirectTo(c, redirectTarget)
+		}
+		if action.Name == core.DeleteSelectedName && core.PreviewsDeletes(modelAdmin) {
+			done, err := confirmDeleteSelected(c, admin, modelAdmin, renderers.For(c), principal, objects, selectAll, redirectTarget)
+			if done || err != nil {
+				return err
+			}
 		}
 		message, err := action.Handler(c.Context(), modelAdmin, objects, principal)
 		if err != nil {

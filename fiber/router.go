@@ -135,7 +135,7 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		if modelAdmin.CanView() {
 			router.Get(prefix+"/lookup", handleLookup(admin, modelAdmin, renderers, basePath))
 			if len(modelAdmin.Actions()) > 0 {
-				router.Post(prefix+"/actions/:name", handleAction(admin, modelAdmin, basePath))
+				router.Post(prefix+"/actions/:name", handleAction(admin, modelAdmin, renderers, basePath))
 			}
 			router.Get(prefix+"/:pk", handleDetail(admin, modelAdmin, renderers, basePath))
 		}

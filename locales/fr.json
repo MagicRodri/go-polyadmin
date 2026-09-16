@@ -39,6 +39,10 @@
   "Dark mode": "Mode sombre",
   "Dashboard": "Tableau de bord",
   "Delete": "Supprimer",
+  "Delete %d record?": {
+    "one": "Supprimer %d enregistrement ?",
+    "other": "Supprimer %d enregistrements ?"
+  },
   "Delete %s": "Supprimer %s",
   "Delete selected": "Supprimer la sélection",
   "Delete the selected records? This cannot be undone.": "Supprimer les enregistrements sélectionnés ? Cette action est irréversible.",
@@ -102,6 +106,7 @@
     "one": "Sélectionner le %d élément correspondant",
     "other": "Sélectionner tous les %d éléments correspondants"
   },
+  "Selected records": "Enregistrements sélectionnés",
   "Select…": "Sélectionner…",
   "Sign in": "Se connecter",
   "Sign in to %s": "Se connecter à %s",
@@ -120,6 +125,7 @@
     "one": "Le %d de cette page est sélectionné.",
     "other": "Tous les %d de cette page sont sélectionnés."
   },
+  "The selection changed since you reviewed it.": "La sélection a changé depuis votre vérification.",
   "These records must be removed first:": "Ces enregistrements doivent d'abord être supprimés :",
   "This action cannot be undone.": "Cette action est irréversible.",
   "This can't be deleted": "Suppression impossible",

@@ -40,7 +40,7 @@
          class="{{ui "combobox" "content"}} w-48">
       {{range .Actions}}
       <div role="option" tabindex="0"
-           data-url="{{$.BasePath}}/{{$.Slug}}/actions/{{.Name}}" {{if .Confirm}}data-confirm="{{t .Confirm}}"{{end}}
+           data-url="{{$.BasePath}}/{{$.Slug}}/actions/{{.Name}}" {{if .Confirm}}data-confirm="{{t .Confirm}}"{{end}} {{if .Preview}}data-preview{{end}}
            @click="label = $el.textContent.trim(); open = false;
                    let form = $el.closest('form');
                    form.action = $el.dataset.url;

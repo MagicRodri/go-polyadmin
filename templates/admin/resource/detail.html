@@ -52,7 +52,7 @@
              grandchild -- the stretch stops at the <form> -- and would
              otherwise sit stunted beside a full-width Edit. */}}
         <form method="post" action="{{$.BasePath}}/{{$.Slug}}/actions/{{.Name}}"
-              {{if .Confirm}}data-confirm="{{t .Confirm}}"{{end}}
+              {{if .Confirm}}data-confirm="{{t .Confirm}}"{{end}} {{if .Preview}}data-preview{{end}}
               onsubmit="return window.adminConfirmSubmit(event, this, this.dataset.confirm)">
           {{template "csrf-field" $.CSRFToken}}
           <input type="hidden" name="pks" value="{{$.PK}}">

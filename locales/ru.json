@@ -47,6 +47,12 @@
   "Dark mode": "Тёмная тема",
   "Dashboard": "Панель управления",
   "Delete": "Удалить",
+  "Delete %d record?": {
+    "few": "Удалить %d записи?",
+    "many": "Удалить %d записей?",
+    "one": "Удалить %d запись?",
+    "other": "Удалить %d записи?"
+  },
   "Delete %s": "Удалить %s",
   "Delete selected": "Удалить выбранное",
   "Delete the selected records? This cannot be undone.": "Удалить выбранные записи? Это действие нельзя отменить.",
@@ -114,6 +120,7 @@
     "one": "Выбрать %d совпадающую запись",
     "other": "Выбрать все %d совпадающие записи"
   },
+  "Selected records": "Выбранные записи",
   "Select…": "Выбрать…",
   "Sign in": "Войти",
   "Sign in to %s": "Войти в %s",
@@ -136,6 +143,7 @@
     "one": "%d запись на этой странице выбрана.",
     "other": "Все %d записи на этой странице выбраны."
   },
+  "The selection changed since you reviewed it.": "Выбор изменился с момента проверки.",
   "These records must be removed first:": "Сначала нужно удалить эти записи:",
   "This action cannot be undone.": "Это действие нельзя отменить.",
   "This can't be deleted": "Удаление невозможно",

@@ -1,0 +1,46 @@
+{{define "content"}}
+<form method="post" action="{{.BasePath}}/{{.CurrentSlug}}/actions/delete_selected" class="{{ui "panel" "form"}}">
+  {{template "csrf-field" .CSRFToken}}
+  <input type="hidden" name="_confirmed" value="1">
+  <input type="hidden" name="_return" value="{{.Selection.Return}}">
+  {{if .Selection.SelectAll}}
+  <input type="hidden" name="_select_all" value="1">
+  <input type="hidden" name="_fingerprint" value="{{.Selection.Fingerprint}}">
+  <input type="hidden" name="search" value="{{.Selection.List.Search}}">
+  <input type="hidden" name="sort" value="{{.Selection.List.Ordering}}">
+  {{range $name, $value := .Selection.List.Filters}}<input type="hidden" name="filter[{{$name}}]" value="{{$value}}">
+  {{end}}
+  {{else}}
+  {{range .Selection.PKs}}<input type="hidden" name="pks" value="{{.}}">
+  {{end}}
+  {{end}}
+  {{if .Selection.Changed}}
+  <div role="alert" class="{{ui "alert" "destructive"}} mb-4"><p class="{{ui "alert" "description"}}">{{t "The selection changed since you reviewed it."}}</p></div>
+  {{end}}
+  <div class="flex items-start gap-3">
+    <span class="inline-flex shrink-0 items-center justify-center rounded-full bg-destructive/10 p-2 text-destructive">
+      {{icon "delete" "w-5 h-5"}}
+    </span>
+    <div class="mt-1.5">
+      <p class="{{ui "text" "heading"}}">{{.Heading}}</p>
+      <p class="mt-1 text-sm text-muted-foreground">{{t "This action cannot be undone."}}</p>
+    </div>
+  </div>
+  <section class="{{ui "panel"}} mt-4">
+    <h3 class="{{ui "text" "heading"}}">{{t "Selected records"}}</h3>
+    <ul class="mt-2 flex flex-col gap-1 text-sm">
+      {{range .Items}}
+      <li>{{if .URL}}<a href="{{.URL}}" class="{{ui "text" "link"}}">{{.Label}}</a>{{else}}{{.Label}}{{end}}</li>
+      {{end}}
+      {{if .More}}<li class="{{ui "text" "muted"}}">{{tn "…and %d more" "…and %d more" .More .More}}</li>{{end}}
+    </ul>
+  </section>
+  {{template "ui/delete-preview" .Preview}}
+  <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+    {{if not .Preview.Blocked}}
+    <button type="submit" id="delete-confirm" class="{{ui "button" "destructive"}}">{{icon "delete" "w-4 h-4"}} {{t "Delete"}}</button>
+    {{end}}
+    <a href="{{.Selection.Return}}" class="{{ui "button" "outline"}}">{{t "Cancel"}}</a>
+  </div>
+</form>
+{{end}}
