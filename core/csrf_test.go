@@ -76,10 +76,12 @@ func TestSafeRedirectPath(t *testing.T) {
 	// a browser reads as protocol-relative ("//host", or "/\host", as
 	// browsers treat "\" like "/") must be refused on its own.
 	for referer, want := range map[string]string{
-		"https://admin.example.com//evil.example/x":  "/",
-		"https://admin.example.com/\\evil.example/x": "/",
-		"/\\evil.example/x":                          "/",
-		"https://admin.example.com/users?page=2":     "/users?page=2",
+		"https://admin.example.com//evil.example/x":    "/",
+		"https://admin.example.com/\\evil.example/x":   "/",
+		"/\\evil.example/x":                            "/",
+		"https://admin.example.com/users?page=2":       "/users?page=2",
+		"https://admin.example.com/%09/evil.example/x": "/",
+		"https://admin.example.com/%0A/evil.example/x": "/",
 	} {
 		if got := SafeRedirectPath(referer, host, "", "/"); got != want {
 			t.Errorf("root mount: SafeRedirectPath(%q) = %q, want %q", referer, got, want)

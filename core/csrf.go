@@ -77,6 +77,13 @@ func SafeRedirectPath(referer, host, basePath, fallback string) string {
 	if strings.HasPrefix(parsed.Path, "//") || strings.HasPrefix(parsed.Path, "/\\") {
 		return fallback
 	}
+	// url.Parse percent-decodes Path, so "%09" arrives as a tab. Browsers
+	// strip tabs and newlines from a URL, which would turn "/\t/evil.example"
+	// back into "//evil.example" -- off-site. No admin path has a control
+	// character, so refuse any.
+	if strings.IndexFunc(parsed.Path, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
+		return fallback
+	}
 	// Exact match, or a child path -- "/adminX" must not pass for "/admin".
 	if parsed.Path != basePath && !strings.HasPrefix(parsed.Path, basePath+"/") {
 		return fallback

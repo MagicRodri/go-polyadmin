@@ -114,3 +114,10 @@ func TestInlineDateCellIsFilledWithItsISOForm(t *testing.T) {
 		t.Errorf("got %s", got)
 	}
 }
+
+func TestDatetimeInputPadsYearsBelowAThousand(t *testing.T) {
+	got := inputValue(core.FieldTypeDateTime, time.Date(99, 3, 1, 10, 30, 0, 0, time.UTC))
+	if got != "0099-03-01T10:30" {
+		t.Errorf("got %q, want %q", got, "0099-03-01T10:30")
+	}
+}
