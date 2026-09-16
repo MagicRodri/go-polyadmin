@@ -342,6 +342,13 @@ resource's own `.view`. The handler's return value (a string, or `""`)
 becomes the success toast text, falling back to
 `"{label} applied to N record(s)."` when empty.
 
+The built-in **`delete_selected`** is the one exception to the Dialog. On
+a ModelAdmin that implements `core.DeletePreviewer` it opens a
+server-rendered confirmation page instead, listing the selected records
+and what deleting them takes with it — see
+[`deletes.md`](deletes.md). That applies to an action of your own named
+`delete_selected` too: the page is keyed on the name.
+
 ## Templates
 
 `BaseModelAdmin.ListTemplate`/`DetailTemplate`/`FormTemplate`/

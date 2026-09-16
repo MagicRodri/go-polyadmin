@@ -169,7 +169,7 @@ default (fine for exploring locally, not for anything real) — see
 [`docs/authentication.md`](docs/authentication.md) and
 [`docs/permissions.md`](docs/permissions.md) before deploying.
 For everything else a `ModelAdmin` supports (relations, filters,
-actions, a dashboard, exports), see
+actions, a dashboard, exports, delete previews), see
 [`docs/model-admin.md`](docs/model-admin.md); for the UI components and
 theming, [`docs/components.md`](docs/components.md); and for the rest,
 [`docs/`](docs/).
@@ -210,7 +210,9 @@ to opt out.
 
 Feature-complete: CRUD, search/filter/sort/pagination, relations +
 autocomplete, record/bulk Actions, a dashboard, CSV and XLSX export,
-an optional login page, an optional audit log, flash-message toasts,
+delete previews (see what a delete takes with it; protected records
+block it), an optional login page, an optional audit log,
+flash-message toasts,
 and per-resource/per-widget template overrides. The API is idiomatic Go
 — see the package doc comments in `core/*.go` and `fiber/*.go` for
 specifics (functional options, `BaseModelAdmin` embedding instead of
