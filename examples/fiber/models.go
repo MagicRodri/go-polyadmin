@@ -44,6 +44,8 @@ func (r *OrganizationRepository) Create(name string, founded time.Time, balance 
 	return o
 }
 
+func (r *OrganizationRepository) Delete(o *Organization) { delete(r.organizations, o.ID) }
+
 func (r *OrganizationRepository) Update(o *Organization, name string, founded time.Time, balance float64) *Organization {
 	o.Name = name
 	o.Founded = founded
@@ -84,6 +86,8 @@ func (r *RoleRepository) List() []*Role {
 }
 
 func (r *RoleRepository) Get(pk int) *Role { return r.roles[pk] }
+
+func (r *RoleRepository) Delete(role *Role) { delete(r.roles, role.ID) }
 
 func (r *RoleRepository) Create(name string) *Role {
 	role := &Role{ID: r.nextID, Name: name}
@@ -149,6 +153,18 @@ func (r *UserRepository) Update(u *User, email string, isActive bool, plan strin
 
 func (r *UserRepository) Delete(u *User) {
 	delete(r.users, u.ID)
+}
+
+// Matching returns the users keep accepts, in ID order -- the repository
+// is a map, and a preview's sample should not reshuffle between requests.
+func (r *UserRepository) Matching(keep func(*User) bool) []*User {
+	var out []*User
+	for id := 1; id < r.nextID; id++ {
+		if u := r.users[id]; u != nil && keep(u) {
+			out = append(out, u)
+		}
+	}
+	return out
 }
 
 func seed(users *UserRepository, organizations *OrganizationRepository, roles *RoleRepository) {

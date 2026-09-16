@@ -35,7 +35,7 @@ func newOrganizationTestApp(t *testing.T) (*fiber.App, *OrganizationRepository) 
 	users := NewUserRepository()
 	roles := NewRoleRepository()
 	admin := core.New(core.WithModelAdmins(
-		NewOrganizationAdmin(repo),
+		NewOrganizationAdmin(repo, users),
 		NewUserAdmin(users, repo, roles),
 	))
 	app := fiber.New()

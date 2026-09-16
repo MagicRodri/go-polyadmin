@@ -128,7 +128,7 @@ func main() {
 	// against an identity anyone actually proved.
 	sessions := NewCookieSessionBackend()
 	options := []core.Option{
-		core.WithModelAdmins(NewUserAdmin(users, organizations, roles), NewOrganizationAdmin(organizations), NewRoleAdmin(roles)),
+		core.WithModelAdmins(NewUserAdmin(users, organizations, roles), NewOrganizationAdmin(organizations, users), NewRoleAdmin(roles, users)),
 		core.WithDashboard(dashboard),
 		core.WithAuthenticator(sessions),
 		core.WithLoginBackend(sessions),

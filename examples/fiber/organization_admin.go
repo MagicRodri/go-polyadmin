@@ -12,9 +12,10 @@ import (
 type OrganizationAdmin struct {
 	core.BaseModelAdmin
 	repository *OrganizationRepository
+	users      *UserRepository
 }
 
-func NewOrganizationAdmin(repository *OrganizationRepository) *OrganizationAdmin {
+func NewOrganizationAdmin(repository *OrganizationRepository, users *UserRepository) *OrganizationAdmin {
 	return &OrganizationAdmin{
 		BaseModelAdmin: core.BaseModelAdmin{
 			ModelName:        "Organization",
@@ -33,6 +34,7 @@ func NewOrganizationAdmin(repository *OrganizationRepository) *OrganizationAdmin
 			DeclaredInlines: []core.Inline{core.NewTabularInline("users", "Organization")},
 		},
 		repository: repository,
+		users:      users,
 	}
 }
 
@@ -128,4 +130,32 @@ func validBalance(ctx context.Context, value any) error {
 		return errors.New("Enter a valid number.")
 	}
 	return nil
+}
+
+// DeletePreview: an organization's users go with it (see Delete). The
+// admin shows this before anyone confirms -- docs/deletes.md.
+func (a *OrganizationAdmin) DeletePreview(ctx context.Context, objects []any) (core.DeletePreview, error) {
+	members := a.members(objects)
+	sample := make([]any, len(members))
+	for i, u := range members {
+		sample[i] = u
+	}
+	return core.DeletePreview{Cascades: []core.DeleteGroup{{Resource: "users", Objects: sample, Total: len(members)}}}, nil
+}
+
+func (a *OrganizationAdmin) Delete(ctx context.Context, obj any) error {
+	org := obj.(*Organization)
+	for _, u := range a.members([]any{org}) {
+		a.users.Delete(u)
+	}
+	a.repository.Delete(org)
+	return nil
+}
+
+func (a *OrganizationAdmin) members(objects []any) []*User {
+	doomed := make(map[int]bool, len(objects))
+	for _, obj := range objects {
+		doomed[obj.(*Organization).ID] = true
+	}
+	return a.users.Matching(func(u *User) bool { return u.Organization != nil && doomed[u.Organization.ID] })
 }
