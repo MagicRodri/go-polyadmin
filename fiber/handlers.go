@@ -408,7 +408,11 @@ func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *R
 		if !authorizeObject(admin, principal, core.ResourcePermission(slug, "delete"), obj) {
 			return writeForbidden(c, admin, basePath)
 		}
-		html, err := renderer.RenderDelete(principal, csrfToken(c), modelAdmin, obj)
+		preview, err := resolveForDelete(c, admin, modelAdmin, principal, []any{obj})
+		if err != nil {
+			return err
+		}
+		html, err := renderer.RenderDelete(principal, csrfToken(c), modelAdmin, obj, preview)
 		if err != nil {
 			return err
 		}
@@ -431,6 +435,15 @@ func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 		if !core.IsNil(obj) {
 			if !authorizeObject(admin, principal, core.ResourcePermission(slug, "delete"), obj) {
 				return writeForbidden(c, admin, basePath)
+			}
+			preview, err := resolveForDelete(c, admin, modelAdmin, principal, []any{obj})
+			if err != nil {
+				return err
+			}
+			if preview.Blocked {
+				// Back to the delete page, which says why. redirectTo sends
+				// HX-Redirect for the htmx route, a 303 otherwise.
+				return redirectTo(c, fmt.Sprintf("%s/%s/%v/delete", basePath, slug, modelAdmin.GetPK(obj)))
 			}
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
 				return err
@@ -459,6 +472,15 @@ func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 		if !core.IsNil(obj) {
 			if !authorizeObject(admin, principal, core.ResourcePermission(slug, "delete"), obj) {
 				return writeForbidden(c, admin, basePath)
+			}
+			preview, err := resolveForDelete(c, admin, modelAdmin, principal, []any{obj})
+			if err != nil {
+				return err
+			}
+			if preview.Blocked {
+				// Back to the delete page, which says why. redirectTo sends
+				// HX-Redirect for the htmx route, a 303 otherwise.
+				return redirectTo(c, fmt.Sprintf("%s/%s/%v/delete", basePath, slug, modelAdmin.GetPK(obj)))
 			}
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
 				return err
@@ -743,6 +765,22 @@ func handleInlineDelete(admin *core.Admin, modelAdmin core.ModelAdmin, renderers
 			return err
 		}
 		if !core.IsNil(childObj) {
+			preview, err := resolveForDelete(c, admin, childAdmin, principal, []any{childObj})
+			if err != nil {
+				return err
+			}
+			if preview.Blocked {
+				// 200 with the rebuilt section and the reason on top: htmx
+				// would drop a 4xx body, and a redirect would lose the
+				// parent form's unsaved edits.
+				refusal := renderer.deletePreviewView(preview)
+				html, err := renderer.renderInlineSection(principal, modelAdmin, parentObj, inline, nil, nil, nil, &refusal)
+				if err != nil {
+					return err
+				}
+				c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
+				return c.SendString(html)
+			}
 			if err := childAdmin.Delete(c.Context(), childObj); err != nil {
 				return err
 			}

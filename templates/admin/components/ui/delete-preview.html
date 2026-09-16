@@ -1,0 +1,37 @@
+{{/* The delete preview (docs/deletes.md): what else a delete takes out,
+     and why it may be refused. The delete page and the delete_selected
+     confirmation page render "ui/delete-preview"; an inline section whose
+     Remove was refused renders "ui/delete-refusal" on its own. */}}
+{{define "ui/delete-group"}}
+<section class="{{ui "panel"}}">
+  <h3 class="{{ui "text" "heading"}}">{{.Heading}}</h3>
+  <ul class="mt-2 flex flex-col gap-1 text-sm">
+    {{range .Items}}
+    <li>{{if .URL}}<a href="{{.URL}}" class="{{ui "text" "link"}}">{{.Label}}</a>{{else}}{{.Label}}{{end}}</li>
+    {{end}}
+    {{if .More}}<li class="{{ui "text" "muted"}}">{{tn "…and %d more" "…and %d more" .More .More}}</li>{{end}}
+    {{if .Hidden}}<li class="{{ui "text" "muted"}}">{{tn "%d you can't view" "%d you can't view" .Hidden .Hidden}}</li>{{end}}
+  </ul>
+</section>
+{{end}}
+
+{{define "ui/delete-refusal"}}
+<div role="alert" class="{{ui "alert" "destructive"}}">
+  <p class="{{ui "alert" "title"}}">{{t "This can't be deleted"}}</p>
+  {{if .Denied}}<p class="{{ui "alert" "description"}}">{{t "Your account doesn't have permission to delete: %s" .Denied}}</p>{{end}}
+  {{if .Protected}}
+  <p class="{{ui "alert" "description"}} mt-2">{{t "These records must be removed first:"}}</p>
+  <div class="mt-2 flex flex-col gap-2">{{range .Protected}}{{template "ui/delete-group" .}}{{end}}</div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "ui/delete-preview"}}
+{{if .Cascades}}
+<div class="mt-4">
+  <h2 class="{{ui "text" "heading"}}">{{t "This will also delete"}}</h2>
+  <div class="mt-2 flex flex-col gap-2">{{range .Cascades}}{{template "ui/delete-group" .}}{{end}}</div>
+</div>
+{{end}}
+{{if .Blocked}}<div class="mt-4">{{template "ui/delete-refusal" .}}</div>{{end}}
+{{end}}

@@ -326,7 +326,7 @@ func TestDeleteGetRendersConfirmation(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Fatalf("got %d", resp.StatusCode)
 	}
-	if text := body(t, resp); !strings.Contains(text, "Are you sure") {
+	if text := body(t, resp); !strings.Contains(text, "Delete «john@example.com»?") {
 		t.Fatalf("got %s", text)
 	}
 }

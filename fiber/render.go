@@ -667,6 +667,9 @@ type listData struct {
 	Actions           []actionInfo
 	Permissions       permissions
 	Reorderable       bool
+	// PreviewsDeletes makes the row's Delete a link to the delete page,
+	// which is where a preview has anything to say.
+	PreviewsDeletes bool
 }
 
 func (r *Renderer) buildListData(
@@ -813,6 +816,7 @@ func (r *Renderer) buildListData(
 		Actions:           actionInfos(modelAdmin),
 		Permissions:       perms,
 		Reorderable:       modelAdmin.Reorderable(),
+		PreviewsDeletes:   core.PreviewsDeletes(modelAdmin),
 	}
 }
 
@@ -1254,6 +1258,9 @@ type inlineSectionData struct {
 	Columns []inlineColumn
 	Rows    []inlineRowData
 	AddRow  *inlineAddRowData // nil unless Mode == "edit" && the principal has the child's own create permission
+	// Refusal explains a Remove the child's DeletePreview blocked; nil
+	// every other time the section is rendered.
+	Refusal *deletePreviewView
 }
 
 // buildInlineSections builds one inlineSectionData per viewable Inline.
@@ -1396,6 +1403,16 @@ func (r *Renderer) RenderInlineFragment(
 	principal *core.Principal, modelAdmin core.ModelAdmin, obj any, inline core.Inline,
 	redisplayPK any, redisplayData map[string]any, redisplayErrs map[string][]string,
 ) (string, error) {
+	return r.renderInlineSection(principal, modelAdmin, obj, inline, redisplayPK, redisplayData, redisplayErrs, nil)
+}
+
+// renderInlineSection is RenderInlineFragment plus the refusal an inline
+// Remove blocked by the child's DeletePreview shows above the rows.
+func (r *Renderer) renderInlineSection(
+	principal *core.Principal, modelAdmin core.ModelAdmin, obj any, inline core.Inline,
+	redisplayPK any, redisplayData map[string]any, redisplayErrs map[string][]string,
+	refusal *deletePreviewView,
+) (string, error) {
 	sections, err := r.buildInlineSections(principal, modelAdmin, obj, "edit", inline.Child, redisplayPK, redisplayData, redisplayErrs)
 	if err != nil {
 		return "", err
@@ -1407,6 +1424,7 @@ func (r *Renderer) RenderInlineFragment(
 			break
 		}
 	}
+	section.Refusal = refusal
 	var buf bytes.Buffer
 	if err := r.inlineFragment.ExecuteTemplate(&buf, "content", section); err != nil {
 		return "", err
@@ -1417,13 +1435,17 @@ func (r *Renderer) RenderInlineFragment(
 type deleteData struct {
 	pageBase
 	VerboseName string
+	ObjectLabel string
+	Preview     deletePreviewView
 }
 
-func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any) (string, error) {
+func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, preview core.ResolvedDeletePreview) (string, error) {
 	title := r.t("Delete %s", r.t(modelAdmin.VerboseName()))
 	data := deleteData{
 		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), r.deleteBreadcrumbs(modelAdmin, obj), nil),
 		VerboseName: modelAdmin.VerboseName(),
+		ObjectLabel: objectLabel(modelAdmin, obj),
+		Preview:     r.deletePreviewView(preview),
 	}
 	tmpl, err := r.contentTemplate(modelAdmin, "delete", r.deleteTpl)
 	if err != nil {

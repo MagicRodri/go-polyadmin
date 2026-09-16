@@ -158,6 +158,33 @@ func sweepMainApp(t *testing.T) (*fiber.App, []string) {
 	return app, allow
 }
 
+// sweepPreviewApp shows every delete-preview string at once: a cascade
+// larger than its sample, a record hidden from the viewer, a type the
+// viewer may not delete, and an unmanaged protected type.
+func sweepPreviewApp(t *testing.T) (*fiber.App, []string) {
+	var notes *testUserAdmin
+	authorizer := previewSweepAuthorizer{}
+	app, users, notes := newPreviewApp(t, func([]any) core.DeletePreview {
+		return core.DeletePreview{
+			Cascades:  []core.DeleteGroup{{Resource: "notes", Objects: []any{notes.store[1], notes.store[2]}, Total: 7}},
+			Protected: []core.DeleteGroup{{Label: "Invoices", Objects: []any{"INV-1"}}},
+		}
+	}, core.WithPseudoLocale(), core.WithAuthorizer(authorizer))
+	users.createUser("a@example.com", true)
+	notes.createUser("n1@example.com", true)
+	notes.createUser("n2@example.com", true)
+	return app, append([]string{"a@example.com", "n1@example.com", "INV-1", "PO"}, localeNames...)
+}
+
+type previewSweepAuthorizer struct{}
+
+func (previewSweepAuthorizer) Can(principal *core.Principal, permission string, resource any) bool {
+	if u, ok := resource.(*testUser); ok && permission == "notes.view" && u.Email == "n2@example.com" {
+		return false
+	}
+	return permission != "notes.delete"
+}
+
 func sweepInlineApp(t *testing.T) (*fiber.App, []string) {
 	app, orgAdmin, userAdmin := newInlineTestApp(t, core.InlineLayoutTabular, core.WithPseudoLocale())
 	seedOrgWithUsers(orgAdmin, userAdmin, "a@example.com")
@@ -206,6 +233,7 @@ var sweepPages = []sweepPage{
 	{area: "forms", name: "inline edit", path: "/admin/organizations/1/edit", app: sweepInlineApp},
 	{area: "detail", name: "detail", path: "/admin/users/1", app: sweepMainApp},
 	{area: "detail", name: "delete", path: "/admin/users/1/delete", app: sweepMainApp},
+	{area: "detail", name: "delete preview", path: "/admin/users/1/delete", app: sweepPreviewApp},
 	{area: "detail", name: "inline detail", path: "/admin/organizations/1", app: sweepInlineApp},
 	{area: "detail", name: "dashboard", path: "/admin/", app: sweepMainApp},
 	{area: "errors", name: "not found", path: "/admin/users/999", app: sweepMainApp},

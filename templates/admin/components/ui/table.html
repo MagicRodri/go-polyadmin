@@ -163,11 +163,19 @@
                 {{icon "edit" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "Edit"}}</span></a>
               {{end}}
               {{if $.Permissions.CanDelete}}
+              {{if $.PreviewsDeletes}}
+              {{/* A previewing resource has something to say before the
+                   delete, so the row leads to the page that says it. */}}
+              <a href="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/delete" role="menuitem"
+                 class="{{ui "dropdown" "item"}} text-destructive hover:bg-destructive/10">
+                {{icon "delete" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "Delete"}}</span></a>
+              {{else}}
               <button type="button" role="menuitem" @click="open = false"
                       class="{{ui "dropdown" "item"}} text-destructive hover:bg-destructive/10"
                       hx-delete="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/delete" hx-target="#row-{{.PK}}"
                       hx-swap="outerHTML swap:0.2s" hx-confirm="{{t "Delete this %s?" (t $.VerboseName)}}">
                 {{icon "delete" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "Delete"}}</span></button>
+              {{end}}
               {{end}}
             </div>
           </div>

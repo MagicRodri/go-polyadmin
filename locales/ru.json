@@ -5,6 +5,13 @@
     "one": "%d строка",
     "other": "%d строки"
   },
+  "%d you can't view": {
+    "few": "%d записи, недоступные вам",
+    "many": "%d записей, недоступных вам",
+    "one": "%d запись, недоступная вам",
+    "other": "%d записи, недоступные вам"
+  },
+  "%s (%d)": "%s (%d)",
   "%s applied to %d record.": {
     "few": "%s применено к %d записям.",
     "many": "%s применено к %d записям.",
@@ -26,7 +33,6 @@
   "Admin": "Администрирование",
   "All": "Все",
   "Anonymous": "Аноним",
-  "Are you sure you want to delete this %s? This action cannot be undone.": "Подтвердите удаление записи «%s». Это действие нельзя отменить.",
   "Asc": "По возрастанию",
   "Back to the admin": "Вернуться в панель администратора",
   "Breadcrumb": "Хлебные крошки",
@@ -45,6 +51,7 @@
   "Delete selected": "Удалить выбранное",
   "Delete the selected records? This cannot be undone.": "Удалить выбранные записи? Это действие нельзя отменить.",
   "Delete this %s?": "Удалить «%s»?",
+  "Delete «%s»?": "Удалить «%s»?",
   "Deleted %d record.": {
     "few": "Удалено %d записи.",
     "many": "Удалено %d записей.",
@@ -129,7 +136,11 @@
     "one": "%d запись на этой странице выбрана.",
     "other": "Все %d записи на этой странице выбраны."
   },
+  "These records must be removed first:": "Сначала нужно удалить эти записи:",
+  "This action cannot be undone.": "Это действие нельзя отменить.",
+  "This can't be deleted": "Удаление невозможно",
   "This page expired before the form was submitted. Reload and try again.": "Срок действия страницы истёк до отправки формы. Обновите страницу и попробуйте снова.",
+  "This will also delete": "Также будут удалены",
   "Toggle dark mode": "Переключить тёмную тему",
   "Toggle sidebar": "Переключить боковую панель",
   "Total": "Всего",
@@ -139,11 +150,18 @@
   "Yes": "Да",
   "You have been signed out.": "Вы вышли из системы.",
   "You need to be signed in to view this page.": "Чтобы просмотреть эту страницу, войдите в систему.",
+  "Your account doesn't have permission to delete: %s": "У вашей учётной записи нет права удалять: %s",
   "Your account doesn't have permission to do that.": "У вашей учётной записи нет прав для этого действия.",
   "create": "создание",
   "delete": "удаление",
   "m@example.com": "m@example.com",
   "no change": "без изменений",
   "system": "система",
-  "update": "изменение"
+  "update": "изменение",
+  "…and %d more": {
+    "few": "…и ещё %d",
+    "many": "…и ещё %d",
+    "one": "…и ещё %d",
+    "other": "…и ещё %d"
+  }
 }

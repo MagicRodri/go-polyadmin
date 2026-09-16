@@ -6,6 +6,7 @@
 
 {{define "inlineSection"}}
 <div id="inline-{{.Slug}}" class="mt-8">
+  {{with .Refusal}}<div class="mb-3">{{template "ui/delete-refusal" .}}</div>{{end}}
   <h3 class="{{ui "text" "heading"}}">{{t .Label}}</h3>
   {{if eq .Mode "placeholder"}}
   <div class="{{ui "panel" "dashed"}}">

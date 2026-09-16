@@ -3,6 +3,11 @@
     "one": "%d ligne",
     "other": "%d lignes"
   },
+  "%d you can't view": {
+    "one": "%d enregistrement que vous ne pouvez pas voir",
+    "other": "%d enregistrements que vous ne pouvez pas voir"
+  },
+  "%s (%d)": "%s (%d)",
   "%s applied to %d record.": {
     "one": "%s appliqué à %d enregistrement.",
     "other": "%s appliqué à %d enregistrements."
@@ -20,7 +25,6 @@
   "Admin": "Administration",
   "All": "Tous",
   "Anonymous": "Anonyme",
-  "Are you sure you want to delete this %s? This action cannot be undone.": "Confirmer la suppression de « %s » ? Cette action est irréversible.",
   "Asc": "Croissant",
   "Back to the admin": "Retour à l'administration",
   "Breadcrumb": "Fil d'Ariane",
@@ -39,6 +43,7 @@
   "Delete selected": "Supprimer la sélection",
   "Delete the selected records? This cannot be undone.": "Supprimer les enregistrements sélectionnés ? Cette action est irréversible.",
   "Delete this %s?": "Supprimer « %s » ?",
+  "Delete «%s»?": "Supprimer « %s » ?",
   "Deleted %d record.": {
     "one": "%d enregistrement supprimé.",
     "other": "%d enregistrements supprimés."
@@ -115,7 +120,11 @@
     "one": "Le %d de cette page est sélectionné.",
     "other": "Tous les %d de cette page sont sélectionnés."
   },
+  "These records must be removed first:": "Ces enregistrements doivent d'abord être supprimés :",
+  "This action cannot be undone.": "Cette action est irréversible.",
+  "This can't be deleted": "Suppression impossible",
   "This page expired before the form was submitted. Reload and try again.": "Cette page a expiré avant l'envoi du formulaire. Rechargez la page et réessayez.",
+  "This will also delete": "Seront aussi supprimés",
   "Toggle dark mode": "Basculer le mode sombre",
   "Toggle sidebar": "Basculer la barre latérale",
   "Total": "Total",
@@ -125,11 +134,16 @@
   "Yes": "Oui",
   "You have been signed out.": "Vous avez été déconnecté.",
   "You need to be signed in to view this page.": "Vous devez être connecté pour voir cette page.",
+  "Your account doesn't have permission to delete: %s": "Votre compte n'a pas le droit de supprimer : %s",
   "Your account doesn't have permission to do that.": "Votre compte n'a pas la permission d'effectuer cette action.",
   "create": "création",
   "delete": "suppression",
   "m@example.com": "m@example.com",
   "no change": "aucun changement",
   "system": "système",
-  "update": "modification"
+  "update": "modification",
+  "…and %d more": {
+    "one": "…et %d autre",
+    "other": "…et %d autres"
+  }
 }
