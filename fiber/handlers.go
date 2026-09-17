@@ -24,6 +24,9 @@ const selectAllField = "_select_all"
 const (
 	saveContinueField   = "_continue"
 	saveAddAnotherField = "_addanother"
+	// saveAsNewField turns an edit into a create: the submitted values
+	// become a new record and the original is left alone (save_as).
+	saveAsNewField = "_saveasnew"
 )
 
 // parseListRequestFromForm rebuilds the list query from the posted form,
@@ -164,7 +167,7 @@ func handleDetail(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Rend
 		}
 		perms := computePermissions(admin, principal, modelAdmin, obj)
 		relPerms := computeRelationPermissions(admin, principal, modelAdmin, modelAdmin.DetailFields())
-		html, err := renderer.RenderDetail(c.Context(), principal, csrfToken(c), modelAdmin, obj, perms, relPerms, popFlash(c))
+		html, err := renderer.RenderDetail(c.Context(), principal, csrfToken(c), modelAdmin, obj, perms, relPerms, popFlash(c), listToken(c, basePath))
 		if err != nil {
 			return err
 		}
@@ -187,6 +190,18 @@ func validateWritable(ctx context.Context, modelAdmin core.ModelAdmin, data map[
 		}
 	}
 	return errs
+}
+
+// listToken reads the list a page was reached from -- the _list query
+// parameter on a GET, the hidden field on a POST -- and validates it the
+// way a Referer is validated. An invalid one reads as "no list", so a
+// forged token redirects to the bare list rather than off-site.
+func listToken(c *fiber.Ctx, basePath string) string {
+	raw := queryValue(c, core.ListTokenField)
+	if raw == "" {
+		raw = formValue(c, core.ListTokenField)
+	}
+	return core.SafeListToken(raw, string(c.Request().Host()), basePath)
 }
 
 // formValue reads a posted field and returns a string that outlives the
@@ -254,7 +269,7 @@ func handleCreateGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *R
 			return writeAuthError(c, admin, basePath, result)
 		}
 		relOptions := computeRelationOptions(admin, modelAdmin, nil)
-		html, err := renderer.RenderForm(principal, csrfToken(c), modelAdmin, nil, nil, nil, relOptions)
+		html, err := renderer.RenderForm(principal, csrfToken(c), modelAdmin, nil, nil, nil, relOptions, listToken(c, basePath))
 		if err != nil {
 			return err
 		}
@@ -278,9 +293,9 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *
 			var html string
 			var err error
 			if isHTMXRequest(c) {
-				html, err = renderer.RenderFormFragment(principal, csrfToken(c), modelAdmin, nil, data, errs, relOptions)
+				html, err = renderer.RenderFormFragment(principal, csrfToken(c), modelAdmin, nil, data, errs, relOptions, listToken(c, basePath))
 			} else {
-				html, err = renderer.RenderForm(principal, csrfToken(c), modelAdmin, nil, data, errs, relOptions)
+				html, err = renderer.RenderForm(principal, csrfToken(c), modelAdmin, nil, data, errs, relOptions, listToken(c, basePath))
 			}
 			if err != nil {
 				return err
@@ -301,14 +316,17 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *
 		// "Save and add another" goes back to an empty form, which is the
 		// whole point when entering records in a batch -- checked before
 		// building the record's own URL, since it never uses one.
+		// preserve_filters: every page reached from the list keeps
+		// carrying it, so the trail back leads into the filtered list.
+		back := listToken(c, basePath)
 		if c.FormValue(saveAddAnotherField) != "" {
-			return redirectTo(c, basePath+"/"+slug+"/create")
+			return redirectTo(c, core.WithListToken(basePath+"/"+slug+"/create", back))
 		}
 		target := basePath + "/" + slug + "/" + stringOrEmpty(modelAdmin.GetPK(obj))
 		if c.FormValue(saveContinueField) != "" {
 			target += "/edit"
 		}
-		return redirectTo(c, target)
+		return redirectTo(c, core.WithListToken(target, back))
 	}
 }
 
@@ -331,7 +349,7 @@ func handleEditGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Ren
 			return writeForbidden(c, admin, basePath)
 		}
 		relOptions := computeRelationOptions(admin, modelAdmin, obj)
-		html, err := renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, nil, nil, relOptions)
+		html, err := renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, nil, nil, relOptions, listToken(c, basePath))
 		if err != nil {
 			return err
 		}
@@ -364,9 +382,9 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Re
 			relOptions := computeRelationOptions(admin, modelAdmin, obj)
 			var html string
 			if isHTMXRequest(c) {
-				html, err = renderer.RenderFormFragment(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions)
+				html, err = renderer.RenderFormFragment(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions, listToken(c, basePath))
 			} else {
-				html, err = renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions)
+				html, err = renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions, listToken(c, basePath))
 			}
 			if err != nil {
 				return err
@@ -374,19 +392,42 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Re
 			c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
 			return c.Status(fiber.StatusUnprocessableEntity).SendString(html)
 		}
+		// "Save as new": the submitted values become a new record, and the
+		// one being edited is left untouched. Gated on the option, so a
+		// forged field on an admin without it is an ordinary save.
+		if modelAdmin.AllowsSaveAs() && c.FormValue(saveAsNewField) != "" {
+			if !computePermissions(admin, principal, modelAdmin, nil).CanCreate {
+				return writeForbidden(c, admin, basePath)
+			}
+			created, err := modelAdmin.Create(c.Context(), data)
+			if err != nil {
+				return err
+			}
+			recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditCreate, created)
+			setFlash(c, "success", tr(c, "%s created.", tr(c, modelAdmin.VerboseName())))
+			back := listToken(c, basePath)
+			target := basePath + "/" + slug + "/" + stringOrEmpty(modelAdmin.GetPK(created))
+			if c.FormValue(saveContinueField) != "" {
+				target += "/edit"
+			}
+			return redirectTo(c, core.WithListToken(target, back))
+		}
 		if _, err := modelAdmin.Update(c.Context(), obj, data); err != nil {
 			return err
 		}
 		recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditUpdate, obj)
 		setFlash(c, "success", tr(c, "%s updated.", tr(c, modelAdmin.VerboseName())))
+		// preserve_filters, as on create: the record's own page keeps
+		// carrying the list, so its breadcrumb leads back into it.
+		back := listToken(c, basePath)
 		if c.FormValue(saveAddAnotherField) != "" {
-			return redirectTo(c, basePath+"/"+slug+"/create")
+			return redirectTo(c, core.WithListToken(basePath+"/"+slug+"/create", back))
 		}
-		target := basePath + "/" + slug + "/" + c.Params("pk")
+		target := basePath + "/" + slug + "/" + pathParam(c, "pk")
 		if c.FormValue(saveContinueField) != "" {
 			target += "/edit"
 		}
-		return redirectTo(c, target)
+		return redirectTo(c, core.WithListToken(target, back))
 	}
 }
 
@@ -412,7 +453,7 @@ func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *R
 		if err != nil {
 			return err
 		}
-		html, err := renderer.RenderDelete(principal, csrfToken(c), modelAdmin, obj, preview)
+		html, err := renderer.RenderDelete(principal, csrfToken(c), modelAdmin, obj, preview, listToken(c, basePath))
 		if err != nil {
 			return err
 		}
@@ -450,6 +491,9 @@ func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 			}
 			recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditDelete, obj)
 			setFlash(c, "success", tr(c, "%s deleted.", tr(c, modelAdmin.VerboseName())))
+		}
+		if back := listToken(c, basePath); back != "" {
+			return redirectTo(c, back)
 		}
 		return redirectTo(c, basePath+"/"+slug)
 	}

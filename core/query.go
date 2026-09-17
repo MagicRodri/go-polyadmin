@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -99,6 +100,38 @@ func ApplyFilters(modelAdmin ModelAdmin, objects []any, raw map[string]string) [
 	return objects
 }
 
+// IsSortable reports whether a list column offers a sort. Unset
+// SortableFields leaves every column sortable; an empty one leaves none.
+func IsSortable(modelAdmin ModelAdmin, name string) bool {
+	sortable := modelAdmin.SortableFields()
+	if sortable == nil {
+		return true
+	}
+	for _, allowed := range sortable {
+		if allowed == name {
+			return true
+		}
+	}
+	return false
+}
+
+// LinksToRecord reports whether a list cell links to the record. Unset
+// LinkFields links the first column, as Django does; an empty one links
+// nothing and leaves the row menu as the way in.
+func LinksToRecord(modelAdmin ModelAdmin, name string) bool {
+	linked := modelAdmin.LinkFields()
+	if linked == nil {
+		display := modelAdmin.ListDisplay()
+		return len(display) > 0 && display[0] == name
+	}
+	for _, allowed := range linked {
+		if allowed == name {
+			return true
+		}
+	}
+	return false
+}
+
 func ApplyOrdering(modelAdmin ModelAdmin, objects []any, ordering string) []any {
 	if ordering == "" {
 		return objects
@@ -169,6 +202,12 @@ func ExecuteListQuery(modelAdmin ModelAdmin, objects []any, req ListRequest) []a
 // Idempotent, so a caller needing the resolved values can apply it once
 // and pass the same request on.
 func ApplyDefaults(modelAdmin ModelAdmin, req ListRequest) ListRequest {
+	// A ?sort= naming a column the admin does not offer is dropped, so
+	// the restriction holds for a hand-typed URL too. DefaultOrdering
+	// below is exempt: it is the admin's own choice, not user input.
+	if req.Ordering != "" && !IsSortable(modelAdmin, strings.TrimPrefix(req.Ordering, "-")) {
+		req.Ordering = ""
+	}
 	if req.Ordering == "" {
 		req.Ordering = modelAdmin.DefaultOrdering()
 	}
@@ -210,4 +249,38 @@ func ListObjects(ctx context.Context, modelAdmin ModelAdmin, req ListRequest) ([
 		end = offset + limit
 	}
 	return objects[offset:end], total, nil
+}
+
+// ListTokenField is the reserved query parameter and form field carrying
+// the list a page was reached from -- its search, filters, sort and page
+// (docs/lists.md). It is what preserve_filters preserves: the pages
+// reached from a list hand it back, so the trail out of a filtered list
+// leads into it rather than into the bare one.
+const ListTokenField = "_list"
+
+// SafeListToken validates a token the way SafeRedirectPath validates a
+// Referer: same host, under the admin's base path, no control
+// characters. An invalid one yields "", which every caller reads as "no
+// list to go back to".
+func SafeListToken(token, host, basePath string) string {
+	if token == "" {
+		return ""
+	}
+	if safe := SafeRedirectPath(token, host, basePath, ""); safe != "" {
+		return safe
+	}
+	return ""
+}
+
+// WithListToken appends a validated token to a URL as the _list
+// parameter, and returns the URL unchanged when there is none.
+func WithListToken(rawURL, token string) string {
+	if token == "" {
+		return rawURL
+	}
+	separator := "?"
+	if strings.Contains(rawURL, "?") {
+		separator = "&"
+	}
+	return rawURL + separator + ListTokenField + "=" + url.QueryEscape(token)
 }

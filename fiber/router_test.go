@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MagicRodri/go-polyadmin/core"
 
@@ -22,6 +23,9 @@ type testUser struct {
 	ID       int
 	Email    string
 	IsActive bool
+	// Joined is only read by the date-hierarchy tests; the other fixtures
+	// leave it zero, and no admin displays it unless it asks to.
+	Joined time.Time
 }
 
 type testUserAdmin struct {

@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // In-memory Organization/User models + repositories for the reference
 // app. A real application would back these with GORM, sqlx, Bun, or a
@@ -25,10 +28,14 @@ func NewOrganizationRepository() *OrganizationRepository {
 	return &OrganizationRepository{organizations: make(map[int]*Organization), nextID: 1}
 }
 
+// List returns organizations in insertion order, for the same reason
+// UserRepository.List does.
 func (r *OrganizationRepository) List() []*Organization {
 	out := make([]*Organization, 0, len(r.organizations))
-	for _, o := range r.organizations {
-		out = append(out, o)
+	for id := 1; id < r.nextID; id++ {
+		if o := r.organizations[id]; o != nil {
+			out = append(out, o)
+		}
 	}
 	return out
 }
@@ -123,10 +130,16 @@ func NewUserRepository() *UserRepository {
 	return &UserRepository{users: make(map[int]*User), nextID: 1}
 }
 
+// List returns users in insertion order, like RoleRepository.List and for
+// the same reason: ranging over the map reshuffles between requests, which
+// a page of 25 out of 200 makes obvious -- the same reload shows a
+// different page.
 func (r *UserRepository) List() []*User {
 	out := make([]*User, 0, len(r.users))
-	for _, u := range r.users {
-		out = append(out, u)
+	for id := 1; id < r.nextID; id++ {
+		if u := r.users[id]; u != nil {
+			out = append(out, u)
+		}
 	}
 	return out
 }
@@ -171,11 +184,21 @@ func seed(users *UserRepository, organizations *OrganizationRepository, roles *R
 	// Founded in the same month for every organization: Task 15's browser
 	// test checks that this date renders with a French month name under
 	// the fr locale, and it doesn't matter which organization it looks at.
+	// Acme keeps March 2019: a browser test pins "Mar 1, 2019" as a data
+	// value and checks the same date renders "mars" under fr. The others
+	// spread out, so the date drill-down has years and months to walk.
 	founded := time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC)
 	acme := organizations.Create("Acme Corp", founded, 1234.5)
-	widgets := organizations.Create("Widgets Inc", founded, 1234.5)
-	globex := organizations.Create("Globex Corporation", founded, 1234.5)
-	initech := organizations.Create("Initech", founded, 1234.5)
+	widgets := organizations.Create("Widgets Inc", time.Date(2021, 6, 15, 0, 0, 0, 0, time.UTC), 1234.5)
+	globex := organizations.Create("Globex Corporation", time.Date(2023, 11, 2, 0, 0, 0, 0, time.UTC), 1234.5)
+	initech := organizations.Create("Initech", time.Date(2023, 11, 20, 0, 0, 0, 0, time.UTC), 1234.5)
+	for i := 5; i < 25; i++ {
+		organizations.Create(
+			fmt.Sprintf("Org %02d Holdings", i),
+			time.Date(2019+i%5, time.Month(1+(i*3)%12), 1+(i*7)%28, 0, 0, 0, 0, time.UTC),
+			float64(1000+i*137),
+		)
+	}
 
 	// Enough roles that the multi-select's search box has something to
 	// do -- the control only earns its keep past the point where
@@ -196,4 +219,22 @@ func seed(users *UserRepository, organizations *OrganizationRepository, roles *R
 	users.Create("peter@example.com", true, "Enterprise", globex, []any{support})
 	users.Create("samir@example.com", true, "Free", initech, nil)
 	users.Create("milton@example.com", false, "Free", nil, nil)
+
+	// Enough rows to fill a viewport and give pagination, filters and the
+	// date drill-down something to work on. The seven named users above are
+	// what the tests assert against, so the filler deliberately avoids
+	// Initech (whose cascade count is asserted) and the Auditor role (whose
+	// being unheld is asserted), and is generated rather than listed.
+	plans := []string{"Free", "Pro", "Enterprise"}
+	fillerOrgs := []*Organization{acme, widgets, globex, nil}
+	fillerRoles := [][]any{nil, {support}, {billing}, {admin}, {security, support}}
+	for i := len(users.List()) + 1; i <= 200; i++ {
+		users.Create(
+			fmt.Sprintf("user%03d@example.com", i),
+			i%4 != 0,
+			plans[i%len(plans)],
+			fillerOrgs[i%len(fillerOrgs)],
+			fillerRoles[i%len(fillerRoles)],
+		)
+	}
 }

@@ -79,13 +79,21 @@ func excluding(names []string, exclude string) []string {
 // what makes the table read as rows rather than as stacked blocks.
 const inlineMultiSelectRows = 4
 
+// relationOptions is relation.Options, or none when there is no relation.
+func relationOptions(relation *relationFieldOptions) []relationOption {
+	if relation == nil {
+		return nil
+	}
+	return relation.Options
+}
+
 // inlineTableCellHTML is a trimmed sibling of formInputHTML for the
 // tabular inline layout: a bare input/select, no <label>/wrapper <div>
 // (the column header <th> already carries the label; a <form> can't
 // wrap a table row/cell, so there's no per-field wrapper to put a
 // label inside anyway). Deliberately duplicates formInputHTML's
 // per-type branches rather than trying to strip its wrapper.
-func inlineTableCellHTML(basePath string, field core.Field, value any, errs []string, relation *relationFieldOptions) template.HTML {
+func (r *Renderer) inlineTableCellHTML(basePath string, field core.Field, value any, errs []string, relation *relationFieldOptions) template.HTML {
 	name := html.EscapeString(field.Name)
 	// Compact flavors of the same shadcn controls the full form uses.
 	fieldClasses := classInputCompact
@@ -99,45 +107,50 @@ func inlineTableCellHTML(basePath string, field core.Field, value any, errs []st
 			name, attr(checked, "checked"), classCheckbox)
 
 	case core.FieldTypeForeignKey, core.FieldTypeOneToOne:
-		fmt.Fprintf(&b, `<select name="%s" autocomplete="off" class="%s"><option value="">&mdash;</option>`, name, selectClasses)
+		// The same trigger-and-popover control the full form uses, in its
+		// compact flavour: a native <select> here would be the one control
+		// in the row that is not the admin's own.
+		options := make([]fieldOptionData, 0, 1)
+		options = append(options, fieldOptionData{Value: "", Label: "\u2014"})
 		if relation != nil {
 			for _, opt := range relation.Options {
-				selected := fmt.Sprint(opt.PK) == fmt.Sprint(relation.SelectedPK)
-				fmt.Fprintf(&b, `<option value="%s" %s>%s</option>`, html.EscapeString(fmt.Sprint(opt.PK)), attr(selected, "selected"), html.EscapeString(opt.Label))
+				pk := fmt.Sprint(opt.PK)
+				options = append(options, fieldOptionData{Value: pk, Label: opt.Label, Selected: pk == fmt.Sprint(relation.SelectedPK)})
 			}
 		}
-		b.WriteString(`</select>`)
+		cell, err := r.uiHTML("ui/select", map[string]any{
+			"name": field.Name, "options": options, "placeholder": "\u2014", "compact": true,
+		})
+		if err != nil {
+			return template.HTML("")
+		}
+		b.WriteString(string(cell))
 
 	case core.FieldTypeManyToMany:
-		// Capped, and the cap is the whole point: sizing the listbox to
-		// the option count made every row as tall as the longest option
-		// list -- eight roles gave a 195px row, and three such rows
-		// filled the viewport. Past the cap a native <select multiple>
-		// scrolls internally, which is the ScrollArea behaviour here;
-		// the scroll-area classes only restyle that scrollbar onto the
-		// theme (see ui "scroll-area" and theme.html).
-		size := 1
-		if relation != nil && len(relation.Options) > size {
-			size = len(relation.Options)
-		}
-		if size > inlineMultiSelectRows {
-			size = inlineMultiSelectRows
-		}
-		fmt.Fprintf(&b, `<select multiple name="%s" autocomplete="off" size="%d" class="%s %s">`,
-			name, size, classSelectMulti, classScrollAreaY)
-		if relation != nil {
-			for _, opt := range relation.Options {
-				selected := false
-				for _, spk := range relation.SelectedPKs {
-					if fmt.Sprint(spk) == fmt.Sprint(opt.PK) {
-						selected = true
-						break
-					}
+		// The same shadcn control the full form uses: a trigger with chips
+		// and a portalled popover, so a row stays one line tall however
+		// many options there are -- the native <select multiple> it
+		// replaces had to be capped and scrolled internally to avoid
+		// 195px rows.
+		options := make([]fieldOptionData, 0, len(relationOptions(relation)))
+		for _, opt := range relationOptions(relation) {
+			pk := fmt.Sprint(opt.PK)
+			selected := false
+			for _, spk := range relation.SelectedPKs {
+				if fmt.Sprint(spk) == pk {
+					selected = true
+					break
 				}
-				fmt.Fprintf(&b, `<option value="%s" %s>%s</option>`, html.EscapeString(fmt.Sprint(opt.PK)), attr(selected, "selected"), html.EscapeString(opt.Label))
 			}
+			options = append(options, fieldOptionData{Value: pk, Label: opt.Label, Selected: selected})
 		}
-		b.WriteString(`</select>`)
+		cell, err := r.uiHTML("ui/multi-select", map[string]any{
+			"name": field.Name, "options": options, "placeholder": r.t("Select…"), "compact": true,
+		})
+		if err != nil {
+			return template.HTML("")
+		}
+		b.WriteString(string(cell))
 
 	case core.FieldTypeEnum:
 		fmt.Fprintf(&b, `<select name="%s" autocomplete="off" class="%s">`, name, selectClasses)

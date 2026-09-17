@@ -3,9 +3,8 @@ see is Intl formatting and the switcher round-trip."""
 
 import re
 
-from playwright.sync_api import expect
-
 from conftest import ADMIN_URL, SUPERUSER, _sign_in
+from playwright.sync_api import expect
 
 # Data values in the example app, and the switcher's untranslated names.
 # Everything here is either a seeded record value (session.go/models.go)
@@ -28,6 +27,8 @@ ROLES = (
 ALLOWED = re.compile(
     r"^[\w.+-]+@example\.com$"
     r"|^(?:Acme Corp|Widgets Inc|Globex Corporation|Initech)$"
+    # The seed's filler organizations, data like the four named ones.
+    r"|^Org \d\d Holdings$"
     r"|^(?:Free|Pro|Enterprise)$"
     rf"|^(?:{ROLES})(?:, (?:{ROLES}))*$"
     r"|^(?:Demo Admin|Demo Viewer|Amélie)$"

@@ -24,6 +24,12 @@ func NewOrganizationAdmin(repository *OrganizationRepository, users *UserReposit
 			DisplayFields:    []string{"ID", "Name", "Founded", "Balance"},
 			FormFieldNames:   []string{"Name", "Founded", "Balance"},
 			SearchFieldNames: []string{"Name"},
+			// The small-parity batch, shown off together: a date filter in
+			// the panel, "Save as new" for cloning a company, and the name
+			// -- not the ID -- as the link into the record.
+			DeclaredFilters: []core.Filter{core.NewDateFilter("Founded")},
+			AllowSaveAs:     true,
+			LinkFieldNames:  []string{"Name"},
 			DeclaredFields: []core.Field{
 				core.NewField("Name", core.FieldTypeString, core.WithRequired()),
 				core.NewField("Founded", core.FieldTypeDate, core.WithValidators(validFoundedDate)),

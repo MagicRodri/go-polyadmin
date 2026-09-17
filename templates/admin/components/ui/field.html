@@ -108,7 +108,7 @@
            x-init="query = $refs.textInput.value;"
            @click.outside="open = false">
         <input x-ref="hiddenInput" type="hidden" name="{{.Name}}" value="{{.ComboboxSelectedPK}}">
-        <div class="{{ui "combobox" "trigger"}}">
+        <div x-ref="trigger" class="{{ui "combobox" "trigger"}}">
           {{icon "search" (ui "combobox" "icon")}}
           {{/* role=combobox on the input, not the wrapper: the input is
                what holds focus, so it is what has to advertise the popup
@@ -127,10 +127,21 @@
                  class="{{ui "input" "bare"}}">
         </div>
         {{/* htmx replaces these children on every keystroke, so the
-             remembered highlight is stale the moment a swap lands. */}}
-        <div x-ref="results" id="{{.ComboboxResultsID}}" role="listbox"
-             @htmx:after-swap="clearActive()"
-             class="{{ui "combobox" "content"}}" x-show="open" x-cloak></div>
+             remembered highlight is stale the moment a swap lands.
+
+             Portalled to <body>, as Radix does: the popover is taller
+             than the row it opens from, and any clipping ancestor -- a
+             collapsible fieldset, a table's scroll area -- would slice
+             it off. x-anchor then positions it against the trigger, and
+             x-effect matches its width, which "w-full" can no longer do
+             from the body. */}}
+        <template x-teleport="body">
+          <div x-ref="results" id="{{.ComboboxResultsID}}" role="listbox"
+               x-anchor.bottom-start.offset.4="$refs.trigger"
+               x-effect="if (open && $refs.trigger) $el.style.width = $refs.trigger.offsetWidth + 'px'"
+               @htmx:after-swap="clearActive()"
+               class="{{ui "combobox" "content"}}" x-show="open" x-cloak></div>
+        </template>
       </div>
       {{else}}
       {{template "ui/select" dict

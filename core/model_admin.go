@@ -50,6 +50,16 @@ type ModelAdmin interface {
 	// create/detail/edit pages. See core/inline.go and docs/inlines.md.
 	Inlines() []Inline
 	AutocompleteFields() []string
+	// The small-parity options -- see docs/lists.md and
+	// docs/model-admin.md. SortableFields and LinkFields distinguish nil
+	// ("unset") from empty ("none"), so both return the declared slice
+	// rather than a resolved one; IsSortable and LinksToRecord apply the
+	// defaults.
+	SortableFields() []string
+	LinkFields() []string
+	Prepopulated() map[string][]string
+	AllowsSaveAs() bool
+	PreservesFilters() bool
 	GetPK(obj any) any
 	TemplateOverride(view string) string
 
@@ -158,6 +168,34 @@ type BaseModelAdmin struct {
 	// EnableReordering defaults to false (opt-in, unlike Disable*
 	// above) -- see the doc comment on Reorderable().
 	EnableReordering bool
+
+	// SortableFieldNames restricts which list columns offer a sort, Django's
+	// sortable_by. nil leaves every column sortable; an empty (non-nil)
+	// slice makes none of them sortable. The restriction also holds for a
+	// hand-typed ?sort=, but not for OrderingDefault, which is the
+	// admin's own choice rather than user input.
+	SortableFieldNames []string
+	// LinkFieldNames names the list cells that link to the record, Django's
+	// list_display_links. nil links the first column; an empty (non-nil)
+	// slice links none, leaving the row menu as the way in.
+	LinkFieldNames []string
+	// PrepopulatedFields fills a field from others as they are typed:
+	// {"Slug": {"Title"}} slugifies Title into Slug. Client-side and on
+	// the create form only, so an existing record's slug is never
+	// rewritten under it.
+	PrepopulatedFields map[string][]string
+	// PrepopulatedUnicode keeps a prepopulated field's letters as they
+	// are instead of transliterating them to ASCII -- see Slugify.
+	PrepopulatedUnicode []string
+	// AllowSaveAs adds "Save as new" to the edit form, which saves the
+	// submitted values as a new record and leaves the original alone.
+	// Opt-in, as Django's save_as is.
+	AllowSaveAs bool
+	// DisablePreserveFilters stops the list handing its search, filters,
+	// sort and page to the pages reached from it, so they no longer lead
+	// back into the list as it was left. Disable*, because preserving
+	// them is the behaviour worth defaulting to.
+	DisablePreserveFilters bool
 }
 
 func (b BaseModelAdmin) Slug() string {
@@ -323,7 +361,21 @@ func (b BaseModelAdmin) CanView() bool   { return !b.DisableView }
 func (b BaseModelAdmin) CanCreate() bool { return !b.DisableCreate }
 func (b BaseModelAdmin) CanUpdate() bool { return !b.DisableUpdate }
 func (b BaseModelAdmin) CanDelete() bool { return !b.DisableDelete }
-func (b BaseModelAdmin) CanExport() bool { return !b.DisableExport }
+
+func (b BaseModelAdmin) SortableFields() []string { return b.SortableFieldNames }
+
+func (b BaseModelAdmin) LinkFields() []string { return b.LinkFieldNames }
+
+func (b BaseModelAdmin) Prepopulated() map[string][]string { return b.PrepopulatedFields }
+
+// UnicodeSlugFields are the prepopulated fields whose slugs keep their own
+// letters instead of being transliterated -- see Slugify.
+func (b BaseModelAdmin) UnicodeSlugFields() []string { return b.PrepopulatedUnicode }
+
+func (b BaseModelAdmin) AllowsSaveAs() bool { return b.AllowSaveAs }
+
+func (b BaseModelAdmin) PreservesFilters() bool { return !b.DisablePreserveFilters }
+func (b BaseModelAdmin) CanExport() bool        { return !b.DisableExport }
 
 func (b BaseModelAdmin) Reorderable() bool { return b.EnableReordering }
 

@@ -65,8 +65,9 @@
 <table class="min-w-full divide-y divide-border">
   <thead class="bg-muted/50"><tr>
     {{range .Columns}}<th class="{{ui "table" "th-compact"}}">{{t .Label}}</th>{{end}}
-    {{/* Every mode has a trailing column: row actions when editing,
-         the View link when read-only. */}}<th></th>
+    {{/* A trailing column for the row actions, when editing. Read-only
+         rows open from their primary key's own cell instead. */}}
+    {{if eq .Mode "edit"}}<th></th>{{end}}
   </tr></thead>
   <tbody class="divide-y divide-border">
     {{range .Rows}}
@@ -86,10 +87,6 @@
                 class="{{ui "button" "ghost-destructive" "size-icon-sm"}}">
           {{icon "delete" "w-4 h-4"}}<span class="sr-only">{{t "Remove"}}</span></button>
         {{end}}
-      </td>
-      {{else}}
-      <td class="px-3 py-2 text-right whitespace-nowrap">
-        <a href="{{.DetailURL}}" class="{{ui "text" "link"}}">{{t "View"}}</a>
       </td>
       {{end}}
     </tr>

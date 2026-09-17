@@ -349,6 +349,47 @@ and what deleting them takes with it — see
 [`deletes.md`](deletes.md). That applies to an action of your own named
 `delete_selected` too: the page is keyed on the name.
 
+## Save as new
+
+`AllowSaveAs` adds a second submit to the edit form. It saves the
+submitted values as a **new** record and leaves the one being edited
+untouched -- Django's `save_as`:
+
+```go
+core.BaseModelAdmin{AllowSaveAs: true}
+```
+
+It validates exactly as an update would, needs the principal's create
+permission, and lands on the new record. Inline children are **not**
+copied: they still point at the original, and duplicating a dozen of
+them silently would be a surprise.
+
+## Prepopulated fields
+
+Fill one field from others as they are typed -- a slug from a title:
+
+```go
+core.BaseModelAdmin{
+    PrepopulatedFields: map[string][]string{"Slug": {"Title"}},
+    // Keep the letters as they are instead of transliterating:
+    PrepopulatedUnicode: []string{"Slug"},
+}
+```
+
+This runs in the browser, on the **create form only**: once a record
+exists its slug is a real identifier, and rewriting it from the title is
+how links rot. Typing in the target detaches it for the rest of the
+form's life, and a value already there is never overwritten.
+
+Slugs transliterate to ASCII by default -- `Café du Coin` becomes
+`cafe-du-coin`, `Привет мир` becomes `privet-mir` -- which is what
+`core.Slugify` does server-side, so a script and the browser agree.
+Letters outside the transliteration table drop out, which is what
+`PrepopulatedUnicode` (and `core.SlugifyUnicode`) is for.
+
+Nothing is slugified on the server and uniqueness is not checked: this
+is a convenience, not a constraint.
+
 ## Templates
 
 `BaseModelAdmin.ListTemplate`/`DetailTemplate`/`FormTemplate`/

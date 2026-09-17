@@ -1,6 +1,7 @@
 package fiber
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -114,5 +115,92 @@ func TestDashboardStatRendersDeltaDirection(t *testing.T) {
 	// red), so it follows whichever theme is active -- see ui.go.
 	if !strings.Contains(text, "$45,385") || !strings.Contains(text, "12.5%") || !strings.Contains(text, "text-destructive") {
 		t.Fatalf("got %s", text)
+	}
+}
+
+// TestALongWidgetScrollsInsideItsOwnCard: the dashboard is a grid, so a
+// card that grows with its content drags every card in its row to the
+// same height. The body is bounded instead, and scrolls with the themed
+// scrollbar.
+func TestALongWidgetScrollsInsideItsOwnCard(t *testing.T) {
+	rows := make([]map[string]any, 200)
+	for i := range rows {
+		rows[i] = map[string]any{"Email": "user" + strconv.Itoa(i) + "@example.com"}
+	}
+	dashboard := &core.Dashboard{Widgets: []core.Widget{
+		core.NewTable("Recent", []string{"Email"}, func() []map[string]any { return rows }),
+	}}
+	app := newTestApp(t, core.New(core.WithModelAdmins(newTestUserAdmin()), core.WithDashboard(dashboard)))
+
+	widgetBody, err := uiClasses("widget", "body")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	page := body(t, doGet(t, app, "/admin/", nil))
+	if !strings.Contains(page, widgetBody) {
+		t.Fatal("the widget body is not the bounded scroll box")
+	}
+	if !strings.Contains(widgetBody, "max-h-") || !strings.Contains(widgetBody, "overflow-y-auto") {
+		t.Errorf("the body is not bounded and scrollable: %q", widgetBody)
+	}
+	// theme.html styles the bar; a bare overflow box would show the
+	// browser's own, which is what the rest of the admin avoids.
+	if !strings.Contains(widgetBody, "ui-scroll-area") {
+		t.Errorf("the body does not use the themed scrollbar: %q", widgetBody)
+	}
+}
+
+// TestAWidgetOwnsOnlyOneScrollBox: a table widget used to bring its own
+// overflow container, which inside the bounded body meant two nested
+// scrollers -- and, on a wide table, two visible scrollbars.
+func TestAWidgetOwnsOnlyOneScrollBox(t *testing.T) {
+	dashboard := &core.Dashboard{Widgets: []core.Widget{
+		core.NewTable("Recent", []string{"Email"}, func() []map[string]any {
+			return []map[string]any{{"Email": "a@example.com"}}
+		}),
+	}}
+	app := newTestApp(t, core.New(core.WithModelAdmins(newTestUserAdmin()), core.WithDashboard(dashboard)))
+
+	widgetBody, _ := uiClasses("widget", "body")
+	page := body(t, doGet(t, app, "/admin/", nil))
+	idx := strings.Index(page, widgetBody)
+	if idx < 0 {
+		t.Fatal("no widget body on the page")
+	}
+	section := page[idx:]
+	section = section[:strings.Index(section, "</table>")]
+	if strings.Contains(section, "overflow-x-auto") {
+		t.Error("the table widget still nests its own scroller")
+	}
+	// Bounded as it is, the header stays put while the rows move.
+	if !strings.Contains(section, "sticky top-0") {
+		t.Error("the widget table's header does not stick while it scrolls")
+	}
+}
+
+// TestAWidgetNeverScrollsSideways: a card is a fixed column of the
+// dashboard grid. Content wider than it has to wrap, not hand the
+// reader a second scrollbar.
+func TestAWidgetNeverScrollsSideways(t *testing.T) {
+	dashboard := &core.Dashboard{Widgets: []core.Widget{
+		core.NewTable("Recent", []string{"Email"}, func() []map[string]any {
+			return []map[string]any{{"Email": "a-very-long-address-that-would-not-fit@example.com"}}
+		}),
+	}}
+	app := newTestApp(t, core.New(core.WithModelAdmins(newTestUserAdmin()), core.WithDashboard(dashboard)))
+
+	widgetBody, _ := uiClasses("widget", "body")
+	if !strings.Contains(widgetBody, "overflow-x-hidden") {
+		t.Errorf("a widget body can still scroll sideways: %q", widgetBody)
+	}
+	page := body(t, doGet(t, app, "/admin/", nil))
+	section := page[strings.Index(page, widgetBody):]
+	section = section[:strings.Index(section, "</table>")]
+	rows := section[strings.Index(section, "<tbody"):]
+	if strings.Contains(rows, "whitespace-nowrap") {
+		t.Error("the cells still hold their line instead of wrapping")
+	}
+	if !strings.Contains(rows, "break-words") {
+		t.Error("a long unbroken value would still push the card sideways")
 	}
 }

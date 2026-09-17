@@ -45,11 +45,17 @@
           @keydown.home.prevent="if (open) setActive(optionEls()[0])"
           @keydown.end.prevent="if (open) setActive(optionEls().slice(-1)[0])"
           {{if .disabled}}disabled{{end}}
-          class="{{ui "select"}} justify-between">
+          class="{{if .compact}}{{ui "select" "cell"}}{{else}}{{ui "select"}}{{end}} justify-between gap-2">
     <span x-text="label" class="truncate text-left"></span>
     {{icon "chevron-down" "w-3.5 h-3.5 shrink-0 text-muted-foreground"}}
   </button>
+  {{/* Portalled to <body>, as Radix does -- see the relation combobox in
+       ui/field.html. A select in a table cell is the case that needs it:
+       the row clips anything taller than itself. */}}
+  <template x-teleport="body">
   <div x-show="open" x-cloak role="listbox" :id="$id('select-listbox')" x-ref="options"
+       x-anchor.bottom-start.offset.4="$refs.trigger"
+       x-effect="if (open && $refs.trigger) { $el.style.width = 'auto'; $el.style.minWidth = $refs.trigger.offsetWidth + 'px'; }"
        x-transition:enter="transition ease-out duration-150"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
@@ -66,6 +72,7 @@
     {{end}}
     {{if not .options}}<div class="{{ui "combobox" "empty"}}">{{t "No options."}}</div>{{end}}
   </div>
+  </template>
 </div>
 {{end}}
 

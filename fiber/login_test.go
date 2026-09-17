@@ -269,6 +269,69 @@ func TestSidebarOffersSignOutWhenALoginBackendIsConfigured(t *testing.T) {
 	}
 }
 
+// TestTheUserMenuHoldsActionsOnly: the trigger the menu opens from sits
+// directly beside it and already shows who you are, so an identity
+// header inside the menu told the reader nothing new.
+func TestTheUserMenuHoldsActionsOnly(t *testing.T) {
+	app, _ := newLoginApp(t)
+	page := body(t, doGet(t, app, "/admin/users", map[string]string{"Cookie": fakeSessionCookie + "=demo"}))
+	footer := sidebarFooter(t, page)
+
+	if !strings.Contains(footer, "Sign out") {
+		t.Fatal("no sign-out in the footer; the assertions below would be vacuous")
+	}
+	if got := strings.Count(footer, "Demo Admin"); got != 1 {
+		t.Errorf("the signed-in name appears %d times in the footer, want 1", got)
+	}
+	if got := strings.Count(footer, "Superuser"); got != 1 {
+		t.Errorf("the signed-in role appears %d times in the footer, want 1", got)
+	}
+	label, err := uiClasses("dropdown", "label")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	if strings.Contains(footer, label) {
+		t.Error("the user menu still carries an identity header")
+	}
+}
+
+// TestWithNothingToSignOutOfTheFooterOpensNothing: with no login
+// backend the menu would hold no items at all, and a trigger that opens
+// an empty box is a dead end.
+func TestWithNothingToSignOutOfTheFooterOpensNothing(t *testing.T) {
+	admin := core.New(
+		core.WithModelAdmins(newTestUserAdmin()),
+		core.WithAuthenticator(core.NewAllowAllAuthenticator(&core.Principal{ID: "demo", DisplayName: "Demo"})),
+	)
+	footer := sidebarFooter(t, body(t, doGet(t, newTestApp(t, admin), "/admin/users", nil)))
+	if !strings.Contains(footer, "Demo") {
+		t.Fatal("the footer does not name the principal; the assertion below would be vacuous")
+	}
+	if strings.Contains(footer, `aria-haspopup="menu"`) {
+		t.Error("the footer still opens a menu with nothing in it")
+	}
+}
+
+// sidebarFooter returns the sidebar's footer region, bounded at the
+// rail that follows it.
+func sidebarFooter(t *testing.T, page string) string {
+	t.Helper()
+	classes, err := uiClasses("sidebar", "footer")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	start := strings.Index(page, classes)
+	if start < 0 {
+		t.Fatal("no sidebar footer on the page")
+	}
+	footer := page[start:]
+	end := strings.Index(footer, `aria-label="Toggle sidebar"`)
+	if end < 0 {
+		t.Fatal("no sidebar rail after the footer")
+	}
+	return footer[:end]
+}
+
 func TestSidebarOmitsSignOutWithoutALoginBackend(t *testing.T) {
 	admin := core.New(
 		core.WithModelAdmins(newTestUserAdmin()),

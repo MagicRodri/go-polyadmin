@@ -1,16 +1,18 @@
 {{define "content"}}
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
   {{range .Widgets}}
-  <div class="{{ui "widget"}} {{if eq .Size "lg"}}sm:col-span-2 xl:col-span-3{{end}}">
-    <div class="mb-3 flex items-center gap-3">
+  <div class="{{ui "widget"}} {{if eq .Size "lg"}}{{ui "widget" "span-lg"}}{{end}}">
+    <div class="{{ui "widget" "header"}}">
       <span class="{{ui "widget" "icon"}}">
         {{icon .Icon "w-5 h-5"}}
       </span>
-      <h2 class="text-sm font-medium text-muted-foreground">{{t .Title}}</h2>
+      <h2 class="{{ui "widget" "title"}}">{{t .Title}}</h2>
     </div>
-    {{.Body}}
+    {{/* Bounded, so a widget with hundreds of rows scrolls inside its
+         own card instead of stretching every card beside it. */}}
+    <div class="{{ui "widget" "body"}}">{{.Body}}</div>
   </div>
   {{end}}
-  {{if not .Widgets}}<p class="text-sm text-muted-foreground">{{t "No widgets configured."}}</p>{{end}}
+  {{if not .Widgets}}<p class="{{ui "text" "muted"}}">{{t "No widgets configured."}}</p>{{end}}
 </div>
 {{end}}

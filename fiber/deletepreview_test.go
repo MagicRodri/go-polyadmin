@@ -168,12 +168,13 @@ func TestListRowDeleteLinksToThePageOnlyWhenPreviewing(t *testing.T) {
 	app, users, _ := newPreviewApp(t, protectedInvoices)
 	users.createUser("a@example.com", true)
 	page := body(t, doGet(t, app, "/admin/users", nil))
-	if !strings.Contains(page, `href="/admin/users/1/delete"`) || strings.Contains(page, `hx-delete="/admin/users/1/delete"`) {
+	// Both forms carry the list they came from -- preserve_filters.
+	if !strings.Contains(page, `href="/admin/users/1/delete?_list=`) || strings.Contains(page, `hx-delete="/admin/users/1/delete?_list=`) {
 		t.Error("a previewing list still deletes rows in place")
 	}
 	plain, plainUsers := makeApp(t)
 	plainUsers.createUser("a@example.com", true)
-	if !strings.Contains(body(t, doGet(t, plain, "/admin/users", nil)), `hx-delete="/admin/users/1/delete"`) {
+	if !strings.Contains(body(t, doGet(t, plain, "/admin/users", nil)), `hx-delete="/admin/users/1/delete?_list=`) {
 		t.Error("a list without the capability lost its in-place delete")
 	}
 }

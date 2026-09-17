@@ -33,10 +33,13 @@
           (dict "Label" (t "XLSX") "URL" (printf "%s/%s/export/xlsx%s" .BasePath .Slug .ExportQuery)))}}
       {{end}}
       {{if .Permissions.CanCreate}}
-      <a href="{{.BasePath}}/{{.Slug}}/create"
-         class="{{ui "button"}} {{ui "button" "size-sm"}} {{ui "toolbar" "item"}}">
-        {{icon "plus" (printf "size-4 %s" (ui "toolbar" "item-icon"))}}
-        <span class="{{ui "toolbar" "item-label"}}">{{t "New"}}</span></a>
+      {{/* Icon-only, and so not a "toolbar" "item": the label is what
+           stretches a stacked control to full width, and a lone plus in a
+           full-width bar reads as floating. aria-label carries the name
+           the visible text used to. */}}
+      <a href="{{.BasePath}}/{{.Slug}}/create{{.ListQuery}}" title="{{t "New"}}" aria-label="{{t "New"}}"
+         class="{{ui "button" "size-icon"}} self-end lg:self-auto">
+        {{icon "plus" "size-4"}}</a>
       {{end}}
     </div>
   </div>

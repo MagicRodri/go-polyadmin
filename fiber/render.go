@@ -6,10 +6,12 @@ package fiber
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
+	"net/url"
 	"os"
 	"path"
 	"sort"
@@ -101,7 +103,11 @@ type pageBase struct {
 	// ("resource:"+slug, "page:"+path, or "").
 	CurrentSlug   string
 	CurrentNavKey string
-	NavItems      []navEntry
+	// ListToken is the list this page was reached from -- preserve_filters
+	// (docs/lists.md). Forms post it back in a hidden field; "" when there
+	// is none.
+	ListToken string
+	NavItems  []navEntry
 	// SiteTitle is translated; SiteInitials, the avatar fallback, comes
 	// from the untranslated title, so it stays the site's own mark.
 	SiteTitle    string
@@ -186,6 +192,70 @@ func (r *Renderer) pageBase(principal *core.Principal, csrfToken, title, header,
 // objectLabel names an object in a breadcrumb trail: the first
 // SearchFields entry (usually the most identifying), else the first
 // ListDisplay column, else the primary key.
+// prepopulatedJSON describes prepopulated_fields for the client: which
+// field is filled from which, and whether its slug keeps its own letters.
+// Empty on an edit form -- an existing record's slug is a real identifier,
+// and rewriting it from the title is how links rot.
+func prepopulatedJSON(modelAdmin core.ModelAdmin, obj any) string {
+	fields := modelAdmin.Prepopulated()
+	if obj != nil || len(fields) == 0 {
+		return ""
+	}
+	unicode := make(map[string]bool)
+	if base, ok := modelAdmin.(interface{ UnicodeSlugFields() []string }); ok {
+		for _, name := range base.UnicodeSlugFields() {
+			unicode[name] = true
+		}
+	}
+	type spec struct {
+		From    []string `json:"from"`
+		Unicode bool     `json:"unicode,omitempty"`
+	}
+	out := make(map[string]spec, len(fields))
+	for target, sources := range fields {
+		out[target] = spec{From: sources, Unicode: unicode[target]}
+	}
+	encoded, err := json.Marshal(out)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
+}
+
+// pkColumn is the column that opens the record from a readonly inline
+// row: the primary key's own when it is shown -- an id is the one cell
+// that is never a link already and never wraps -- and the first column
+// otherwise, so a row is always reachable.
+//
+// GetPK reads a value, not a field name (a ModelAdmin may override it),
+// so the column is found by name.
+func pkColumn(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	for _, name := range names {
+		if strings.EqualFold(name, "id") {
+			return name
+		}
+	}
+	return names[0]
+}
+
+// linkedCell wraps a rendered list cell in a link to its record, which is
+// what list_display_links asks for. A cell that already contains an anchor
+// -- a relation, chiefly -- is left alone: nesting <a> inside <a> is
+// invalid HTML that browsers silently restructure.
+func linkedCell(cell template.HTML, url string) template.HTML {
+	if strings.Contains(string(cell), "<a ") {
+		return cell
+	}
+	classes, err := uiClasses("text", "link")
+	if err != nil {
+		return cell
+	}
+	return template.HTML(fmt.Sprintf(`<a href="%s" class="%s">%s</a>`, template.HTMLEscapeString(url), classes, cell))
+}
+
 func objectLabel(modelAdmin core.ModelAdmin, obj any) string {
 	names := modelAdmin.SearchFields()
 	if len(names) == 0 {
@@ -208,20 +278,20 @@ func (r *Renderer) listBreadcrumbs(modelAdmin core.ModelAdmin) []breadcrumb {
 	return append(r.categoryBreadcrumb(modelAdmin.Category()), breadcrumb{Label: r.t(modelAdmin.VerboseName()), Active: true})
 }
 
-func (r *Renderer) detailBreadcrumbs(modelAdmin core.ModelAdmin, obj any) []breadcrumb {
+func (r *Renderer) detailBreadcrumbs(modelAdmin core.ModelAdmin, obj any, listToken string) []breadcrumb {
 	crumbs := r.categoryBreadcrumb(modelAdmin.Category())
 	return append(crumbs,
-		breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: fmt.Sprintf("%s/%s", r.basePath, modelAdmin.Slug())},
+		breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: r.listCrumbURL(modelAdmin, listToken)},
 		breadcrumb{Label: objectLabel(modelAdmin, obj), Active: true},
 	)
 }
 
-func (r *Renderer) formBreadcrumbs(modelAdmin core.ModelAdmin, obj any) []breadcrumb {
+func (r *Renderer) formBreadcrumbs(modelAdmin core.ModelAdmin, obj any, listToken string) []breadcrumb {
 	crumbs := r.categoryBreadcrumb(modelAdmin.Category())
-	crumbs = append(crumbs, breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: fmt.Sprintf("%s/%s", r.basePath, modelAdmin.Slug())})
+	crumbs = append(crumbs, breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: r.listCrumbURL(modelAdmin, listToken)})
 	if obj != nil {
 		crumbs = append(crumbs,
-			breadcrumb{Label: objectLabel(modelAdmin, obj), URL: fmt.Sprintf("%s/%s/%v", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))},
+			breadcrumb{Label: objectLabel(modelAdmin, obj), URL: core.WithListToken(fmt.Sprintf("%s/%s/%v", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj)), listToken)},
 			breadcrumb{Label: r.t("Edit"), Active: true},
 		)
 	} else {
@@ -230,13 +300,24 @@ func (r *Renderer) formBreadcrumbs(modelAdmin core.ModelAdmin, obj any) []breadc
 	return crumbs
 }
 
-func (r *Renderer) deleteBreadcrumbs(modelAdmin core.ModelAdmin, obj any) []breadcrumb {
+func (r *Renderer) deleteBreadcrumbs(modelAdmin core.ModelAdmin, obj any, listToken string) []breadcrumb {
 	crumbs := r.categoryBreadcrumb(modelAdmin.Category())
 	return append(crumbs,
-		breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: fmt.Sprintf("%s/%s", r.basePath, modelAdmin.Slug())},
-		breadcrumb{Label: objectLabel(modelAdmin, obj), URL: fmt.Sprintf("%s/%s/%v", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))},
+		breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: r.listCrumbURL(modelAdmin, listToken)},
+		breadcrumb{Label: objectLabel(modelAdmin, obj), URL: core.WithListToken(fmt.Sprintf("%s/%s/%v", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj)), listToken)},
 		breadcrumb{Label: r.t("Delete"), Active: true},
 	)
+}
+
+// listCrumbURL is the breadcrumb back to the list: the one the page was
+// reached from when preserve_filters handed us a token, the bare list
+// otherwise. This is where a user actually returns, so it is the crumb
+// that matters most for preserving filters.
+func (r *Renderer) listCrumbURL(modelAdmin core.ModelAdmin, listToken string) string {
+	if listToken != "" {
+		return listToken
+	}
+	return fmt.Sprintf("%s/%s", r.basePath, modelAdmin.Slug())
 }
 
 type Renderer struct {
@@ -575,7 +656,10 @@ func scrollAreaCell(field core.Field, value template.HTML) template.HTML {
 }
 
 type columnHeader struct {
-	Label     string
+	Label string
+	// Sortable is false for a column outside SortableFields: the header
+	// renders as plain text, with no menu and no URLs.
+	Sortable  bool
 	NextSort  string
 	Indicator string
 	// Explicit Asc/Desc choices rather than a link that cycles, so a click's
@@ -682,6 +766,10 @@ type listData struct {
 	// PreviewsDeletes makes the row's Delete a link to the delete page,
 	// which is where a preview has anything to say.
 	PreviewsDeletes bool
+	// ListQuery is "?_list=<this list>" for the pages reached from here,
+	// so they lead back into the list as it was left. Empty when the
+	// ModelAdmin has preserve_filters off.
+	ListQuery string
 }
 
 func (r *Renderer) buildListData(
@@ -695,6 +783,14 @@ func (r *Renderer) buildListData(
 	messages []flashMessage,
 ) listData {
 	slug := modelAdmin.Slug()
+	listToken := ""
+	if modelAdmin.PreservesFilters() {
+		listToken = listURL(r.basePath, slug, req, listURLOpts{Page: req.Page})
+	}
+	listQuery := ""
+	if listToken != "" {
+		listQuery = "?" + core.ListTokenField + "=" + url.QueryEscape(listToken)
+	}
 	columns := make([]columnHeader, 0, len(modelAdmin.ListDisplay()))
 	for _, name := range modelAdmin.ListDisplay() {
 		field, _ := modelAdmin.Field(name)
@@ -714,7 +810,8 @@ func (r *Renderer) buildListData(
 			direction = "desc"
 		}
 		columns = append(columns, columnHeader{
-			Label: field.Label, NextSort: nextSort, Indicator: indicator,
+			Label: field.Label, Sortable: core.IsSortable(modelAdmin, name),
+			NextSort: nextSort, Indicator: indicator,
 			Direction: direction,
 			AscURL:    listURL(r.basePath, slug, req, listURLOpts{Ordering: name, HasOrder: true}),
 			DescURL:   listURL(r.basePath, slug, req, listURLOpts{Ordering: "-" + name, HasOrder: true}),
@@ -723,12 +820,18 @@ func (r *Renderer) buildListData(
 
 	rows := make([]listRow, 0, len(page.Items))
 	for _, obj := range page.Items {
+		pk := modelAdmin.GetPK(obj)
+		recordURL := fmt.Sprintf("%s/%s/%v", r.basePath, slug, pk) + listQuery
 		cells := make([]template.HTML, 0, len(modelAdmin.ListDisplay()))
 		for _, name := range modelAdmin.ListDisplay() {
 			field, _ := modelAdmin.Field(name)
-			cells = append(cells, r.fieldValueHTML(relationPermissions, field, field.GetValue(obj), modelAdmin.EmptyValue()))
+			cell := r.fieldValueHTML(relationPermissions, field, field.GetValue(obj), modelAdmin.EmptyValue())
+			if perms.CanView && core.LinksToRecord(modelAdmin, name) {
+				cell = linkedCell(cell, recordURL)
+			}
+			cells = append(cells, cell)
 		}
-		rows = append(rows, listRow{PK: modelAdmin.GetPK(obj), Cells: cells})
+		rows = append(rows, listRow{PK: pk, Cells: cells})
 	}
 
 	// Each choice is a link, not a <select> option, so each needs its own URL
@@ -829,6 +932,7 @@ func (r *Renderer) buildListData(
 		Permissions:       perms,
 		Reorderable:       modelAdmin.Reorderable(),
 		PreviewsDeletes:   core.PreviewsDeletes(modelAdmin),
+		ListQuery:         listQuery,
 	}
 }
 
@@ -1057,7 +1161,7 @@ const historyLimit = 10
 // ctx is threaded through for the audit history lookup, which is a
 // real read against the host's log rather than page data already in
 // hand -- it deserves the request's cancellation like any other.
-func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, perms permissions, relationPermissions map[string]bool, messages []flashMessage) (string, error) {
+func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, perms permissions, relationPermissions map[string]bool, messages []flashMessage, listToken string) (string, error) {
 	fields := make([]detailField, 0, len(modelAdmin.DetailFields()))
 	for _, name := range modelAdmin.DetailFields() {
 		field, _ := modelAdmin.Field(name)
@@ -1071,7 +1175,7 @@ func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, 
 		return "", err
 	}
 	data := detailData{
-		pageBase:       r.pageBase(principal, csrfToken, r.t(modelAdmin.VerboseName()), r.t(modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), r.detailBreadcrumbs(modelAdmin, obj), messages),
+		pageBase:       r.pageBase(principal, csrfToken, r.t(modelAdmin.VerboseName()), r.t(modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), r.detailBreadcrumbs(modelAdmin, obj, listToken), messages),
 		Slug:           modelAdmin.Slug(),
 		PK:             modelAdmin.GetPK(obj),
 		Fields:         fields,
@@ -1081,6 +1185,7 @@ func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, 
 		InlineSections: inlineSections,
 		WideBody:       wideBody(inlineSections),
 	}
+	data.ListToken = listToken
 	tmpl, err := r.contentTemplate(modelAdmin, "detail", r.detail)
 	if err != nil {
 		return "", err
@@ -1106,6 +1211,13 @@ type formData struct {
 	Fieldsets      []fieldsetData
 	InlineSections []inlineSectionData
 	WideBody       bool
+	// AllowSaveAs adds "Save as new" beside Save, on an edit form only --
+	// there is nothing to copy from on a create form.
+	AllowSaveAs bool
+	// Prepopulated is the create form's field-filling map as JSON, read by
+	// the behaviour in theme.html. Empty on an edit form and when the
+	// ModelAdmin declares none.
+	Prepopulated string
 }
 
 // fieldsetData is one rendered group of form inputs. A group with an
@@ -1126,12 +1238,13 @@ func (r *Renderer) RenderForm(
 	submitted map[string]any,
 	errs map[string][]string,
 	relationOptions map[string]*relationFieldOptions,
+	listToken string,
 ) (string, error) {
 	tmpl, err := r.contentTemplate(modelAdmin, "form", r.form)
 	if err != nil {
 		return "", err
 	}
-	return r.executeForm(tmpl, "base", principal, csrfToken, modelAdmin, obj, submitted, errs, relationOptions)
+	return r.executeForm(tmpl, "base", principal, csrfToken, modelAdmin, obj, submitted, errs, relationOptions, listToken)
 }
 
 func (r *Renderer) RenderFormFragment(
@@ -1142,12 +1255,13 @@ func (r *Renderer) RenderFormFragment(
 	submitted map[string]any,
 	errs map[string][]string,
 	relationOptions map[string]*relationFieldOptions,
+	listToken string,
 ) (string, error) {
 	tmpl, err := r.contentTemplate(modelAdmin, "form", r.form)
 	if err != nil {
 		return "", err
 	}
-	return r.executeForm(tmpl, "content", principal, csrfToken, modelAdmin, obj, submitted, errs, relationOptions)
+	return r.executeForm(tmpl, "content", principal, csrfToken, modelAdmin, obj, submitted, errs, relationOptions, listToken)
 }
 
 func (r *Renderer) executeForm(
@@ -1160,6 +1274,7 @@ func (r *Renderer) executeForm(
 	submitted map[string]any,
 	errs map[string][]string,
 	relationOptions map[string]*relationFieldOptions,
+	listToken string,
 ) (string, error) {
 	title, action := r.t("Create %s", r.t(modelAdmin.VerboseName())), fmt.Sprintf("%s/%s/create", r.basePath, modelAdmin.Slug())
 	if obj != nil {
@@ -1200,7 +1315,7 @@ func (r *Renderer) executeForm(
 	}
 
 	data := formData{
-		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), r.formBreadcrumbs(modelAdmin, obj), nil),
+		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), r.formBreadcrumbs(modelAdmin, obj, listToken), nil),
 		VerboseName: modelAdmin.VerboseName(),
 		FormAction:  action,
 		// The edit form offers Delete, so it needs the detail page's permission
@@ -1210,7 +1325,10 @@ func (r *Renderer) executeForm(
 		Fieldsets:      fieldsets,
 		InlineSections: inlineSections,
 		WideBody:       wideBody(inlineSections),
+		AllowSaveAs:    modelAdmin.AllowsSaveAs() && obj != nil,
+		Prepopulated:   prepopulatedJSON(modelAdmin, obj),
 	}
+	data.ListToken = listToken
 	if obj != nil {
 		data.Slug = modelAdmin.Slug()
 		data.PK = modelAdmin.GetPK(obj)
@@ -1342,7 +1460,7 @@ func (r *Renderer) buildInlineSections(
 						value = data[name]
 					}
 					if inline.Layout == core.InlineLayoutTabular {
-						cells = append(cells, inlineTableCellHTML(r.basePath, field, value, errs[name], relOptions[name]))
+						cells = append(cells, r.inlineTableCellHTML(r.basePath, field, value, errs[name], relOptions[name]))
 					} else {
 						input, err := r.formInputHTML(r.basePath, field, value, errs[name], relOptions[name],
 							childAdmin.IsReadOnly(name, nil))
@@ -1353,11 +1471,21 @@ func (r *Renderer) buildInlineSections(
 					}
 				}
 			} else {
+				detailURL := fmt.Sprintf("%s/%s/%v", r.basePath, inline.Child, childPK)
+				linkColumn := pkColumn(detailNames)
 				for _, name := range detailNames {
 					field, _ := childAdmin.Field(name)
 					valueHTML := r.fieldValueHTML(relPerms, field, field.GetValue(child), childAdmin.EmptyValue())
 					if inline.Layout == core.InlineLayoutTabular {
-						cells = append(cells, scrollAreaCell(field, valueHTML))
+						cell := scrollAreaCell(field, valueHTML)
+						// The primary key's cell opens the record, so the row
+						// needs no column of its own for a View link.
+						// linkedCell leaves a cell that is already a link --
+						// a relation -- alone.
+						if name == linkColumn {
+							cell = linkedCell(cell, detailURL)
+						}
+						cells = append(cells, cell)
 					} else {
 						cells = append(cells, inlineDetailRowHTML(r.t(field.Label), valueHTML))
 					}
@@ -1387,7 +1515,7 @@ func (r *Renderer) buildInlineSections(
 					value = data[name]
 				}
 				if inline.Layout == core.InlineLayoutTabular {
-					cells = append(cells, inlineTableCellHTML(r.basePath, field, value, errs[name], relOptions[name]))
+					cells = append(cells, r.inlineTableCellHTML(r.basePath, field, value, errs[name], relOptions[name]))
 				} else {
 					input, err := r.formInputHTML(r.basePath, field, value, errs[name], relOptions[name],
 						childAdmin.IsReadOnly(name, nil))
@@ -1451,14 +1579,15 @@ type deleteData struct {
 	Preview     deletePreviewView
 }
 
-func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, preview core.ResolvedDeletePreview) (string, error) {
+func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, preview core.ResolvedDeletePreview, listToken string) (string, error) {
 	title := r.t("Delete %s", r.t(modelAdmin.VerboseName()))
 	data := deleteData{
-		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), r.deleteBreadcrumbs(modelAdmin, obj), nil),
+		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), r.deleteBreadcrumbs(modelAdmin, obj, listToken), nil),
 		VerboseName: modelAdmin.VerboseName(),
 		ObjectLabel: objectLabel(modelAdmin, obj),
 		Preview:     r.deletePreviewView(preview),
 	}
+	data.ListToken = listToken
 	tmpl, err := r.contentTemplate(modelAdmin, "delete", r.deleteTpl)
 	if err != nil {
 		return "", err

@@ -207,15 +207,15 @@ func TestStackedToolbarControlsPutTheLabelLeftAndTheIconRight(t *testing.T) {
 	}
 	page := filterablePage(t, nil)
 
-	// Filters, the action select, Export and New each get a label that
-	// takes the slack.
-	if got := strings.Count(page, label); got < 4 {
+	// Filters, the action select and Export each get a label that takes
+	// the slack. New is deliberately icon-only and so is not one of them.
+	if got := strings.Count(page, label); got < 3 {
 		t.Errorf("expected each stacked control's label to take the slack, found %d occurrences", got)
 	}
-	// Filters' and New's leading icons plus Export's icon+chevron move
-	// to the trailing edge; the action select's chevron is already last
-	// and needs no reorder.
-	if got := strings.Count(page, iconClass); got < 4 {
+	// Filters' leading icon plus Export's icon+chevron move to the
+	// trailing edge; the action select's chevron is already last and
+	// needs no reorder.
+	if got := strings.Count(page, iconClass); got < 3 {
 		t.Errorf("expected leading icons to move to the trailing edge, found %d occurrences", got)
 	}
 }
@@ -661,5 +661,63 @@ func TestMarkerFillsUseAFunctionReplacement(t *testing.T) {
 	}
 	if found < 2 {
 		t.Errorf("found %d marker fills, want the multi-select's and the pagination's", found)
+	}
+}
+
+// TestToastsAreTheSonnerToaster pins the anatomy that makes these
+// toasts Sonner's rather than a generic stack: its column geometry, a
+// queue that can pause a toast's timer, an icon per level, and a close
+// button with a name.
+func TestToastsAreTheSonnerToaster(t *testing.T) {
+	ua := newTestUserAdmin()
+	ua.createUser("a@example.com", true)
+	page := body(t, doGet(t, newTestApp(t, core.New(core.WithModelAdmins(ua))), "/admin/users", nil))
+
+	list, err := uiClasses("toast", "list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Sonner's own measurements: 14px between toasts, and a 356px
+	// column inside a 32px offset from the viewport's edge.
+	for _, want := range []string{"gap-[14px]", "sm:w-[420px]", "sm:p-8"} {
+		if !strings.Contains(list, want) {
+			t.Errorf("the toast column is not Sonner's geometry: missing %q", want)
+		}
+	}
+	// The timer pauses while the pointer rests on a toast -- without a
+	// queue that owns the timers, hovering could not hold one open.
+	for _, want := range []string{`x-data="adminToaster()"`, "@mouseenter=\"pause(toast)\"", "@mouseleave=\"resume(toast)\""} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the toaster cannot pause a toast on hover: missing %q", want)
+		}
+	}
+	// One glyph per level, and none for a plain toast.
+	if !strings.Contains(page, iconPaths["check-circle"]) || !strings.Contains(page, iconPaths["x-circle"]) {
+		t.Error("the toast does not carry its per-level icons")
+	}
+	if !strings.Contains(page, `x-show="toast.type !== 'default'"`) {
+		t.Error("a plain toast should carry no icon, as Sonner's does not")
+	}
+	// The close button used to be unlabelled, which left it nameless to
+	// a screen reader.
+	if !strings.Contains(page, `aria-label="Close"`) {
+		t.Error("the toast's close button has no accessible name")
+	}
+}
+
+// TestThePageIndicatorNeverWraps: shadcn fixes the indicator at
+// w-[100px], which a translated "Page 1 of 8" overflows in most
+// languages -- Russian's wrapped onto a second line, pushing the jump
+// buttons out of the footer's row.
+func TestThePageIndicatorNeverWraps(t *testing.T) {
+	indicator, err := uiClasses("pagination", "page-indicator")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(indicator, "min-w-[100px]") {
+		t.Errorf("the indicator's width is not a floor: %q", indicator)
+	}
+	if !strings.Contains(indicator, "whitespace-nowrap") {
+		t.Errorf("a long translation can still wrap: %q", indicator)
 	}
 }

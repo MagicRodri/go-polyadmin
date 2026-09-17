@@ -84,6 +84,11 @@
         {{range $i, $col := .Columns}}
         <th scope="col" class="{{ui "table" "th"}}"
             {{if eq $col.Direction "asc"}}aria-sort="ascending"{{else if eq $col.Direction "desc"}}aria-sort="descending"{{end}}>
+          {{if not $col.Sortable}}
+          {{/* Outside sortable_by: a plain label, with no menu and no
+               sort URLs to hand-type either -- the server drops them. */}}
+          <span class="inline-flex h-8 items-center">{{t $col.Label}}</span>
+          {{else}}
           <div class="relative inline-flex" x-data="{ open: false }"
                @keydown.escape="open = false" @click.outside="open = false">
             <button type="button" x-ref="sort{{$i}}" @click="open = !open"
@@ -112,6 +117,7 @@
                 {{icon "arrow-down" "size-4 shrink-0 text-muted-foreground"}}<span class="truncate">{{t "Desc"}}</span></a>
             </div>
           </div>
+          {{end}}
         </th>
         {{end}}
         <th scope="col" class="w-8"></th>
@@ -155,24 +161,24 @@
                  x-transition:leave-end="opacity-0 scale-95"
                  class="{{ui "dropdown" "content"}} w-32">
               {{if $.Permissions.CanView}}
-              <a href="{{$.BasePath}}/{{$.Slug}}/{{.PK}}" role="menuitem" class="{{ui "dropdown" "item"}}">
+              <a href="{{$.BasePath}}/{{$.Slug}}/{{.PK}}{{$.ListQuery}}" role="menuitem" class="{{ui "dropdown" "item"}}">
                 {{icon "view" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "View"}}</span></a>
               {{end}}
               {{if $.Permissions.CanUpdate}}
-              <a href="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/edit" role="menuitem" class="{{ui "dropdown" "item"}}">
+              <a href="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/edit{{$.ListQuery}}" role="menuitem" class="{{ui "dropdown" "item"}}">
                 {{icon "edit" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "Edit"}}</span></a>
               {{end}}
               {{if $.Permissions.CanDelete}}
               {{if $.PreviewsDeletes}}
               {{/* A previewing resource has something to say before the
                    delete, so the row leads to the page that says it. */}}
-              <a href="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/delete" role="menuitem"
+              <a href="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/delete{{$.ListQuery}}" role="menuitem"
                  class="{{ui "dropdown" "item"}} text-destructive hover:bg-destructive/10">
                 {{icon "delete" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "Delete"}}</span></a>
               {{else}}
               <button type="button" role="menuitem" @click="open = false"
                       class="{{ui "dropdown" "item"}} text-destructive hover:bg-destructive/10"
-                      hx-delete="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/delete" hx-target="#row-{{.PK}}"
+                      hx-delete="{{$.BasePath}}/{{$.Slug}}/{{.PK}}/delete{{$.ListQuery}}" hx-target="#row-{{.PK}}"
                       hx-swap="outerHTML swap:0.2s" hx-confirm="{{t "Delete this %s?" (t $.VerboseName)}}">
                 {{icon "delete" "w-4 h-4 shrink-0"}}<span class="truncate">{{t "Delete"}}</span></button>
               {{end}}

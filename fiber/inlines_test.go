@@ -259,7 +259,7 @@ func TestInlineSectionReadonlyOnDetailPage(t *testing.T) {
 	}
 }
 
-func TestReadonlyTabularInlineLinksEachRowFromATrailingViewColumn(t *testing.T) {
+func TestReadonlyTabularInlineLinksEachRowFromItsPrimaryKey(t *testing.T) {
 	app, orgAdmin, userAdmin := newInlineTestApp(t, core.InlineLayoutTabular)
 	org, users := seedOrgWithUsers(orgAdmin, userAdmin, "a@example.com")
 
@@ -271,15 +271,28 @@ func TestReadonlyTabularInlineLinksEachRowFromATrailingViewColumn(t *testing.T) 
 	row := strings.Split(strings.Split(table, "<tbody")[1], "</tr>")[0]
 	cells := strings.Split(row, "<td")[1:]
 
-	last := cells[len(cells)-1]
-	if !strings.Contains(last, `href="/admin/users/`+strconv.Itoa(users[0].ID)+`"`) || !strings.Contains(last, ">View</a>") {
-		t.Errorf("expected a trailing View link to the child record, got %s", last)
+	// The id cell opens the record, so there is no trailing View column.
+	if !strings.Contains(cells[0], `href="/admin/users/`+strconv.Itoa(users[0].ID)+`"`) {
+		t.Errorf("the primary key's cell does not open the record: %s", cells[0])
 	}
-	if strings.Contains(cells[0], "/admin/users/") {
-		t.Errorf("the first value must not be wrapped in the row link: %s", cells[0])
+	if strings.Contains(row, ">View</a>") {
+		t.Error("the trailing View column is still there")
 	}
 	if headerCells != len(cells) {
 		t.Errorf("the header has %d cells, the row %d", headerCells, len(cells))
+	}
+}
+
+// TestAReadonlyInlineNeverNestsALinkInARelationCell is the reason the row
+// link used to be its own column: a relation cell renders as a link
+// already, and <a> inside <a> is invalid.
+func TestAReadonlyInlineNeverNestsALinkInARelationCell(t *testing.T) {
+	app, orgAdmin, userAdmin := newInlineTestApp(t, core.InlineLayoutTabular)
+	org, _ := seedOrgWithUsers(orgAdmin, userAdmin, "a@example.com")
+
+	section := strings.Split(body(t, doGet(t, app, "/admin/organizations/"+strconv.Itoa(org.ID), nil)), `id="inline-users"`)[1]
+	if strings.Contains(section, `class="text-primary underline-offset-4 hover:underline"><a`) {
+		t.Error("a relation cell was wrapped in a second anchor")
 	}
 }
 

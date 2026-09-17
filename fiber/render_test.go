@@ -116,7 +116,7 @@ func TestDetailBreadcrumbsIncludeCategoryBeforeResourceLink(t *testing.T) {
 	userAdmin := newTestUserAdmin()
 	userAdmin.NavCategory = "Directory"
 	user := userAdmin.createUser("john@example.com", true)
-	crumbs := breadcrumbRenderer(t, userAdmin).detailBreadcrumbs(userAdmin, user)
+	crumbs := breadcrumbRenderer(t, userAdmin).detailBreadcrumbs(userAdmin, user, "")
 	if len(crumbs) != 3 {
 		t.Fatalf("got %+v", crumbs)
 	}
@@ -131,7 +131,7 @@ func TestDetailBreadcrumbsIncludeCategoryBeforeResourceLink(t *testing.T) {
 func TestDeleteBreadcrumbsLastCrumbIsActive(t *testing.T) {
 	userAdmin := newTestUserAdmin()
 	user := userAdmin.createUser("john@example.com", true)
-	crumbs := breadcrumbRenderer(t, userAdmin).deleteBreadcrumbs(userAdmin, user)
+	crumbs := breadcrumbRenderer(t, userAdmin).deleteBreadcrumbs(userAdmin, user, "")
 	last := crumbs[len(crumbs)-1]
 	if last.Label != "Delete" || !last.Active {
 		t.Fatalf("got %+v", last)
@@ -141,13 +141,13 @@ func TestDeleteBreadcrumbsLastCrumbIsActive(t *testing.T) {
 func TestFormBreadcrumbsNewAndEditLastCrumbIsActive(t *testing.T) {
 	userAdmin := newTestUserAdmin()
 	renderer := breadcrumbRenderer(t, userAdmin)
-	newCrumbs := renderer.formBreadcrumbs(userAdmin, nil)
+	newCrumbs := renderer.formBreadcrumbs(userAdmin, nil, "")
 	if last := newCrumbs[len(newCrumbs)-1]; last.Label != "New" || !last.Active {
 		t.Fatalf("got %+v", last)
 	}
 
 	user := userAdmin.createUser("john@example.com", true)
-	editCrumbs := renderer.formBreadcrumbs(userAdmin, user)
+	editCrumbs := renderer.formBreadcrumbs(userAdmin, user, "")
 	if last := editCrumbs[len(editCrumbs)-1]; last.Label != "Edit" || !last.Active {
 		t.Fatalf("got %+v", last)
 	}

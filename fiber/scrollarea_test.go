@@ -86,39 +86,40 @@ func inlineSection(t *testing.T, page string) string {
 	return section
 }
 
-func TestManyToManyListboxInAnEditRowIsCapped(t *testing.T) {
+// TestManyToManyInAnEditRowIsTheShadcnControl: the row holds the same
+// trigger-and-popover control the full form uses, not a native
+// <select multiple> sized to its options.
+func TestManyToManyInAnEditRowIsTheShadcnControl(t *testing.T) {
 	app, orgAdmin, userAdmin := newInlineTestApp(t, core.InlineLayoutTabular)
 	org, _ := seedOrgWithUsers(orgAdmin, userAdmin, "a@example.com")
-	// More options than the cap, or there is nothing to cap.
 	for i := 1; i <= inlineMultiSelectRows+4; i++ {
 		orgAdmin.store[100+i] = &inlineTestOrg{ID: 100 + i, Name: "Team " + strconv.Itoa(i)}
 	}
 
 	section := inlineSection(t, body(t, doGet(t, app, "/admin/organizations/"+strconv.Itoa(org.ID)+"/edit", nil)))
-	if !strings.Contains(section, "<select multiple") {
-		t.Fatal("no multi-select in the edit row; the assertions below would be vacuous")
+	if strings.Contains(section, "<select multiple") {
+		t.Error("the native listbox is still there")
 	}
-	if !strings.Contains(section, `size="`+strconv.Itoa(inlineMultiSelectRows)+`"`) {
-		t.Errorf("the listbox is not capped at %d rows", inlineMultiSelectRows)
+	if !strings.Contains(section, `aria-haspopup="listbox"`) {
+		t.Fatal("no shadcn multi-select in the edit row")
 	}
-	// It must not be sized to the option count.
-	if strings.Contains(section, `size="`+strconv.Itoa(inlineMultiSelectRows+5)+`"`) {
-		t.Error("the listbox is still sized to the number of options")
+	// Its popover leaves the row rather than being clipped by it.
+	if !strings.Contains(section, `x-teleport="body"`) {
+		t.Error("the popover is not portalled out of the row")
+	}
+	// Nothing is sized to the option count any more.
+	if strings.Contains(section, `size="`+strconv.Itoa(inlineMultiSelectRows)+`"`) {
+		t.Error("something in the row is still sized in rows")
 	}
 }
 
-func TestManyToManyListboxInAnEditRowUsesTheScrollAreaStyling(t *testing.T) {
+func TestARelationCellInAnEditRowIsTheShadcnSelect(t *testing.T) {
 	app, orgAdmin, userAdmin := newInlineTestApp(t, core.InlineLayoutTabular)
 	org, _ := seedOrgWithUsers(orgAdmin, userAdmin, "a@example.com")
-	orgAdmin.store[101] = &inlineTestOrg{ID: 101, Name: "Team"}
 
 	section := inlineSection(t, body(t, doGet(t, app, "/admin/organizations/"+strconv.Itoa(org.ID)+"/edit", nil)))
-	scroll, err := uiClasses("scroll-area", "y")
-	if err != nil {
-		t.Fatalf("uiClasses: %v", err)
-	}
-	if !strings.Contains(section, scroll) {
-		t.Error("the edit row's listbox does not carry the scroll-area classes")
+	if !strings.Contains(section, "adminMultiSelect()") && !strings.Contains(section, "adminSelect()") {
+		t.Error("the row's relation control is not one of the admin's own")
 	}
 }
 

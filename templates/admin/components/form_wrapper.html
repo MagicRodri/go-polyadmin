@@ -17,9 +17,11 @@
 <div id="resource-form-wrapper" class="{{ui "page"}}">
   <div class="{{if .WideBody}}{{ui "page" "body-wide"}}{{else}}{{ui "page" "body"}}{{end}}">
     <form id="resource-form" method="post" action="{{.FormAction}}"
+          {{if .Prepopulated}}data-prepopulated="{{.Prepopulated}}"{{end}}
           hx-post="{{.FormAction}}" hx-target="#resource-form-wrapper" hx-swap="outerHTML"
           class="{{ui "panel" "form"}}">
       {{template "csrf-field" .CSRFToken}}
+  {{if .ListToken}}<input type="hidden" name="_list" value="{{.ListToken}}">{{end}}
       {{if .NonFieldErrors}}
       {{/* A tinted, outlined panel rather than a solid red block: solid
            destructive is reserved for buttons, so an error summary does
@@ -96,6 +98,13 @@
         <button type="submit" form="resource-form" name="_addanother" value="1"
                 class="{{ui "button" "outline"}}">
           {{icon "plus" "w-4 h-4"}} {{t "Save and add another"}}</button>
+        {{/* save_as: only on an existing record, since there is nothing to
+             copy from on a create form. */}}
+        {{if .AllowSaveAs}}
+        <button type="submit" form="resource-form" name="_saveasnew" value="1"
+                class="{{ui "button" "outline"}}">
+          {{icon "copy" "w-4 h-4"}} {{t "Save as new"}}</button>
+        {{end}}
         {{end}}
         <a href="{{.BasePath}}/{{.CurrentSlug}}"
            class="{{ui "button" "ghost-muted"}}">

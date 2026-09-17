@@ -109,7 +109,7 @@ func TestZeroTimeRendersAsEmpty(t *testing.T) {
 }
 
 func TestInlineDateCellIsFilledWithItsISOForm(t *testing.T) {
-	got := string(inlineTableCellHTML("/admin", core.NewField("X", core.FieldTypeDate), time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC), nil, nil))
+	got := string(breadcrumbRenderer(t, newTestUserAdmin()).inlineTableCellHTML("/admin", core.NewField("X", core.FieldTypeDate), time.Date(2019, 3, 1, 0, 0, 0, 0, time.UTC), nil, nil))
 	if !strings.Contains(got, `value="2019-03-01"`) {
 		t.Errorf("got %s", got)
 	}
