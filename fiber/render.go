@@ -698,6 +698,11 @@ type filterChoice struct {
 	URL      string
 }
 
+type filterHidden struct {
+	Name  string
+	Value string
+}
+
 type filterControl struct {
 	Name    string
 	Label   string
@@ -707,6 +712,32 @@ type filterControl struct {
 	// clears just this filter.
 	Active   string
 	ClearURL string
+	// Current is this filter's raw value on this request. The badge
+	// counts on it rather than on a Selected choice: a custom date range
+	// and a combobox selection are both real values that match no
+	// declared choice, and counting choices treated those lists as
+	// unfiltered.
+	Current string
+	// Kind is core.FilterKind as a plain string: "" for a link list,
+	// "daterange" for the two date inputs, "relation" for the combobox.
+	// html/template compares strings cleanly and typed constants badly.
+	Kind string
+	// Prefilled into the range inputs when the current value is a range
+	// rather than a preset. Both empty otherwise.
+	RangeFrom string
+	RangeTo   string
+	// The GET form an input-bearing control submits: the list's own path,
+	// plus every other parameter as a hidden field, so submitting
+	// reproduces the list it was opened from with one thing changed.
+	FormAction string
+	Hidden     []filterHidden
+	// A relation filter whose field is in AutocompleteFields renders the
+	// lookup-backed combobox instead of a link list -- the same
+	// declaration, and the same control, the form uses.
+	UsesCombobox  bool
+	LookupURL     string
+	SelectedPK    string
+	SelectedLabel string
 }
 
 // actionInfo is an Action's template-facing shape --
@@ -758,11 +789,16 @@ type listData struct {
 	// much it hides without being opened. Counted here because html/template
 	// has no arithmetic. Search is excluded: it has its own visible box.
 	ActiveFilterCount int
-	Ordering          string
-	ExportQuery       string
-	Actions           []actionInfo
-	Permissions       permissions
-	Reorderable       bool
+	// The panel's range form field names, so the template never spells a
+	// reserved parameter itself.
+	RangeForField  string
+	RangeFromField string
+	RangeToField   string
+	Ordering       string
+	ExportQuery    string
+	Actions        []actionInfo
+	Permissions    permissions
+	Reorderable    bool
 	// PreviewsDeletes makes the row's Delete a link to the delete page,
 	// which is where a preview has anything to say.
 	PreviewsDeletes bool
@@ -840,8 +876,45 @@ func (r *Renderer) buildListData(
 	filterControls := make([]filterControl, 0, len(modelAdmin.Filters()))
 	for _, filter := range modelAdmin.Filters() {
 		current := req.Filters[filter.Name()]
-		choices := make([]filterChoice, 0)
-		for _, pair := range filter.ChoicesWithLabels() {
+
+		kind := ""
+		if control, declares := filter.(core.FilterControl); declares {
+			kind = string(control.ControlKind())
+		}
+
+		// A relation filter cannot enumerate its own values -- it reaches
+		// neither the registry nor the principal -- so the adapter sources
+		// them here and appends them after the filter's own "All".
+		var sourced []filterChoice
+		usesCombobox, lookupURL, selectedPK, selectedLabel := false, "", "", ""
+		if kind == string(core.FilterKindRelation) {
+			field, hasField := modelAdmin.Field(filter.Name())
+			if !hasField {
+				continue // nothing to filter on
+			}
+			viewable := false
+			if autocompleteFields(modelAdmin)[filter.Name()] {
+				// The whole point of AutocompleteFields is never loading
+				// the target's queryset into the page, so the choices are
+				// not sourced at all -- /lookup answers as the reader
+				// types. The target still has to be viewable.
+				usesCombobox, viewable, lookupURL, selectedPK, selectedLabel =
+					relationFilterCombobox(r.admin, principal, modelAdmin, field, current, r.basePath)
+			} else {
+				sourced, viewable = relationFilterChoices(r.admin, principal, modelAdmin, field)
+			}
+			if !viewable {
+				// Dropped, not emptied -- see relationFilterChoices.
+				continue
+			}
+		}
+
+		pairs := filter.ChoicesWithLabels()
+		for _, sourcedChoice := range sourced {
+			pairs = append(pairs, [2]string{sourcedChoice.Value, sourcedChoice.Label})
+		}
+		choices := make([]filterChoice, 0, len(pairs))
+		for _, pair := range pairs {
 			choices = append(choices, filterChoice{
 				Value:    pair[0],
 				Label:    pair[1],
@@ -861,16 +934,34 @@ func (r *Renderer) buildListData(
 				others[name] = other
 			}
 		}
+		rangeFrom, rangeTo := "", ""
+		if kind == string(core.FilterKindDateRange) {
+			if from, to, isRange := core.DateFilterRangeValues(current); isRange {
+				rangeFrom, rangeTo = from, to
+			}
+		}
 		filterControls = append(filterControls, filterControl{
 			Name: filter.Name(), Label: filter.Label(), Choices: choices,
 			Active:   active,
 			ClearURL: listURL(r.basePath, slug, req, listURLOpts{Filters: others, HasFilters: true}),
+
+			Current:    current,
+			Kind:       kind,
+			RangeFrom:  rangeFrom,
+			RangeTo:    rangeTo,
+			FormAction: listPath(r.basePath, slug),
+			Hidden:     filterFormHidden(req, filter.Name()),
+
+			UsesCombobox:  usesCombobox,
+			LookupURL:     lookupURL,
+			SelectedPK:    selectedPK,
+			SelectedLabel: selectedLabel,
 		})
 	}
 
 	activeFilterCount := 0
 	for _, control := range filterControls {
-		if control.Active != "" {
+		if control.Current != "" {
 			activeFilterCount++
 		}
 	}
@@ -926,6 +1017,9 @@ func (r *Renderer) buildListData(
 		}),
 		HasActiveFilters:  req.Search != "" || len(req.Filters) > 0,
 		ActiveFilterCount: activeFilterCount,
+		RangeForField:     core.RangeForField,
+		RangeFromField:    core.RangeFromField,
+		RangeToField:      core.RangeToField,
 		Ordering:          req.Ordering,
 		ExportQuery:       exportQuery(req),
 		Actions:           actionInfos(modelAdmin),
@@ -968,6 +1062,38 @@ func exportQuery(req core.ListRequest) string {
 // filterChoiceURL is one link in the filter sidebar: everything else
 // carries over unchanged, filterName is set to value, and an empty value
 // clears that filter. Page is omitted, resetting to 1.
+// listPath is the list's own URL with no query -- a GET form's action,
+// since the form supplies the query itself.
+func listPath(basePath, slug string) string {
+	return basePath + "/" + slug
+}
+
+// filterFormHidden is every list parameter except the one the form is
+// about, as hidden fields. Without them, submitting the form would drop
+// the reader's search, sort and other filters.
+func filterFormHidden(req core.ListRequest, exclude string) []filterHidden {
+	hidden := make([]filterHidden, 0, len(req.Filters)+2)
+	if req.Search != "" {
+		hidden = append(hidden, filterHidden{Name: "search", Value: req.Search})
+	}
+	if req.Ordering != "" {
+		hidden = append(hidden, filterHidden{Name: "sort", Value: req.Ordering})
+	}
+	// Page is deliberately dropped: narrowing a list returns to page 1,
+	// exactly as the choice links already do.
+	names := make([]string, 0, len(req.Filters))
+	for name := range req.Filters {
+		if name != exclude {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names) // stable output, so the tests can assert on it
+	for _, name := range names {
+		hidden = append(hidden, filterHidden{Name: "filter[" + name + "]", Value: req.Filters[name]})
+	}
+	return hidden
+}
+
 func filterChoiceURL(basePath, slug string, req core.ListRequest, filterName, value string) string {
 	filters := make(map[string]string, len(req.Filters))
 	for name, other := range req.Filters {

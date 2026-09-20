@@ -46,13 +46,24 @@ func parseListRequestFromForm(c *fiber.Ctx) core.ListRequest {
 	}
 }
 
-func parseListRequest(c *fiber.Ctx) core.ListRequest {
+// parseListRequest reads the list query from the URL. It takes the
+// ModelAdmin only so the panel's range form can be folded into one
+// filter value -- see core.FoldRangeParams, which needs to know which
+// filters are actually declared.
+func parseListRequest(c *fiber.Ctx, modelAdmin core.ModelAdmin) core.ListRequest {
 	filters := make(map[string]string)
 	c.Context().QueryArgs().VisitAll(func(key, value []byte) {
 		if match := filterKeyPattern.FindStringSubmatch(string(key)); match != nil {
 			filters[match[1]] = string(value)
 		}
 	})
+	// The panel's range form posts two date inputs plus the filter they
+	// belong to; fold them into the one value the grammar defines before
+	// anything reads Filters.
+	core.FoldRangeParams(modelAdmin, filters,
+		queryValue(c, core.RangeForField),
+		queryValue(c, core.RangeFromField),
+		queryValue(c, core.RangeToField))
 	page, err := strconv.Atoi(c.Query("page", "1"))
 	if err != nil {
 		page = 1
@@ -121,7 +132,7 @@ func handleList(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Render
 		// Resolved once, then handed to both the query and the pager --
 		// otherwise PageOf would size the page control from the raw
 		// request and disagree with the rows actually fetched.
-		req := core.ApplyDefaults(modelAdmin, parseListRequest(c))
+		req := core.ApplyDefaults(modelAdmin, parseListRequest(c, modelAdmin))
 		objects, total, err := core.ListObjects(c.Context(), modelAdmin, req)
 		if err != nil {
 			return err

@@ -86,6 +86,24 @@ It renders in the same filter panel as `BooleanFilter` and
 own name (`filter[Founded]=7d`), so a filtered list is a link like any
 other.
 
+Below the presets the panel offers **Custom range**, two date inputs
+whose value rides in the same parameter:
+
+```
+?filter[Founded]=7d                       a preset
+?filter[Founded]=2026-01-01:2026-03-01    a range
+?filter[Founded]=2026-01-01:              from that date through today
+```
+
+The range is **inclusive of both endpoints** — that is what "from X to
+Y" means — and `core.DateFilterRange` converts it to the same half-open
+window the presets produce, so a `ListQuerier` host resolving the raw
+value gets identical results either way. An empty end means "through
+today", resolved by the parser rather than by the panel, so the range
+still works with scripting off. An empty start, an unparseable date, or
+an end before its start narrows nothing, the same rule an unrecognised
+preset follows.
+
 Because it rides in the same `ListRequest` as every other filter,
 **exports and `delete_selected` narrow with it**: "all N matching" means
 what the panel is showing.
@@ -109,3 +127,132 @@ Two details worth knowing: the window is **half-open** (`>= from`,
 is compared **by date**, so a datetime's clock time never decides whether
 it counts as "today". An unrecognised value narrows nothing rather than
 failing, so a crafted URL renders the list unfiltered.
+
+## Filtering on whether a field is set at all
+
+`EmptyFilter` splits a list on presence, which is the question behind
+most "why is this record wrong?" hunts:
+
+```go
+core.BaseModelAdmin{
+    DeclaredFilters: []core.Filter{core.NewEmptyFilter("Organization")},
+}
+```
+
+It offers **All**, **Empty** and **Not empty**, and the URL carries
+`filter[Organization]=empty` or `=notempty`.
+
+**Empty means unset or blank, never merely zero.** `nil`, `""`, an empty
+collection, a nil pointer and a zero time are empty; `0`, `false` and
+`"0"` are values somebody chose. A plain `int` or `bool` field can
+therefore never be empty — those types cannot represent "unset", so a
+nullable number is a `*int`, as it already must be for anything
+optional. A `many` relation is empty when it has no members.
+
+A `ListQuerier` host reads the raw value and compares it against the
+constants, so the two paths cannot drift:
+
+```go
+switch req.Filters["Organization"] {
+case core.EmptyFilterEmpty:
+    where = append(where, "organization_id IS NULL")
+case core.EmptyFilterNotEmpty:
+    where = append(where, "organization_id IS NOT NULL")
+}
+```
+
+## Filtering by a related record
+
+```go
+core.BaseModelAdmin{
+    DeclaredFilters: []core.Filter{core.NewRelationFilter("Organization")},
+}
+```
+
+The URL carries the target's primary key — `filter[Organization]=3` —
+and a `many` relation matches when any member does, so "users whose
+Teams include Platform" works.
+
+**The control follows `AutocompleteFields`.** A relation named there
+renders as the same lookup-backed combobox the form uses, pointed at the
+target's own `/lookup` route; every other relation renders as a list of
+links over the target's whole queryset, uncapped, exactly as the form's
+non-autocomplete `<select>` already does. Declaring the relation in
+`AutocompleteFieldNames` is the answer to a large target, and it is the
+same answer in both places.
+
+A reader who may not view the target resource does not get the filter at
+all — it is dropped from the panel rather than shown empty.
+
+**One limitation worth knowing.** `Apply` receives the parent
+ModelAdmin, not the registry, so it cannot call the target's own
+`GetPK`. It uses the same default lookup `BaseModelAdmin.GetPK` does. If
+the target declares a custom `PK` func, set the filter's `RelatedPK` to
+match:
+
+```go
+filter := core.NewRelationFilter("Organization")
+filter.RelatedPK = func(related any) any { return related.(*Org).Code }
+```
+
+## Writing your own filter
+
+A filter is an interface, not a closed set. Implement four methods and
+declare it like any built-in; Django calls this a `SimpleListFilter`,
+and the two halves are the same: the options, and the constraint.
+
+```go
+type planFilter struct{}
+
+func (planFilter) Name() string  { return "Plan" }
+func (planFilter) Label() string { return "Plan" }
+
+func (planFilter) ChoicesWithLabels() [][2]string {
+    return [][2]string{{"", "All"}, {"paid", "Paid"}, {"free", "Free"}}
+}
+
+func (planFilter) Apply(objects []any, raw string, modelAdmin core.ModelAdmin) []any {
+    if raw == "" {
+        return objects // "" always means "no filter"
+    }
+    field, ok := modelAdmin.Field("Plan")
+    if !ok {
+        return objects
+    }
+    out := make([]any, 0, len(objects))
+    for _, obj := range objects {
+        plan, _ := field.GetValue(obj).(string)
+        if (plan != "Free") == (raw == "paid") {
+            out = append(out, obj)
+        }
+    }
+    return out
+}
+```
+
+```go
+core.BaseModelAdmin{
+    DeclaredFilters: []core.Filter{planFilter{}},
+}
+```
+
+Three rules make a host filter equal to a built-in rather than
+cosmetic:
+
+- **`""` always means "no filter".** It is the first choice, it is what
+  Clear all sets, and `Apply` must return its input unchanged for it.
+- **An unrecognised value narrows nothing.** The value comes from a URL,
+  so treat anything you do not recognise as absent rather than failing —
+  a crafted link should render the list, not an error.
+- **`Apply` gets the raw string.** Parsing is the filter's own job,
+  because only it knows what its values mean.
+
+Because it rides in the same `ListRequest` as every built-in, **exports
+and `delete_selected` narrow with it**: "all N matching" means what the
+panel is showing. A `ListQuerier` host reads the same raw value out of
+`req.Filters` and resolves it in its own query.
+
+A filter that needs a control other than a list of links declares one by
+implementing `core.FilterControl` — that is how `DateFilter` gets its
+range inputs and `RelationFilter` its combobox. A filter that does not
+implement it is a choice list, which is what almost every filter wants.

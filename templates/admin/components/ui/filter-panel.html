@@ -80,6 +80,57 @@
           </li>
           {{end}}
         </ul>
+        {{if .UsesCombobox}}
+        {{/* The same control the form uses, in the same GET form the
+             range uses: the combobox writes the chosen pk into its own
+             hidden input, and Apply submits the form, so the panel
+             needs no bespoke navigation. */}}
+        {{/* hx-disinherit: the combobox inside carries its own complete
+             htmx wiring for /lookup, and without this it would inherit
+             this form's hx-select="#resource-list" -- htmx would then
+             select that id out of the lookup's option list, find
+             nothing, and swap nothing, leaving the panel's combobox
+             permanently empty. */}}
+        <form method="get" action="{{.FormAction}}" class="{{ui "filter-panel" "form"}}"
+              hx-get="{{.FormAction}}" hx-target="#resource-list" hx-select="#resource-list"
+              hx-swap="outerHTML" hx-push-url="true" hx-disinherit="*">
+          {{range .Hidden}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">{{end}}
+          {{template "ui/combobox" dict
+              "name" (printf "filter[%s]" .Name)
+              "id" (printf "filter-combobox-%s" .Name)
+              "selectedPK" .SelectedPK
+              "selectedLabel" .SelectedLabel
+              "lookupURL" .LookupURL
+              "placeholder" (t "Search…")
+              "disabled" false}}
+          <button type="submit" class="{{ui "button" "outline" "size-xs"}} w-full">{{t "Apply"}}</button>
+        </form>
+        {{end}}
+        {{if eq .Kind "daterange"}}
+        {{/* A GET form, not a JS-built URL: two date inputs cannot
+             become one parameter without either a form post or
+             scripting, and the form is the one that still works with
+             scripting off. The handler folds _range_from/_range_to into
+             the filter's own value (core.FoldRangeParams). */}}
+        <form method="get" action="{{.FormAction}}" class="{{ui "filter-panel" "form"}}"
+              hx-get="{{.FormAction}}" hx-target="#resource-list" hx-select="#resource-list"
+              hx-swap="outerHTML" hx-push-url="true">
+          {{range .Hidden}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">{{end}}
+          <input type="hidden" name="{{$.RangeForField}}" value="{{.Name}}">
+          <p class="{{ui "filter-panel" "group-label"}}">{{t "Custom range"}}</p>
+          <div class="{{ui "filter-panel" "form-row"}}">
+            <label for="range-from-{{.Name}}" class="{{ui "filter-panel" "form-label"}}">{{t "From"}}</label>
+            <input type="date" id="range-from-{{.Name}}" name="{{$.RangeFromField}}" value="{{.RangeFrom}}"
+                   class="{{ui "input"}} {{ui "filter-panel" "form-input"}}">
+          </div>
+          <div class="{{ui "filter-panel" "form-row"}}">
+            <label for="range-to-{{.Name}}" class="{{ui "filter-panel" "form-label"}}">{{t "To"}}</label>
+            <input type="date" id="range-to-{{.Name}}" name="{{$.RangeToField}}" value="{{.RangeTo}}"
+                   class="{{ui "input"}} {{ui "filter-panel" "form-input"}}">
+          </div>
+          <button type="submit" class="{{ui "button" "outline" "size-xs"}} w-full">{{t "Apply"}}</button>
+        </form>
+        {{end}}
       </div>
       {{end}}
     </div>

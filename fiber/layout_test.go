@@ -36,6 +36,7 @@ func TestTemplateTreeMatchesThePythonImplementationPathForPath(t *testing.T) {
 
 		"admin/components/ui/breadcrumb.html":      true,
 		"admin/components/ui/bulk-actions.html":    true,
+		"admin/components/ui/combobox.html":        true,
 		"admin/components/ui/calendar.html":        true,
 		"admin/components/ui/delete-preview.html":  true,
 		"admin/components/ui/dropdown-menu.html":   true,

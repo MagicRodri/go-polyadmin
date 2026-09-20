@@ -284,3 +284,41 @@ func WithListToken(rawURL, token string) string {
 	}
 	return rawURL + separator + ListTokenField + "=" + url.QueryEscape(token)
 }
+
+// The panel's range form posts these three rather than one filter value,
+// because a form cannot concatenate two inputs. Reserved names, in the
+// same family as _list and _return.
+const (
+	RangeForField  = "_range_for"
+	RangeFromField = "_range_from"
+	RangeToField   = "_range_to"
+)
+
+// FoldRangeParams turns a range form's submission into the single filter
+// value the grammar defines, in place. Folding here rather than in the
+// browser is what keeps the range working with scripting off.
+//
+// rangeFor arrives from the client, so it is honoured only when the
+// ModelAdmin actually declares a filter by that name -- otherwise a
+// crafted form could inject any key into Filters. Submitting both inputs
+// empty clears the filter instead of setting an empty range.
+func FoldRangeParams(modelAdmin ModelAdmin, filters map[string]string, rangeFor, from, to string) {
+	if rangeFor == "" {
+		return
+	}
+	declared := false
+	for _, filter := range modelAdmin.Filters() {
+		if filter.Name() == rangeFor {
+			declared = true
+			break
+		}
+	}
+	if !declared {
+		return
+	}
+	if from == "" && to == "" {
+		delete(filters, rangeFor)
+		return
+	}
+	filters[rangeFor] = from + ":" + to
+}

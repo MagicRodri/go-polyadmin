@@ -2,6 +2,7 @@ package fiber
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/MagicRodri/go-polyadmin/core"
 )
@@ -113,4 +114,106 @@ func fmtValue(value any) string {
 		return s
 	}
 	return stringOrEmpty(value)
+}
+
+// relationFilterChoices is a relation filter's choice list: every record
+// of the target ModelAdmin, as (pk, display) pairs.
+//
+// ok is false when the principal may not view the target. The caller
+// drops the filter entirely in that case -- an empty filter group reads
+// as a broken control, and a reader who may not see organizations should
+// not be told they exist. This is the principal-aware check, not
+// computeRelationOptions' coarser CanView: a filter offers records by
+// name, so it has to answer to the same authorizer the target's own list
+// does.
+//
+// The queryset is loaded whole and uncapped, through listObjects and
+// context.Background(), exactly as computeRelationOptions already does
+// for a non-autocomplete relation <select>. AutocompleteFields is the
+// answer to a large target, and it is the same answer in both places; a
+// cap here and not there would have the panel and the form disagree
+// about the same relation.
+func relationFilterChoices(
+	admin *core.Admin,
+	principal *core.Principal,
+	modelAdmin core.ModelAdmin,
+	field core.Field,
+) ([]filterChoice, bool) {
+	if field.Relation == nil {
+		return nil, false
+	}
+	allowed := computeRelationPermissions(admin, principal, modelAdmin, []string{field.Name})
+	if !allowed[field.Relation.Target] {
+		return nil, false
+	}
+	targetAdmin, ok := admin.GetModelAdmin(field.Relation.Target)
+	if !ok {
+		return nil, false
+	}
+	objects, _, err := core.ListObjects(context.Background(), targetAdmin, core.ListRequest{Unlimited: true})
+	if err != nil {
+		return nil, false
+	}
+	displayField, hasDisplay := targetAdmin.Field(field.Relation.DisplayField)
+	choices := make([]filterChoice, 0, len(objects))
+	for _, obj := range objects {
+		pk := fmt.Sprint(targetAdmin.GetPK(obj))
+		label := pk
+		if hasDisplay {
+			label = fmtValue(displayField.GetValue(obj))
+		}
+		choices = append(choices, filterChoice{Value: pk, Label: label})
+	}
+	return choices, true
+}
+
+// autocompleteFields is AutocompleteFields() as a set, for the lookups
+// the control assembly does per filter.
+func autocompleteFields(modelAdmin core.ModelAdmin) map[string]bool {
+	names := make(map[string]bool)
+	for _, name := range modelAdmin.AutocompleteFields() {
+		names[name] = true
+	}
+	return names
+}
+
+// relationFilterCombobox resolves what the panel's combobox needs for a
+// relation filter: the target's lookup route, and the label of whatever
+// is currently selected. It loads no queryset -- that is the whole point
+// of AutocompleteFields -- but the target must still be viewable, so the
+// same permission check the link list uses applies here too.
+//
+// current is the filter's raw value, which is the target's primary key.
+func relationFilterCombobox(
+	admin *core.Admin,
+	principal *core.Principal,
+	modelAdmin core.ModelAdmin,
+	field core.Field,
+	current string,
+	basePath string,
+) (usesCombobox, viewable bool, lookupURL, selectedPK, selectedLabel string) {
+	if field.Relation == nil {
+		return false, false, "", "", ""
+	}
+	allowed := computeRelationPermissions(admin, principal, modelAdmin, []string{field.Name})
+	if !allowed[field.Relation.Target] {
+		return false, false, "", "", ""
+	}
+	targetAdmin, ok := admin.GetModelAdmin(field.Relation.Target)
+	if !ok {
+		return false, false, "", "", ""
+	}
+	lookupURL = basePath + "/" + field.Relation.Target + "/lookup"
+	if current != "" {
+		// One object, not the queryset: the trigger has to show what is
+		// selected or the reader cannot tell what they are filtering by.
+		if related, err := targetAdmin.GetObject(context.Background(), current); err == nil && !core.IsNil(related) {
+			selectedPK = current
+			selectedLabel = current
+			if displayField, hasDisplay := targetAdmin.Field(field.Relation.DisplayField); hasDisplay {
+				selectedLabel = fmtValue(displayField.GetValue(related))
+			}
+		}
+	}
+	return true, true, lookupURL, selectedPK, selectedLabel
 }

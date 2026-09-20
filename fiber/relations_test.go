@@ -486,3 +486,70 @@ func TestLookupResultsAreListboxOptions(t *testing.T) {
 		t.Error("lookup results must be options, or the panel is a listbox with no options in it")
 	}
 }
+
+func TestARelationFilterListsTheTargetsRecords(t *testing.T) {
+	app, userAdmin, orgAdmin := makeRelationApp(t)
+	userAdmin.DeclaredFilters = []core.Filter{core.NewRelationFilter("Organization")}
+	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
+
+	page := body(t, doGet(t, app, "/admin/users", nil))
+	if !strings.Contains(page, "Acme") {
+		t.Error("the relation filter does not offer the target's records")
+	}
+	if !strings.Contains(page, "filter[Organization]=1") {
+		t.Error("a relation choice does not carry the target's primary key")
+	}
+}
+
+func TestARelationFilterDisappearsWhenTheTargetIsNotViewable(t *testing.T) {
+	// Not rendered empty: an empty group is a control that looks broken.
+	// A reader who may not see organizations is not told they exist.
+	userAdmin := newRelUserAdmin()
+	userAdmin.DeclaredFilters = []core.Filter{core.NewRelationFilter("Organization")}
+	orgAdmin := newTestOrgAdmin()
+	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
+	admin := core.New(core.WithModelAdmins(userAdmin, orgAdmin),
+		core.WithAuthorizer(denyOrgViewAuthorizer{}))
+	app := newTestApp(t, admin)
+
+	page := body(t, doGet(t, app, "/admin/users", nil))
+	if strings.Contains(page, "filter[Organization]") {
+		t.Error("a filter over a target the principal cannot view was offered")
+	}
+}
+
+func TestALargeRelationFilterUsesTheCombobox(t *testing.T) {
+	// newAutocompleteRelUserAdmin already declares Organization in
+	// AutocompleteFieldNames -- it is the fixture the form's combobox
+	// tests use, which is the point: one declaration, both controls.
+	userAdmin := newAutocompleteRelUserAdmin()
+	userAdmin.DeclaredFilters = []core.Filter{core.NewRelationFilter("Organization")}
+	orgAdmin := newTestOrgAdmin()
+	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
+	app := newTestApp(t, core.New(core.WithModelAdmins(userAdmin, orgAdmin)))
+
+	page := body(t, doGet(t, app, "/admin/users", nil))
+	if !strings.Contains(page, `name="filter[Organization]"`) {
+		t.Fatal("the panel did not render a combobox input for an autocomplete relation")
+	}
+	// It queries the target's own lookup route, which is already
+	// authorized against that target's view permission.
+	if !strings.Contains(page, "/admin/organizations/lookup") {
+		t.Error("the panel's combobox does not point at the target's lookup route")
+	}
+	// The whole queryset must NOT have been dumped into the panel.
+	if strings.Contains(page, `filter[Organization]=1`) {
+		t.Error("the combobox branch still rendered a link list")
+	}
+}
+
+func TestASmallRelationFilterStaysALinkList(t *testing.T) {
+	app, userAdmin, orgAdmin := makeRelationApp(t) // no AutocompleteFieldNames
+	userAdmin.DeclaredFilters = []core.Filter{core.NewRelationFilter("Organization")}
+	orgAdmin.store[1] = &testOrg{ID: 1, Name: "Acme"}
+
+	page := body(t, doGet(t, app, "/admin/users", nil))
+	if !strings.Contains(page, "filter[Organization]=1") {
+		t.Error("a relation not in AutocompleteFields should render as links")
+	}
+}

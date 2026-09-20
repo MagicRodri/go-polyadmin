@@ -55,7 +55,21 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 					Fields: []string{"Plan", "Organization", "Roles"}},
 			},
 			SearchFieldNames: []string{"Email"},
-			DeclaredFilters:  []core.Filter{core.NewBooleanFilter("IsActive")},
+			DeclaredFilters: []core.Filter{
+				core.NewBooleanFilter("IsActive"),
+				// Organization is in AutocompleteFieldNames below, so
+				// this renders as the lookup-backed combobox rather
+				// than a list of every organization.
+				core.NewRelationFilter("Organization"),
+				// Roles is a many-to-many: this matches a user holding
+				// the chosen role among however many they have.
+				core.NewRelationFilter("Roles"),
+				// Not every user has an organization, and "which ones
+				// are unassigned?" is the question the seed makes real.
+				core.NewEmptyFilter("Organization"),
+				// A filter this application wrote itself -- see planFilter.
+				planFilter{},
+			},
 			// Routes the "Organization" relation through the /lookup
 			// endpoint instead of a same-page <select>
 			// populated from every organization -- demonstrates the
@@ -165,4 +179,38 @@ func (a *UserAdmin) Update(ctx context.Context, obj any, data map[string]any) (a
 func (a *UserAdmin) Delete(ctx context.Context, obj any) error {
 	a.repository.Delete(obj.(*User))
 	return nil
+}
+
+// planFilter is a filter this application wrote itself: it implements
+// core.Filter and nothing else, borrowing nothing from the framework's
+// own filter types. This is the hook Django calls a SimpleListFilter --
+// the admin supplies both the options and the constraint.
+//
+// It exists in the example so the extension point is exercised by the
+// browser suite rather than only described in docs/lists.md.
+type planFilter struct{}
+
+func (planFilter) Name() string  { return "Plan" }
+func (planFilter) Label() string { return "Plan" }
+
+func (planFilter) ChoicesWithLabels() [][2]string {
+	return [][2]string{{"", "All"}, {"paid", "Paid"}, {"free", "Free"}}
+}
+
+func (planFilter) Apply(objects []any, raw string, modelAdmin core.ModelAdmin) []any {
+	if raw == "" {
+		return objects
+	}
+	field, ok := modelAdmin.Field("Plan")
+	if !ok {
+		return objects
+	}
+	out := make([]any, 0, len(objects))
+	for _, obj := range objects {
+		plan, _ := field.GetValue(obj).(string)
+		if (plan != "Free") == (raw == "paid") {
+			out = append(out, obj)
+		}
+	}
+	return out
 }

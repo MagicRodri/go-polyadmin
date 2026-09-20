@@ -23,7 +23,7 @@ func handleExportCSV(admin *core.Admin, modelAdmin core.ModelAdmin, basePath str
 		}
 		// Unlimited: an export of a filtered set is the whole set, not
 		// whichever page the user happened to be looking at.
-		req := parseListRequest(c)
+		req := parseListRequest(c, modelAdmin)
 		req.Unlimited = true
 		objects, _, err := core.ListObjects(c.Context(), modelAdmin, req)
 		if err != nil {
@@ -73,7 +73,7 @@ func handleExportXLSX(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 		}
 		// Unlimited: an export of a filtered set is the whole set, not
 		// whichever page the user happened to be looking at.
-		req := parseListRequest(c)
+		req := parseListRequest(c, modelAdmin)
 		req.Unlimited = true
 		objects, _, err := core.ListObjects(c.Context(), modelAdmin, req)
 		if err != nil {
