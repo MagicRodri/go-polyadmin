@@ -2,7 +2,8 @@
 
 A Django-admin-style, server-rendered admin framework for
 [Fiber](https://gofiber.io). See [`docs/`](docs/) for reference
-documentation.
+documentation, or visit the [PolyAdmin documentation site](https://magicrodri.github.io/polyadmin-docs/)
+for the shared Go and Python guides.
 
 ## What you get from declaring a `ModelAdmin`
 
