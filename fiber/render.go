@@ -752,9 +752,10 @@ type actionInfo struct {
 	Preview bool
 }
 
-func actionInfos(modelAdmin core.ModelAdmin) []actionInfo {
+// actionInfos describes actions for the templates. The caller passes them
+// already resolved for its page: core.ActionsForList or core.ActionsForDetail.
+func actionInfos(modelAdmin core.ModelAdmin, actions []core.Action) []actionInfo {
 	previews := core.PreviewsDeletes(modelAdmin)
-	actions := modelAdmin.Actions()
 	out := make([]actionInfo, 0, len(actions))
 	for _, a := range actions {
 		info := actionInfo{Name: a.Name, Label: a.Label, Confirm: a.Confirm}
@@ -1022,7 +1023,7 @@ func (r *Renderer) buildListData(
 		RangeToField:      core.RangeToField,
 		Ordering:          req.Ordering,
 		ExportQuery:       exportQuery(req),
-		Actions:           actionInfos(modelAdmin),
+		Actions:           actionInfos(modelAdmin, core.ActionsForList(modelAdmin)),
 		Permissions:       perms,
 		Reorderable:       modelAdmin.Reorderable(),
 		PreviewsDeletes:   core.PreviewsDeletes(modelAdmin),
@@ -1305,7 +1306,7 @@ func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, 
 		Slug:           modelAdmin.Slug(),
 		PK:             modelAdmin.GetPK(obj),
 		Fields:         fields,
-		Actions:        actionInfos(modelAdmin),
+		Actions:        actionInfos(modelAdmin, core.ActionsForDetail(modelAdmin)),
 		History:        r.historyFor(ctx, modelAdmin, obj),
 		Permissions:    perms,
 		InlineSections: inlineSections,
