@@ -1,5 +1,10 @@
 # go-polyadmin
 
+[![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![CI](https://github.com/MagicRodri/go-polyadmin/actions/workflows/notify-docs.yml/badge.svg)](https://github.com/MagicRodri/go-polyadmin/actions/workflows/notify-docs.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub Repo stars](https://img.shields.io/github/stars/MagicRodri/go-polyadmin?style=flat-square)](https://github.com/MagicRodri/go-polyadmin)
+
 A Django-admin-style, server-rendered admin framework for
 [Fiber](https://gofiber.io). See [`docs/`](docs/) for reference
 documentation, or visit the [PolyAdmin documentation site](https://magicrodri.github.io/polyadmin-docs/)
