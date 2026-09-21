@@ -10,6 +10,20 @@ import (
 // when the Admin has no Authenticator configured.
 type ActionHandler func(ctx context.Context, modelAdmin ModelAdmin, objects []any, principal *Principal) (string, error)
 
+// ActionWhere says which pages offer an Action. The zero value behaves as
+// ActionWhereBoth, so an Action literal that never mentions it keeps its
+// old behaviour.
+type ActionWhere string
+
+const (
+	ActionWhereBoth   ActionWhere = "both"
+	ActionWhereList   ActionWhere = "list"
+	ActionWhereDetail ActionWhere = "detail"
+)
+
+func (w ActionWhere) onList() bool   { return w != ActionWhereDetail }
+func (w ActionWhere) onDetail() bool { return w != ActionWhereList }
+
 // Action is a ModelAdmin capability applied to one or more records.
 // It's invoked with a list of objects either way -- a
 // "record" action from the detail page passes a list of exactly one, a
@@ -29,10 +43,15 @@ type Action struct {
 	// ResourcePermission(slug, Permission) alongside the resource's
 	// "view" permission -- "" means no extra check.
 	Permission string
+	// Where places the action: the list page's bulk bar, a record's detail
+	// page, or both. Placement only, not authorization -- the action route
+	// serves every action whichever page offered it, and checks Permission
+	// there.
+	Where ActionWhere
 }
 
 func NewAction(name string, handler ActionHandler, opts ...func(*Action)) Action {
-	a := Action{Name: name, Label: defaultLabel(name), Handler: handler}
+	a := Action{Name: name, Label: defaultLabel(name), Handler: handler, Where: ActionWhereBoth}
 	for _, opt := range opts {
 		opt(&a)
 	}
@@ -49,6 +68,17 @@ func WithActionConfirm(confirm string) func(*Action) {
 
 func WithActionPermission(permission string) func(*Action) {
 	return func(a *Action) { a.Permission = permission }
+}
+
+func WithActionWhere(where ActionWhere) func(*Action) {
+	return func(a *Action) {
+		switch where {
+		case ActionWhereBoth, ActionWhereList, ActionWhereDetail:
+			a.Where = where
+		default:
+			panic(fmt.Sprintf("polyadmin: action %q: unknown placement %q", a.Name, where))
+		}
+	}
 }
 
 // DeleteSelectedName is the built-in bulk delete's action name. It is
@@ -76,6 +106,7 @@ func NewDeleteSelectedAction() Action {
 		Label:      N_("Delete selected"),
 		Confirm:    N_("Delete the selected records? This cannot be undone."),
 		Permission: "delete",
+		Where:      ActionWhereList,
 		Handler: func(ctx context.Context, modelAdmin ModelAdmin, objects []any, principal *Principal) (string, error) {
 			deleted := 0
 			for _, obj := range objects {
@@ -100,4 +131,61 @@ func GetAction(modelAdmin ModelAdmin, name string) (Action, bool) {
 		}
 	}
 	return Action{}, false
+}
+
+// ActionsForList is what the list page's bulk bar offers.
+func ActionsForList(modelAdmin ModelAdmin) []Action {
+	var out []Action
+	for _, action := range modelAdmin.Actions() {
+		if action.Where.onList() {
+			out = append(out, action)
+		}
+	}
+	return out
+}
+
+// ActionsForDetail is what one record's detail page offers. delete_selected
+// is a bulk action, so it is never among them -- not by Where, not by being
+// named in DetailActions, not when a ModelAdmin replaces it.
+func ActionsForDetail(modelAdmin ModelAdmin) []Action {
+	var candidates []Action
+	for _, action := range modelAdmin.Actions() {
+		if action.Name != DeleteSelectedName {
+			candidates = append(candidates, action)
+		}
+	}
+	names := modelAdmin.DetailActions()
+	var out []Action
+	if names == nil {
+		for _, action := range candidates {
+			if action.Where.onDetail() {
+				out = append(out, action)
+			}
+		}
+		return out
+	}
+	for _, name := range names {
+		for _, action := range candidates {
+			if action.Name == name {
+				out = append(out, action)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// ValidateDetailActions reports a DetailActions name that is not one of the
+// ModelAdmin's actions.
+func ValidateDetailActions(modelAdmin ModelAdmin) error {
+	known := map[string]bool{}
+	for _, action := range modelAdmin.Actions() {
+		known[action.Name] = true
+	}
+	for _, name := range modelAdmin.DetailActions() {
+		if !known[name] {
+			return fmt.Errorf("%s: DetailActions names %q, which is not one of its actions", modelAdmin.Slug(), name)
+		}
+	}
+	return nil
 }

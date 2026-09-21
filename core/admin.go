@@ -168,6 +168,9 @@ func (a *Admin) Register(modelAdmin ModelAdmin) {
 	if _, exists := a.registry[slug]; exists {
 		panic(fmt.Sprintf("polyadmin: a ModelAdmin is already registered for slug %q", slug))
 	}
+	if err := ValidateDetailActions(modelAdmin); err != nil {
+		panic("polyadmin: " + err.Error())
+	}
 	a.registry[slug] = modelAdmin
 	a.order = append(a.order, slug)
 }

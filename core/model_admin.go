@@ -45,6 +45,9 @@ type ModelAdmin interface {
 	DetailFields() []string
 	Filters() []Filter
 	Actions() []Action
+	// DetailActions names the actions the detail page offers, in order;
+	// nil means "use each action's Where". See ActionsForDetail.
+	DetailActions() []string
 	// Inlines declares child ModelAdmins whose records point back at
 	// this one, managed/displayed inline on this ModelAdmin's
 	// create/detail/edit pages. See core/inline.go and docs/inlines.md.
@@ -118,7 +121,11 @@ type BaseModelAdmin struct {
 	DeclaredFields   []Field
 	DeclaredFilters  []Filter
 	DeclaredActions  []Action
-	DeclaredInlines  []Inline
+	// DeclaredDetailActions names the actions the detail page offers, in
+	// order. nil means every action whose Where includes the detail page; a
+	// non-nil slice overrides Where, and an empty one offers none.
+	DeclaredDetailActions []string
+	DeclaredInlines       []Inline
 	// DeclaredFieldsets, when set, defines both the grouping and the field
 	// list: FormFields() reports it flattened, so the form and the handler
 	// agree. FormFieldNames is then unused.
@@ -347,6 +354,7 @@ func (b BaseModelAdmin) Actions() []Action {
 	// not be the first thing in the listbox.
 	return append(append([]Action{}, b.DeclaredActions...), NewDeleteSelectedAction())
 }
+func (b BaseModelAdmin) DetailActions() []string      { return b.DeclaredDetailActions }
 func (b BaseModelAdmin) Inlines() []Inline            { return b.DeclaredInlines }
 func (b BaseModelAdmin) AutocompleteFields() []string { return b.AutocompleteFieldNames }
 
