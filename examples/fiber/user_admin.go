@@ -84,6 +84,8 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 					return setActive(ctx, ma, objects, p, false)
 				}, core.WithActionLabel("Deactivate"), core.WithActionConfirm("Deactivate the selected users?")),
 			},
+			// The detail page offers Deactivate only; Activate stays a bulk action.
+			DeclaredDetailActions: []string{"deactivate"},
 			DeclaredFields: []core.Field{
 				// HelpText is where an ORM/DB column comment lands. It
 				// shows under the control on the form and under the
