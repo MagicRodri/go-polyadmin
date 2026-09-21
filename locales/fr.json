@@ -56,6 +56,7 @@
     "one": "%d enregistrement supprimé.",
     "other": "%d enregistrements supprimés."
   },
+  "Deleted %d of %d, then failed": "%d sur %d supprimé(s), puis échec",
   "Desc": "Décroissant",
   "Drag to reorder": "Glisser pour réorganiser",
   "Drag to reorder (not saved)": "Glisser pour réorganiser (non enregistré)",

@@ -88,3 +88,19 @@ func TestDeclaringDeleteSelectedReplacesTheBuiltIn(t *testing.T) {
 		t.Error("the built-in displaced the declared action")
 	}
 }
+
+func TestListPageTranslatesTheDeleteSelectedLabelAndConfirmation(t *testing.T) {
+	app, _ := makeApp(t)
+	fr := body(t, doGet(t, app, "/admin/users", map[string]string{"Accept-Language": "fr"}))
+	for _, want := range []string{"Supprimer la sélection", "Supprimer les enregistrements sélectionnés"} {
+		if !strings.Contains(fr, want) {
+			t.Errorf("fr list page lacks %q", want)
+		}
+	}
+	ru := body(t, doGet(t, app, "/admin/users", map[string]string{"Accept-Language": "ru"}))
+	for _, want := range []string{"Удалить выбранное", "Удалить выбранные записи"} {
+		if !strings.Contains(ru, want) {
+			t.Errorf("ru list page lacks %q", want)
+		}
+	}
+}

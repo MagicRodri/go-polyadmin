@@ -114,7 +114,7 @@ func NewDeleteSelectedAction() Action {
 					// Stop at the first failure and report how far it
 					// got: silently continuing would leave the user
 					// unable to tell which records survived.
-					return "", fmt.Errorf("deleted %d of %d, then: %w", deleted, len(objects), err)
+					return "", fmt.Errorf("%s: %w", T(ctx, "Deleted %d of %d, then failed", deleted, len(objects)), err)
 				}
 				deleted++
 			}
