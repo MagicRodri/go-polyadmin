@@ -25,9 +25,9 @@ func TestLayoutEmitsThemeTokens(t *testing.T) {
 		"--muted-foreground: 240 3.8% 46.1%;",
 		"--radius: 0.5rem;",
 		// Chart tokens are for *categorical data* (the Donut widget's
-		// slices) as opposed to UI chrome -- the same split shadcn
-		// draws. Without them a Donut would fall back to literal
-		// Tailwind shades and stop following the theme.
+		// slices) as opposed to UI chrome -- the same split the reference
+		// design system draws. Without them a Donut would fall back to
+		// literal Tailwind shades and stop following the theme.
 		"--chart-1:",
 		"--chart-6:",
 		".dark {",

@@ -121,11 +121,6 @@ func main() {
 	// admin's login page and makes an unauthenticated request redirect
 	// to it, and WithAuthenticator is what reads the session back on
 	// every subsequent request.
-	//
-	// This replaced an AllowAllAuthenticator hardcoded to a superuser,
-	// which meant nothing below -- SuperuserAuthorizer, per-object
-	// permissions, the audit log's principal -- was ever exercised
-	// against an identity anyone actually proved.
 	sessions := NewCookieSessionBackend()
 	options := []core.Option{
 		core.WithModelAdmins(NewUserAdmin(users, organizations, roles), NewOrganizationAdmin(organizations, users), NewRoleAdmin(roles, users)),
@@ -147,7 +142,7 @@ func main() {
 		}),
 	}
 	// en-XA, bracketed and accented, so a page can be swept for text that
-	// never went through the translator -- see browsertests/test_i18n.py.
+	// never went through the translator.
 	if os.Getenv("POLYADMIN_PSEUDO_LOCALE") == "1" {
 		options = append(options, core.WithPseudoLocale())
 	}

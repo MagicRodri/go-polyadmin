@@ -195,7 +195,6 @@ func TestUpdateOrganizationRejectsGarbageAndKeepsOriginalValues(t *testing.T) {
 	}
 }
 
-// getOrganizationPage GETs an admin page and returns its body.
 func getOrganizationPage(t *testing.T, app *fiber.App, path string) string {
 	t.Helper()
 	resp, err := app.Test(httptest.NewRequest("GET", path, nil), -1)

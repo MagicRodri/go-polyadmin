@@ -13,7 +13,7 @@ import (
 )
 
 // A host catalog, so the tests do not depend on the framework catalogs'
-// contents (Task 13 fills them).
+// contents.
 var hostFrench = fstest.MapFS{"fr.json": &fstest.MapFile{Data: []byte(`{"Hello": "Bonjour", "Broadcast Message": "Message diffusé"}`)}}
 
 func helloPageAdmin(t *testing.T, opts ...core.Option) (*core.Admin, string) {
@@ -105,7 +105,7 @@ func TestResolverSeesThePrincipalAndAuthenticationRunsOnce(t *testing.T) {
 func TestHostStringsTranslateThroughT(t *testing.T) {
 	admin, dir := helloPageAdmin(t)
 	app := mountPageApp(t, admin, dir)
-	// The page label reaches the sidebar through {{t .Label}} in Task 7;
+	// The page label reaches the sidebar through {{t .Label}};
 	// here, {{t}} with a non-literal argument is exercised directly.
 	writeOverrideTemplate(t, dir, "pages/hello.html", `{{$label := "Broadcast Message"}}<p id="label">{{t $label}}</p>`)
 	page := body(t, doGet(t, app, "/admin/hello", map[string]string{"Accept-Language": "fr"}))

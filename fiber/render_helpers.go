@@ -72,9 +72,9 @@ func (r *Renderer) fieldValueHTML(relationPermissions map[string]bool, field cor
 	switch field.Type {
 	case core.FieldTypeBoolean:
 		if b, _ := value.(bool); b {
-			// No shadcn "success" token to defer to, so this picks an
-			// emerald pair that clears contrast against bg-card in both
-			// themes.
+			// The reference design system has no "success" token to defer
+			// to, so this picks an emerald pair that clears contrast
+			// against bg-card in both themes.
 			return boolIconHTML("check", "text-emerald-600 dark:text-emerald-400", r.t("Yes"))
 		}
 		return boolIconHTML("close", classPlaceholder, r.t("No"))
@@ -236,8 +236,8 @@ type fieldOptionData struct {
 	Selected bool
 }
 
-// formInputHTML renders a field's form input as shadcn's Form/FormItem
-// unit -- label, control, description, error -- resolving every per-type
+// formInputHTML renders a field's form input as the reference design
+// system's Form/FormItem unit -- label, control, description, error -- resolving every per-type
 // value here in Go and handing the result to the ui/field partial to
 // dispatch and print. Unlike fieldValueHTML, escaping is html/template's
 // own, since every value reaches the template as a plain field on the

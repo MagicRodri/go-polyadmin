@@ -116,8 +116,8 @@ func IsSortable(modelAdmin ModelAdmin, name string) bool {
 }
 
 // LinksToRecord reports whether a list cell links to the record. Unset
-// LinkFields links the first column, as Django does; an empty one links
-// nothing and leaves the row menu as the way in.
+// LinkFields links the first column; an empty one links nothing and
+// leaves the row menu as the way in.
 func LinksToRecord(modelAdmin ModelAdmin, name string) bool {
 	linked := modelAdmin.LinkFields()
 	if linked == nil {

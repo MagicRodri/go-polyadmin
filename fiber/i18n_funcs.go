@@ -9,9 +9,9 @@ import (
 )
 
 // baseFuncs are the locale-independent template functions: `icon` for
-// inline SVGs, `ui` for shadcn-derived class strings (see ui.go),
-// `siteInitials` for avatar fallbacks, `dict`/`list` for multi-argument
-// partial calls.
+// inline SVGs, `ui` for class strings ported from the reference design
+// system (see ui.go), `siteInitials` for avatar fallbacks, `dict`/`list`
+// for multi-argument partial calls.
 var baseFuncs = template.FuncMap{
 	"icon":         iconHTML,
 	"ui":           uiClasses,

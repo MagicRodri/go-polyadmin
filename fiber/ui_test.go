@@ -7,8 +7,8 @@ import (
 )
 
 func TestUIClassesFillsInBothDefaultAxes(t *testing.T) {
-	// Neither axis given: the shadcn defaults for variant *and* size
-	// should both appear.
+	// Neither axis given: the reference design system's defaults for
+	// variant *and* size should both appear.
 	got, err := uiClasses("button")
 	if err != nil {
 		t.Fatalf("uiClasses: %v", err)
@@ -163,8 +163,8 @@ func TestUIRegistryBaseDoesNotFightItsVariants(t *testing.T) {
 	// There is no tailwind-merge here (see ui.go), so a base that sets a
 	// property its own variant or size also sets produces two competing
 	// utilities in one class attribute -- and Tailwind resolves those by
-	// its own output order, not the order written. shadcn's cva entries
-	// avoid this by construction; so must these.
+	// its own output order, not the order written. The reference design
+	// system's cva entries avoid this by construction; so must these.
 	for component, spec := range uiRegistry {
 		baseProps := propertiesOf(spec.Base)
 		for _, group := range []struct {
@@ -228,8 +228,8 @@ func TestUIRegistryUsesThemeTokensNotLiteralPalette(t *testing.T) {
 	// would be invisible to the theme and to dark mode.
 	//
 	// The emerald/amber pairs are the documented exceptions -- there is
-	// no shadcn success/warning token to defer to, so those name an
-	// explicit dark: variant instead.
+	// no success/warning token in the reference design system to defer
+	// to, so those name an explicit dark: variant instead.
 	//
 	// Anchored on a preceding word boundary and a trailing shade number,
 	// so this matches `bg-slate-50` but not `translate-x-4` -- an
@@ -255,35 +255,29 @@ func TestUIRegistryMatchesThePythonImplementationKeyForKey(t *testing.T) {
 	// so this pins the shape a reader comparing them relies on. Kept as
 	// an explicit list rather than parsed from the Python source -- the
 	// point is to fail when someone adds a component to one side only.
-	// The mirror of this test lives in
-	// python-polyadmin/tests/test_ui.py.
 	expected := map[string]bool{
-		// Phase A
 		"button": true, "input": true, "textarea": true, "select": true,
 		"label": true, "checkbox": true, "radio": true, "switch": true,
 		"badge": true, "card": true, "alert": true, "separator": true,
 		"skeleton": true, "avatar": true, "text": true,
-		// Phase B
 		"dialog": true, "dropdown": true, "popover": true, "tooltip": true,
 		"toast": true, "sheet": true,
-		// Phase C
 		"sidebar": true, "nav-item": true, "tabs": true, "accordion": true,
 		"breadcrumb": true, "pagination": true, "table": true,
-		// Phase D
 		"field": true, "combobox": true, "calendar": true, "slider": true,
 		"multi-select": true,
 		// dashboard / misc
 		"widget": true, "panel": true, "page": true, "toolbar": true,
 		"filter-panel": true,
-		// form grouping (Django's fieldsets)
+		// form grouping
 		"fieldset": true,
 		// audit history panel
 		"history": true,
-		// login page (shadcn's login-04 block)
+		// login page (the reference login block)
 		"login": true,
 		// 401/403/404 page
 		"error": true,
-		// bounded scrolling region (shadcn ScrollArea)
+		// bounded scrolling region (the reference ScrollArea)
 		"scroll-area": true,
 	}
 	for component := range uiRegistry {

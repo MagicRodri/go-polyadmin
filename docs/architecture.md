@@ -1,7 +1,7 @@
 # Architecture
 
-go-polyadmin is a Django-admin-style admin framework for
-[Fiber](https://gofiber.io). It owns presentation — routes, forms,
+go-polyadmin is a server-rendered operations framework for Go applications.
+The current [Fiber](https://gofiber.io) adapter owns presentation — routes, forms,
 tables, permissions checks, HTML — and owns no storage: your
 `ModelAdmin` implements the lifecycle hooks against whatever database
 or service you already have. This document explains how the pieces fit

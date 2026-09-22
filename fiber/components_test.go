@@ -705,8 +705,8 @@ func TestToastsAreTheSonnerToaster(t *testing.T) {
 	}
 }
 
-// TestThePageIndicatorNeverWraps: shadcn fixes the indicator at
-// w-[100px], which a translated "Page 1 of 8" overflows in most
+// TestThePageIndicatorNeverWraps: the reference design system fixes
+// the indicator at w-[100px], which a translated "Page 1 of 8" overflows in most
 // languages -- Russian's wrapped onto a second line, pushing the jump
 // buttons out of the footer's row.
 func TestThePageIndicatorNeverWraps(t *testing.T) {

@@ -61,9 +61,9 @@ func (r *OrganizationRepository) Update(o *Organization, name string, founded ti
 }
 
 // Role is the many-to-many target: a user holds any number of them.
-// Modelled after the permissions list Django's admin is known for, and
-// what the searchable multi-select on the user form is there to make
-// bearable once the list is long.
+// Modelled after the kind of long permissions list an admin panel
+// commonly has, which is what the searchable multi-select on the user
+// form is there to make bearable.
 type Role struct {
 	ID   int
 	Name string
@@ -108,7 +108,7 @@ type User struct {
 	Email    string
 	IsActive bool
 	// A plain choice field, so the reference app exercises ui/select
-	// (the shadcn Select port). Every other choice-shaped field here is
+	// (the reference Select port). Every other choice-shaped field here is
 	// a relation, which renders one of the two combobox widgets
 	// instead -- without this, ui/select appeared nowhere in the app.
 	Plan         string
@@ -181,9 +181,9 @@ func (r *UserRepository) Matching(keep func(*User) bool) []*User {
 }
 
 func seed(users *UserRepository, organizations *OrganizationRepository, roles *RoleRepository) {
-	// Founded in the same month for every organization: Task 15's browser
-	// test checks that this date renders with a French month name under
-	// the fr locale, and it doesn't matter which organization it looks at.
+	// Founded in the same month for every organization: a browser test
+	// checks that this date renders with a French month name under the fr
+	// locale, and it doesn't matter which organization it looks at.
 	// Acme keeps March 2019: a browser test pins "Mar 1, 2019" as a data
 	// value and checks the same date renders "mars" under fr. The others
 	// spread out, so the date drill-down has years and months to walk.

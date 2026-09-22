@@ -175,7 +175,6 @@ func (a *Admin) Register(modelAdmin ModelAdmin) {
 	a.order = append(a.order, slug)
 }
 
-// GetModelAdmin looks up a registered ModelAdmin by slug.
 func (a *Admin) GetModelAdmin(slug string) (ModelAdmin, bool) {
 	ma, ok := a.registry[slug]
 	return ma, ok

@@ -88,8 +88,8 @@ func (r *Renderer) categoryBreadcrumb(category string) []breadcrumb {
 
 type pageBase struct {
 	// Principal is who is signed in, for the sidebar footer's NavUser
-	// (shadcn sidebar-07). Every page renders a sidebar, so it has to
-	// reach every page's data.
+	// (the reference sidebar block). Every page renders a sidebar, so it
+	// has to reach every page's data.
 	Principal *core.Principal
 	// CSRFToken is per-request state like Principal, and reaches every
 	// page for the same reason: base.html renders it as a meta tag, and
@@ -391,9 +391,9 @@ var listPartials = []string{
 	"admin/resource/list.html",
 }
 
-// parseComponents parses the shadcn ui partials plus sharedPartials
-// into tmpl -- the pair every template set needs, whether or not it
-// also gets layoutFiles.
+// parseComponents parses the reference design system's ui partials
+// plus sharedPartials into tmpl -- the pair every template set needs,
+// whether or not it also gets layoutFiles.
 func parseComponents(tmpl *template.Template) (*template.Template, error) {
 	tmpl, err := tmpl.ParseFS(coretemplates.FS, uiComponentsGlob)
 	if err != nil {

@@ -10,8 +10,7 @@ import (
 
 // hostDomainFilter is written the way an application would write one:
 // it implements core.Filter and nothing else, borrowing nothing from
-// the framework's own filter types. Django calls this a
-// SimpleListFilter -- lookups() plus queryset().
+// the framework's own filter types.
 type hostDomainFilter struct{}
 
 func (hostDomainFilter) Name() string  { return "Domain" }

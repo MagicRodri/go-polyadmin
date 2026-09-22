@@ -17,7 +17,6 @@ type localeContextKey struct{}
 // from Value -- so c.Context() carries it into ModelAdmin methods.
 var LocaleContextKey = localeContextKey{}
 
-// WithLocaleContext returns ctx carrying lc.
 func WithLocaleContext(ctx context.Context, lc *LocaleContext) context.Context {
 	return context.WithValue(ctx, LocaleContextKey, lc)
 }

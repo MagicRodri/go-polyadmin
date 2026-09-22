@@ -16,8 +16,7 @@ import (
 )
 
 // sweepAreas turns on one group of pages at a time, so each conversion
-// commit leaves the suite green. Every area is on by the end of Task 7
-// except "errors", which Task 9 turns on.
+// commit leaves the suite green.
 var sweepAreas = map[string]bool{
 	"layout": true,
 	"list":   true,

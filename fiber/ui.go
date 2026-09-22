@@ -21,13 +21,15 @@ type uiComponent struct {
 	Parts    map[string]string
 }
 
-// uiRegistry resolves shadcn's cva lookups at template-execution time,
-// via the "ui" template func: {{ui "button" "outline" "size-sm"}}.
+// uiRegistry resolves the reference design system's cva lookups at
+// template-execution time, via the "ui" template func:
+// {{ui "button" "outline" "size-sm"}}.
 //
 // Colors are the CSS variables from admin/theme.html rather than a
 // literal palette, which is what makes the admin themeable. Sizes are
-// prefixed "size-" because shadcn has both a variant and a size named
-// "default"; the prefix also tells the resolver which axis was given.
+// prefixed "size-" because the reference design system has both a
+// variant and a size named "default"; the prefix also tells the
+// resolver which axis was given.
 var uiRegistry = map[string]uiComponent{
 
 	"button": {
@@ -35,14 +37,16 @@ var uiRegistry = map[string]uiComponent{
 		// Variants, and a base must not fight its own axes.
 		Base: "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
 		Variants: map[string]string{
-			// shadcn's six stock button variants, verbatim in intent.
+			// The reference design system's six stock button variants,
+			// verbatim in intent.
 			"default":     "bg-primary text-primary-foreground hover:bg-primary/90",
 			"destructive": "bg-destructive text-destructive-foreground hover:bg-destructive/90",
 			"outline":     "border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
 			"secondary":   "bg-secondary text-secondary-foreground hover:bg-secondary/80",
 			"ghost":       "text-foreground hover:bg-accent hover:text-accent-foreground",
 			"link":        "text-primary underline-offset-4 hover:underline",
-			// shadcn ships no destructive counterpart to `outline`. A
+			// The reference design system ships no destructive counterpart
+			// to `outline`. A
 			// detail page's Delete must match the weight of the outline
 			// Edit beside it (solid `destructive` is reserved for the
 			// confirmation page's submit), and a row's icon-only Delete
@@ -84,10 +88,11 @@ var uiRegistry = map[string]uiComponent{
 		Sizes: map[string]string{"size-default": "min-h-[80px] px-3 py-2"},
 	},
 
-	// A native <select>, not shadcn's Radix-backed SelectTrigger: a
-	// custom listbox does not post its value with a plain form submit,
-	// and the admin's forms have to keep working without JS. Styled to
-	// match the shadcn trigger (same height, border, ring).
+	// A native <select>, not the reference design system's Radix-backed
+	// SelectTrigger: a custom listbox does not post its value with a
+	// plain form submit, and the admin's forms have to keep working
+	// without JS. Styled to match the reference trigger (same height,
+	// border, ring).
 	"select": {
 		Base: "flex w-full items-center rounded-md border border-input bg-background text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
 		Sizes: map[string]string{
@@ -157,11 +162,11 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// shadcn's login-04 block. Its social buttons, "Sign up" and "Forgot
-	// your password?" are deliberately absent: the framework has no
-	// route behind any of them. login-04 fills the right column with a
-	// photograph, which a framework cannot ship, so "aside" styles a
-	// typographic panel instead.
+	// The reference login block. Its social buttons, "Sign up" and
+	// "Forgot your password?" are deliberately absent: the framework has
+	// no route behind any of them. The reference block fills the right
+	// column with a photograph, which a framework cannot ship, so
+	// "aside" styles a typographic panel instead.
 	"login": {
 		Parts: map[string]string{
 			"page":      "flex min-h-svh flex-col items-center justify-center bg-muted p-6 md:p-10",
@@ -289,7 +294,7 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// Sonner, the toaster shadcn/ui ships. Its geometry is kept as it
+	// Sonner, the toaster the reference design system ships. Its geometry is kept as it
 	// ships: a 356px column in the viewport's corner, 14px between
 	// toasts, 16px of padding, 13px text, and a close button parked
 	// half outside the top-left corner. What is dropped is Sonner's
@@ -337,7 +342,7 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// shadcn's sidebar-07 block, at its exact widths (16rem open, 3rem
+	// The reference sidebar block, at its exact widths (16rem open, 3rem
 	// collapsed, 18rem mobile sheet). Its --sidebar-* colour scale is
 	// deliberately not reproduced: the Zinc values are within a hair of
 	// card/accent/border, and restyling the admin must mean editing
@@ -424,8 +429,8 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// Toolbar + footer of the list table, from shadcn's Tasks example:
-	// search and filters left, page actions right; below, the
+	// Toolbar + footer of the list table, from the reference data-table
+	// example: search and filters left, page actions right; below, the
 	// DataTablePagination row.
 	"toolbar": {
 		// Stacked until lg, a row from lg up. lg, not sm, because the
@@ -490,7 +495,7 @@ var uiRegistry = map[string]uiComponent{
 			"selection":     "flex-1 text-sm text-muted-foreground",
 			"controls":      "flex items-center gap-4 lg:gap-8",
 			"rows-per-page": "flex items-center gap-2 text-sm font-medium",
-			// shadcn fixes this at w-[100px]; a translated "Page 1 of 8"
+			// The reference design system fixes this at w-[100px]; a translated "Page 1 of 8"
 			// is wider than that in most languages, so the width is a
 			// floor and the label never wraps to a second line.
 			"page-indicator": "flex min-w-[100px] items-center justify-center whitespace-nowrap text-sm font-medium",
@@ -515,7 +520,7 @@ var uiRegistry = map[string]uiComponent{
 			"head":              "[&_tr]:border-b [&_tr]:border-border",
 			"th":                "px-4 py-2.5 text-left align-middle font-medium whitespace-nowrap text-muted-foreground",
 			"body":              "divide-y divide-border",
-			// data-[state=selected], from shadcn/ui's own TableRow: a
+			// data-[state=selected], from the reference design system's own TableRow: a
 			// checked row-checkbox (list.html) tints the whole row, the
 			// same as a hover, so a selection reads at a glance instead
 			// of only through the toolbar's "N of M selected" count.
@@ -529,9 +534,9 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// The label + control + description + error unit. shadcn calls this
-	// FormItem/FormLabel/FormDescription/FormMessage; here it is what
-	// wraps every generated form input.
+	// The label + control + description + error unit. The reference
+	// design system calls this FormItem/FormLabel/FormDescription/
+	// FormMessage; here it is what wraps every generated form input.
 	"field": {
 		Base: "mb-4",
 		Parts: map[string]string{
@@ -573,10 +578,10 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// The many-to-many control: shadcn's Combobox/Command idiom over the
-	// relation's options, selection shown as removable chips. Django's
-	// filter_horizontal without the two-pane layout, which needs width
-	// this form column doesn't have.
+	// The many-to-many control: the reference design system's
+	// Combobox/Command idiom over the relation's options, selection
+	// shown as removable chips. It skips a two-pane layout, since that
+	// needs width this form column doesn't have.
 	"multi-select": {
 		Parts: map[string]string{
 			// min-h matches the single Select's h-10 so a field with
@@ -644,8 +649,8 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
-	// Form fieldset (Django's `fieldsets`): a titled, collapsible group
-	// of fields inside the record form. A group with no title renders
+	// Form fieldset: a titled, collapsible group of fields inside the
+	// record form. A group with no title renders
 	// bare -- no header, no border -- so the default single-group case
 	// looks exactly like the flat form it replaces.
 	"fieldset": {

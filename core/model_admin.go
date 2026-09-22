@@ -87,8 +87,8 @@ type ModelAdmin interface {
 	Delete(ctx context.Context, obj any) error
 }
 
-// Fieldset is one titled group of form fields -- Django's `fieldsets`.
-// A Title of "" renders the group with no header, which is how the
+// Fieldset is one titled group of form fields. A Title of "" renders
+// the group with no header, which is how the
 // undeclared default renders as a plain flat form. Collapsed only seeds
 // the initial state; the group can always be opened.
 type Fieldset struct {
@@ -140,14 +140,13 @@ type BaseModelAdmin struct {
 	// is not stable between requests.
 	OrderingDefault string
 	// PageSizeDefault is how many rows a list page holds; zero means
-	// DefaultPageSize. Django calls this list_per_page.
+	// DefaultPageSize.
 	PageSizeDefault int
 	// EmptyValueDisplay is what a read-only view shows in place of a
 	// value that is nil or blank. Empty means DefaultEmptyValue.
-	// Django calls this empty_value_display.
 	EmptyValueDisplay string
 	// DisableDeleteSelected removes the built-in bulk delete. Disable*, so
-	// the zero value keeps it, as Django does.
+	// the zero value keeps it.
 	DisableDeleteSelected bool
 	// Relation fields that render as a lookup-driven search box rather than a
 	// <select> over the target's full queryset -- for relations too large, or
@@ -176,15 +175,15 @@ type BaseModelAdmin struct {
 	// above) -- see the doc comment on Reorderable().
 	EnableReordering bool
 
-	// SortableFieldNames restricts which list columns offer a sort, Django's
-	// sortable_by. nil leaves every column sortable; an empty (non-nil)
-	// slice makes none of them sortable. The restriction also holds for a
-	// hand-typed ?sort=, but not for OrderingDefault, which is the
-	// admin's own choice rather than user input.
+	// SortableFieldNames restricts which list columns offer a sort. nil
+	// leaves every column sortable; an empty (non-nil) slice makes none
+	// of them sortable. The restriction also holds for a hand-typed
+	// ?sort=, but not for OrderingDefault, which is the admin's own
+	// choice rather than user input.
 	SortableFieldNames []string
-	// LinkFieldNames names the list cells that link to the record, Django's
-	// list_display_links. nil links the first column; an empty (non-nil)
-	// slice links none, leaving the row menu as the way in.
+	// LinkFieldNames names the list cells that link to the record. nil
+	// links the first column; an empty (non-nil) slice links none,
+	// leaving the row menu as the way in.
 	LinkFieldNames []string
 	// PrepopulatedFields fills a field from others as they are typed:
 	// {"Slug": {"Title"}} slugifies Title into Slug. Client-side and on
@@ -196,7 +195,7 @@ type BaseModelAdmin struct {
 	PrepopulatedUnicode []string
 	// AllowSaveAs adds "Save as new" to the edit form, which saves the
 	// submitted values as a new record and leaves the original alone.
-	// Opt-in, as Django's save_as is.
+	// Opt-in.
 	AllowSaveAs bool
 	// DisablePreserveFilters stops the list handing its search, filters,
 	// sort and page to the pages reached from it, so they no longer lead

@@ -42,8 +42,6 @@ func titlesOf(objects []any) []string {
 	return out
 }
 
-// --- slugify ---------------------------------------------------------
-
 func TestSlugifyTransliteratesToASCII(t *testing.T) {
 	for _, c := range []struct{ in, want string }{
 		{"Café du Coin", "cafe-du-coin"},
@@ -72,8 +70,6 @@ func TestSlugifyUnicodeKeepsItsLetters(t *testing.T) {
 		}
 	}
 }
-
-// --- the date filter ---------------------------------------------------
 
 func datedAdmin() *parityAdmin {
 	admin := newParityAdmin()
@@ -146,8 +142,6 @@ func TestDateFilterIsDeclaredLikeAnyOther(t *testing.T) {
 	}
 }
 
-// --- sortable_by -----------------------------------------------------
-
 func TestUnsetSortableFieldsLeavesEveryColumnSortable(t *testing.T) {
 	admin := newParityAdmin()
 	for _, name := range []string{"ID", "Title", "Created"} {
@@ -193,8 +187,6 @@ func TestTheModelAdminsOwnDefaultOrderingIsExemptFromTheRestriction(t *testing.T
 	}
 }
 
-// --- list_display_links ----------------------------------------------
-
 func TestUnsetLinkFieldsLinksTheFirstColumnOnly(t *testing.T) {
 	admin := newParityAdmin()
 	if !LinksToRecord(admin, "ID") {
@@ -218,8 +210,6 @@ func TestLinkFieldsChoosesAndEmptyMeansNoLinks(t *testing.T) {
 		}
 	}
 }
-
-// --- the other options' accessors ------------------------------------
 
 func TestPreserveFiltersIsOnUntilDisabled(t *testing.T) {
 	admin := newParityAdmin()

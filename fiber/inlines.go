@@ -95,7 +95,8 @@ func relationOptions(relation *relationFieldOptions) []relationOption {
 // per-type branches rather than trying to strip its wrapper.
 func (r *Renderer) inlineTableCellHTML(basePath string, field core.Field, value any, errs []string, relation *relationFieldOptions) template.HTML {
 	name := html.EscapeString(field.Name)
-	// Compact flavors of the same shadcn controls the full form uses.
+	// Compact flavors of the same controls the full form uses, drawn
+	// from the reference design system.
 	fieldClasses := classInputCompact
 	selectClasses := classSelectCell
 
@@ -127,7 +128,8 @@ func (r *Renderer) inlineTableCellHTML(basePath string, field core.Field, value 
 		b.WriteString(string(cell))
 
 	case core.FieldTypeManyToMany:
-		// The same shadcn control the full form uses: a trigger with chips
+		// The same control the full form uses, from the reference design
+		// system: a trigger with chips
 		// and a portalled popover, so a row stays one line tall however
 		// many options there are -- the native <select multiple> it
 		// replaces had to be capped and scrolled internally to avoid

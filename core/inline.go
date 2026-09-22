@@ -14,8 +14,7 @@ const (
 
 // Inline is a reverse-relation admin declaration: lets a parent
 // ModelAdmin manage/display a child ModelAdmin's records that point
-// back at it via one FK/OneToOne field, Django-admin
-// TabularInline/StackedInline style. See docs/inlines.md.
+// back at it via one FK/OneToOne field. See docs/inlines.md.
 //
 // Layout is presentation-only, not behavioral, so there is one Inline
 // struct with a Layout discriminator, not two structurally different

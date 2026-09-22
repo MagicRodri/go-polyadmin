@@ -5,9 +5,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![GitHub Repo stars](https://img.shields.io/github/stars/MagicRodri/go-polyadmin?style=flat-square)](https://github.com/MagicRodri/go-polyadmin)
 
-A Django-admin-style, server-rendered admin framework for
-[Fiber](https://gofiber.io). See [`docs/`](docs/) for reference
-documentation, or visit the [PolyAdmin documentation site](https://magicrodri.github.io/polyadmin-docs/)
+A server-rendered operations workspace for Go applications, with a Fiber
+adapter. See [`docs/`](docs/) for reference documentation, or visit the
+[PolyAdmin documentation site](https://magicrodri.github.io/polyadmin-docs/)
 for the shared Go and Python guides.
 
 ## What you get from declaring a `ModelAdmin`
@@ -31,7 +31,7 @@ permissions) and you get:
   (never dumps the target model's full queryset into the page)
 - Inline related records (`StackedInline`/`TabularInline`) — a
   parent's create/detail/edit pages can show and manage a child's
-  records that point back at it, Django-admin style
+	records that point back at it, directly within the parent workflow
 - Record and bulk Actions, with a shadcn/ui Dialog confirmation step for
   destructive ones
 - Delete previews: the confirmation page says what else a delete takes
@@ -52,7 +52,7 @@ Alpine.js + Tailwind — its CSS-variable token system and component
 markup, without React or Radix. That gives the admin **dark mode and
 themability**: every color resolves through a CSS variable, so restyling
 the whole thing is a change to one template. The layout is mobile-first
-with a collapsible sidebar (a Sheet below `md`), a Django-admin-style
+with a collapsible sidebar (a Sheet below `md`), a focused
 right-hand filter panel on wider screens, and breadcrumbs as the page
 title. Tailwind/Alpine/HTMX are all CDN-loaded — no frontend build step.
 See [`docs/components.md`](docs/components.md).

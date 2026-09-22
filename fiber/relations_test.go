@@ -188,7 +188,7 @@ func TestEditFormPreselectsCurrentRelation(t *testing.T) {
 
 	resp := doGet(t, app, "/admin/users/1/edit", nil)
 	text := body(t, resp)
-	// The plain (non-autocomplete) relation field is now the shadcn
+	// The plain (non-autocomplete) relation field is now the reference
 	// Select port (ui/select.html): a hidden input carries the pk, and
 	// the trigger's initial label text is the target's own label, not
 	// an <option>.

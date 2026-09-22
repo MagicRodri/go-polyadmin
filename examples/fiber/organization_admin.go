@@ -80,8 +80,8 @@ func (a *OrganizationAdmin) Update(ctx context.Context, obj any, data map[string
 	return a.repository.Update(org, name, founded, balance), nil
 }
 
-// parseOrganizationFormFields reads the two fields Task 11 added onto
-// Organization out of the already-validated data map. Create/Update only
+// parseOrganizationFormFields reads Founded and Balance out of the
+// already-validated data map. Create/Update only
 // run once Field.Validate has passed (see validFoundedDate/validBalance
 // below), so a malformed value never reaches here -- but the zero value
 // is still the safe fallback for an absent/optional one.

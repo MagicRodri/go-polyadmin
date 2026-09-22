@@ -88,8 +88,8 @@ func WithActionWhere(where ActionWhere) func(*Action) {
 const DeleteSelectedName = "delete_selected"
 
 // NewDeleteSelectedAction is the bulk delete every admin gets for free
-// -- Django ships the same one, and it is the single most common action
-// anyone would otherwise write by hand.
+// -- the single most common action anyone would otherwise write by
+// hand.
 //
 // It is expressed entirely in terms of the ModelAdmin's own Delete
 // hook, so it works against whatever storage the application actually
@@ -123,7 +123,6 @@ func NewDeleteSelectedAction() Action {
 	}
 }
 
-// GetAction finds a ModelAdmin's declared Action by name.
 func GetAction(modelAdmin ModelAdmin, name string) (Action, bool) {
 	for _, action := range modelAdmin.Actions() {
 		if action.Name == name {

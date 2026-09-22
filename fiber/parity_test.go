@@ -96,8 +96,6 @@ func TestACellThatIsAlreadyALinkIsNotWrappedAgain(t *testing.T) {
 	}
 }
 
-// --- preserve_filters ------------------------------------------------
-
 // filteredList is the list URL the tests navigate away from and expect to
 // come back to.
 const filteredList = "/admin/users?search=a&sort=-Email"
@@ -203,8 +201,6 @@ func TestAnOffsiteListTokenIsDiscarded(t *testing.T) {
 	}
 }
 
-// --- save_as ---------------------------------------------------------
-
 func TestSaveAsNewAppearsOnlyOnTheEditFormAndOnlyWhenAllowed(t *testing.T) {
 	users := newTestUserAdmin()
 	users.AllowSaveAs = true
@@ -273,8 +269,6 @@ func TestSaveAsNewRedisplaysTheFormOnAValidationError(t *testing.T) {
 	}
 }
 
-// --- prepopulated_fields ---------------------------------------------
-
 func TestPrepopulatedFieldsRideOnTheCreateFormOnly(t *testing.T) {
 	users := newTestUserAdmin()
 	users.PrepopulatedFields = map[string][]string{"Email": {"Email"}}
@@ -307,8 +301,6 @@ func TestPrepopulatedUnicodeFieldsAreMarked(t *testing.T) {
 		t.Errorf("the unicode opt-out is not in the attribute:\n%s", page)
 	}
 }
-
-// --- the date filter -------------------------------------------------
 
 // newDatedUserAdmin declares a DateFilter over the users admin's own date
 // field, the way an application would.

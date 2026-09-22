@@ -12,8 +12,7 @@ import (
 	"unicode"
 )
 
-// FieldType tags a Field with its scalar kind. Relation
-// field types (ForeignKey, OneToOne, ManyToMany) are added in Phase 6.
+// FieldType tags a Field with its scalar kind.
 type FieldType string
 
 const (

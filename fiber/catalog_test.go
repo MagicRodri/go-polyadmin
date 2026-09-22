@@ -287,9 +287,9 @@ func doLocalePostForm(t *testing.T, app *fiber.App, path, locale string, form ur
 	return resp
 }
 
-// TestLocaleRenderingHasNoFormatErrors is not in the brief: added because
-// the brief asks for a sanity check that a French/Russian page renders
-// without fmt errors -- a translation whose placeholders don't match the
+// TestLocaleRenderingHasNoFormatErrors is a sanity check that a
+// French/Russian page renders without fmt errors -- a translation whose
+// placeholders don't match the
 // msgid's (wrong verb, wrong count, dropped %[n]s index) would otherwise
 // only show up as "%!s(MISSING)" et al. buried in HTML, easy to miss by
 // eye. It reuses the pseudo-locale sweep's page list (pseudo_test.go) so

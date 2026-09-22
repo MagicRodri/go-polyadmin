@@ -9,8 +9,8 @@ import (
 )
 
 // The wire names for the CSRF token, shared by both adapters and by the
-// Python implementation -- see polyadmin/core/csrf.py. Changing one
-// without the other silently breaks every form in the other language.
+// Python implementation. Changing one without the other silently breaks
+// every form in the other language.
 const (
 	CSRFCookieName = "admin_csrf"
 	CSRFHeaderName = "X-CSRF-Token"

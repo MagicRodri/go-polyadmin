@@ -43,8 +43,7 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 			DetailFieldNames: []string{"ID", "Email", "IsActive", "Plan", "Organization", "Roles"},
 			// Roles is on the form but not in DisplayFields: a
 			// many-to-many column costs a lookup per row and reads as
-			// noise in a table, which is why Django keeps it off
-			// list_display too.
+			// noise in a table.
 			// Grouped rather than flat, to exercise fieldsets -- the
 			// other admins in this app stay flat, so both paths have
 			// example coverage. Declaring these replaces FormFieldNames:
@@ -185,8 +184,8 @@ func (a *UserAdmin) Delete(ctx context.Context, obj any) error {
 
 // planFilter is a filter this application wrote itself: it implements
 // core.Filter and nothing else, borrowing nothing from the framework's
-// own filter types. This is the hook Django calls a SimpleListFilter --
-// the admin supplies both the options and the constraint.
+// own filter types. This is the hook through which an admin supplies
+// both the options and the constraint.
 //
 // It exists in the example so the extension point is exercised by the
 // browser suite rather than only described in docs/lists.md.
