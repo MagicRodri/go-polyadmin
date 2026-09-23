@@ -63,8 +63,11 @@ See [`docs/components.md`](docs/components.md).
 go get github.com/MagicRodri/go-polyadmin
 ```
 
-No tagged release yet, so `go get` resolves the tip of `main`; pin a
-commit if you need reproducibility.
+The first beta release is available as a reproducible Go module version:
+
+```bash
+go get github.com/MagicRodri/go-polyadmin@v0.1.0-beta.1
+```
 
 Declare a `ModelAdmin` against your own storage and mount it on a
 Fiber app:
