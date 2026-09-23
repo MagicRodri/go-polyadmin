@@ -279,6 +279,8 @@ func TestUIRegistryMatchesThePythonImplementationKeyForKey(t *testing.T) {
 		"error": true,
 		// bounded scrolling region (the reference ScrollArea)
 		"scroll-area": true,
+		// image field's list/detail thumbnail
+		"image": true,
 	}
 	for component := range uiRegistry {
 		if !expected[component] {

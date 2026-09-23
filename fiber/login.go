@@ -15,7 +15,7 @@ import (
 // enumerator. core.LoginBackend asks implementations not to
 // distinguish them either, for the same reason.
 var (
-	invalidCredentialsMessage = core.N_("That email and password don't match an account.")
+	invalidCredentialsMessage = core.N_("That username or email and password don't match an account.")
 	signedOutMessage          = core.N_("You have been signed out.")
 )
 

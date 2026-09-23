@@ -214,6 +214,20 @@ var uiRegistry = map[string]uiComponent{
 		},
 	},
 
+	// An image field's read-only value: a small thumbnail, linked to the
+	// full image. One fixed size everywhere -- fieldValueHTML renders
+	// list, detail, and inline rows alike, and none of its other cases
+	// vary by context either.
+	"image": {
+		Parts: map[string]string{
+			"thumb": "inline-block size-8 shrink-0 rounded-md border border-border object-cover align-middle",
+			// Swapped in by the thumbnail's onerror when the URL 404s or
+			// the host refuses to load -- a themed stand-in for the
+			// browser's own broken-image icon.
+			"fallback": "inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground align-middle",
+		},
+	},
+
 	"alert": {
 		// `border` with no color; the variants supply the color.
 		Base: "relative w-full rounded-lg border p-4",
@@ -511,7 +525,14 @@ var uiRegistry = map[string]uiComponent{
 		Base: "w-full min-w-full caption-bottom text-sm",
 		Parts: map[string]string{
 			"wrapper": "overflow-hidden rounded-lg border border-border bg-card",
-			"scroll":  "overflow-x-auto",
+			// The top-level list table: the page itself is the scroller,
+			// so only the horizontal axis is bounded here.
+			"scroll": "overflow-x-auto",
+			// A tabular inline sits inside a parent's detail/edit page
+			// instead of being the page -- many child rows should scroll
+			// in place there, not stretch the page, same reasoning as
+			// widget.body and panel.body.
+			"inline-scroll": "ui-scroll-area max-h-80 overflow-y-auto overflow-x-auto",
 			// The "select all N matching" strip: only ever visible once
 			// a whole page is ticked, so it reads as a follow-up
 			// question rather than permanent chrome.
@@ -681,6 +702,13 @@ var uiRegistry = map[string]uiComponent{
 		Parts: map[string]string{
 			"dashed": "rounded-lg border border-dashed border-border bg-muted/40 p-4 text-sm text-muted-foreground",
 			"form":   "w-full rounded-lg border border-border bg-card p-7 text-card-foreground shadow-sm",
+			// A stacked inline's per-child card, same reasoning as
+			// widget's "body": a related record with many fields
+			// otherwise grows the card to fit them, dragging its
+			// siblings' rows out of alignment. Bounded and scrolled
+			// instead, with theme.html's .ui-scroll-area styling the
+			// bar. The row's own Save/Remove buttons stay outside it.
+			"body": "ui-scroll-area max-h-80 overflow-y-auto overflow-x-hidden",
 		},
 	},
 	// Record-page shell for detail/create/edit: one full-height column

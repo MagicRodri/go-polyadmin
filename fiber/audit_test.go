@@ -25,7 +25,6 @@ func (l *recordingLogger) Record(ctx context.Context, entry core.AuditEntry) err
 	return l.err
 }
 
-// readableLogger adds the read side.
 type readableLogger struct{ recordingLogger }
 
 func (l *readableLogger) History(ctx context.Context, resource string, pk any, limit int) ([]core.AuditEntry, error) {

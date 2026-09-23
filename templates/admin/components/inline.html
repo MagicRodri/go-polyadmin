@@ -25,8 +25,8 @@
 {{range .Rows}}
 <form class="{{ui "panel"}}"
       hx-post="{{.UpdateURL}}" hx-target="#inline-{{$slug}}" hx-swap="outerHTML">
-  {{range .Cells}}{{.}}{{end}}
-  <div class="flex gap-2">
+  <div class="{{ui "panel" "body"}}">{{range .Cells}}{{.}}{{end}}</div>
+  <div class="flex gap-2 pt-3">
     {{if $.CanChange}}
     <button type="submit"
             class="{{ui "button" "size-xs"}}">
@@ -60,10 +60,14 @@
 <div class="{{ui "table" "wrapper"}}">
 {{/* The wrapper is overflow-hidden (it owns the rounded border), so
      without this the table is clipped at the card's edge and the row's
-     own actions become unreachable. */}}
-<div class="{{ui "table" "scroll"}}">
+     own actions become unreachable. Bounded (not the plain list's
+     "scroll") because this sits inside a parent's own page instead of
+     being the page -- many child rows should scroll in place, not
+     stretch it. bg-card (not bg-muted/50) keeps the sticky header
+     opaque over rows scrolling underneath it. */}}
+<div class="{{ui "table" "inline-scroll"}}">
 <table class="min-w-full divide-y divide-border">
-  <thead class="bg-muted/50"><tr>
+  <thead class="sticky top-0 z-10 bg-card"><tr>
     {{range .Columns}}<th class="{{ui "table" "th-compact"}}">{{t .Label}}</th>{{end}}
     {{/* A trailing column for the row actions, when editing. Read-only
          rows open from their primary key's own cell instead. */}}

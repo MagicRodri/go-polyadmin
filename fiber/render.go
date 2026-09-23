@@ -113,7 +113,10 @@ type pageBase struct {
 	SiteTitle    string
 	SiteInitials string
 	SiteLogoURL  string
-	Breadcrumbs  []breadcrumb
+	// FaviconURL is the current ModelAdmin's own FaviconURL if set, else
+	// Admin.SiteFaviconURL. "" renders no <link rel="icon"> at all.
+	FaviconURL  string
+	Breadcrumbs []breadcrumb
 	Messages     []flashMessage
 	// CanSignOut is whether a core.LoginBackend is configured -- i.e.
 	// whether there is a session to end. Without one the admin has no
@@ -170,7 +173,7 @@ func (r *Renderer) buildNav(activeKey string) []navEntry {
 	return order
 }
 
-func (r *Renderer) pageBase(principal *core.Principal, csrfToken, title, header, navKey string, breadcrumbs []breadcrumb, messages []flashMessage) pageBase {
+func (r *Renderer) pageBase(principal *core.Principal, csrfToken, title, header, navKey string, modelAdmin core.ModelAdmin, breadcrumbs []breadcrumb, messages []flashMessage) pageBase {
 	siteTitle := r.admin.SiteTitle
 	if siteTitle == "" {
 		siteTitle = "PolyAdmin"
@@ -179,11 +182,16 @@ func (r *Renderer) pageBase(principal *core.Principal, csrfToken, title, header,
 	if slug, ok := strings.CutPrefix(navKey, "resource:"); ok {
 		currentSlug = slug
 	}
+	faviconURL := r.admin.SiteFaviconURL
+	if modelAdmin != nil && modelAdmin.FaviconURL() != "" {
+		faviconURL = modelAdmin.FaviconURL()
+	}
 	return pageBase{
 		Principal: principal, CSRFToken: csrfToken,
 		Title: title, Header: header, BasePath: r.basePath,
 		CurrentSlug: currentSlug, CurrentNavKey: navKey, NavItems: r.buildNav(navKey),
 		SiteTitle: r.t(siteTitle), SiteInitials: siteInitials(siteTitle), SiteLogoURL: r.admin.SiteLogoURL,
+		FaviconURL:  faviconURL,
 		Breadcrumbs: breadcrumbs, Messages: messages,
 		CanSignOut: r.admin.LoginBackend != nil,
 	}
@@ -1000,7 +1008,7 @@ func (r *Renderer) buildListData(
 	}
 
 	return listData{
-		pageBase:        r.pageBase(principal, csrfToken, r.t(modelAdmin.VerboseName()), r.t(modelAdmin.VerboseName()), "resource:"+slug, r.listBreadcrumbs(modelAdmin), messages),
+		pageBase:        r.pageBase(principal, csrfToken, r.t(modelAdmin.VerboseName()), r.t(modelAdmin.VerboseName()), "resource:"+slug, modelAdmin, r.listBreadcrumbs(modelAdmin), messages),
 		Slug:            slug,
 		VerboseName:     modelAdmin.VerboseName(),
 		Columns:         columns,
@@ -1302,7 +1310,7 @@ func (r *Renderer) RenderDetail(ctx context.Context, principal *core.Principal, 
 		return "", err
 	}
 	data := detailData{
-		pageBase:       r.pageBase(principal, csrfToken, r.t(modelAdmin.VerboseName()), r.t(modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), r.detailBreadcrumbs(modelAdmin, obj, listToken), messages),
+		pageBase:       r.pageBase(principal, csrfToken, r.t(modelAdmin.VerboseName()), r.t(modelAdmin.VerboseName()), "resource:"+modelAdmin.Slug(), modelAdmin, r.detailBreadcrumbs(modelAdmin, obj, listToken), messages),
 		Slug:           modelAdmin.Slug(),
 		PK:             modelAdmin.GetPK(obj),
 		Fields:         fields,
@@ -1442,7 +1450,7 @@ func (r *Renderer) executeForm(
 	}
 
 	data := formData{
-		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), r.formBreadcrumbs(modelAdmin, obj, listToken), nil),
+		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), modelAdmin, r.formBreadcrumbs(modelAdmin, obj, listToken), nil),
 		VerboseName: modelAdmin.VerboseName(),
 		FormAction:  action,
 		// The edit form offers Delete, so it needs the detail page's permission
@@ -1709,7 +1717,7 @@ type deleteData struct {
 func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, preview core.ResolvedDeletePreview, listToken string) (string, error) {
 	title := r.t("Delete %s", r.t(modelAdmin.VerboseName()))
 	data := deleteData{
-		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), r.deleteBreadcrumbs(modelAdmin, obj, listToken), nil),
+		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), modelAdmin, r.deleteBreadcrumbs(modelAdmin, obj, listToken), nil),
 		VerboseName: modelAdmin.VerboseName(),
 		ObjectLabel: objectLabel(modelAdmin, obj),
 		Preview:     r.deletePreviewView(preview),
@@ -1850,7 +1858,7 @@ func (r *Renderer) RenderDashboard(principal *core.Principal, csrfToken string, 
 	title = r.t(title)
 	// A single active crumb -- since base.html has no separate <h1>,
 	// this is the only page-title element the dashboard gets.
-	data := dashboardData{pageBase: r.pageBase(principal, csrfToken, title, title, "", []breadcrumb{{Label: title, Active: true}}, nil), Widgets: rendered}
+	data := dashboardData{pageBase: r.pageBase(principal, csrfToken, title, title, "", nil, []breadcrumb{{Label: title, Active: true}}, nil), Widgets: rendered}
 	var buf bytes.Buffer
 	if err := r.dashboard.ExecuteTemplate(&buf, "base", data); err != nil {
 		return "", err
@@ -1908,7 +1916,7 @@ func (r *Renderer) RenderPage(principal *core.Principal, csrfToken string, page 
 	label := r.t(page.Label)
 	breadcrumbs := append(r.categoryBreadcrumb(page.Category), breadcrumb{Label: label, Active: true})
 	pd := pageData{
-		pageBase: r.pageBase(principal, csrfToken, label, label, "page:"+page.Path, breadcrumbs, messages),
+		pageBase: r.pageBase(principal, csrfToken, label, label, "page:"+page.Path, nil, breadcrumbs, messages),
 		Page:     page,
 		Data:     data,
 	}

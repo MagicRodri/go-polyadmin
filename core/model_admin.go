@@ -30,6 +30,9 @@ type ModelAdmin interface {
 	// shown next to this ModelAdmin's own link, whether it renders flat
 	// or nested inside a category's accordion. Defaults to "collection".
 	Icon() string
+	// FaviconURL is the browser-tab icon shown while viewing this
+	// ModelAdmin's pages. Empty falls back to Admin.SiteFaviconURL.
+	FaviconURL() string
 
 	Fields() map[string]Field
 	Field(name string) (Field, bool)
@@ -113,7 +116,11 @@ type BaseModelAdmin struct {
 	NavCategory string
 	// NavIcon backs Icon() -- named separately for the same reason as
 	// NavCategory/Category(). Empty means defaultIcon.
-	NavIcon          string
+	NavIcon string
+	// NavFaviconURL backs FaviconURL() -- named separately for the same
+	// reason as NavCategory/Category(). Empty means "no override";
+	// FaviconURL() itself falls back to Admin.SiteFaviconURL.
+	NavFaviconURL    string
 	DisplayFields    []string
 	FormFieldNames   []string
 	SearchFieldNames []string
@@ -224,6 +231,10 @@ func (b BaseModelAdmin) Icon() string {
 		return b.NavIcon
 	}
 	return defaultIcon
+}
+
+func (b BaseModelAdmin) FaviconURL() string {
+	return b.NavFaviconURL
 }
 
 // TemplateOverride returns the explicit template path set for the given

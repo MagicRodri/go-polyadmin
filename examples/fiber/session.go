@@ -43,7 +43,8 @@ const (
 
 // demoAccount is one row of what would be a users table.
 type demoAccount struct {
-	email string
+	email    string
+	username string
 	// salt and hash, never the password. Derived at startup here only
 	// because a runnable demo has to document its own credentials --
 	// a real table stores these and has never seen the plaintext.
@@ -60,13 +61,13 @@ type demoAccount struct {
 // whose preferred locale the host resolver -- not the switcher cookie or
 // Accept-Language -- decides.
 var demoCredentials = []struct {
-	email, password, displayName string
-	isSuperuser                  bool
-	locale                       string
+	email, username, password, displayName string
+	isSuperuser                            bool
+	locale                                 string
 }{
-	{"admin@example.com", "polyadmin", "Demo Admin", true, ""},
-	{"viewer@example.com", "polyadmin", "Demo Viewer", false, ""},
-	{"amelie@example.com", "polyadmin", "Amélie", true, "fr"},
+	{"admin@example.com", "admin", "polyadmin", "Demo Admin", true, ""},
+	{"viewer@example.com", "viewer", "polyadmin", "Demo Viewer", false, ""},
+	{"amelie@example.com", "amelie", "polyadmin", "Amélie", true, "fr"},
 }
 
 // ReadOnlyForNonSuperusers grants reads to anyone signed in and reserves
@@ -123,10 +124,14 @@ func NewCookieSessionBackend() *CookieSessionBackend {
 		if err != nil {
 			log.Fatalf("hashing the demo password: %v", err)
 		}
-		b.accounts[c.email] = demoAccount{
-			email: c.email, salt: salt, hash: hash,
+		account := demoAccount{
+			email: c.email, username: c.username, salt: salt, hash: hash,
 			displayName: c.displayName, isSuperuser: c.isSuperuser, locale: c.locale,
 		}
+		// Indexed under both so the login page's "username or email"
+		// field resolves either one to the same account.
+		b.accounts[c.email] = account
+		b.accounts[c.username] = account
 	}
 	return b
 }

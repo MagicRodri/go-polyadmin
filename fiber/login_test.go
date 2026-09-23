@@ -30,7 +30,7 @@ type fakeLoginBackend struct {
 const fakeSessionCookie = "test_session"
 
 func (b *fakeLoginBackend) VerifyCredentials(request any, identifier, password string) *core.Principal {
-	if identifier != "demo@example.com" || password != b.password {
+	if (identifier != "demo@example.com" && identifier != "demo") || password != b.password {
 		return nil
 	}
 	return &core.Principal{ID: "demo", DisplayName: "Demo Admin", IsSuperuser: true}
@@ -160,6 +160,31 @@ func TestLoginPageOmitsControlsWithNoRouteBehindThem(t *testing.T) {
 		if strings.Contains(page, unwanted) {
 			t.Errorf("login page renders %q, which has no route behind it", unwanted)
 		}
+	}
+}
+
+func TestLoginIdentifierFieldAcceptsPlainText(t *testing.T) {
+	app, _ := newLoginApp(t)
+	page := body(t, doGet(t, app, "/admin/login", nil))
+	if strings.Contains(page, `type="email"`) {
+		t.Error("identifier input is type=email, which rejects a plain username before it reaches the server")
+	}
+	if !strings.Contains(page, "Username or email") {
+		t.Error("login page label should invite a username, not just an email")
+	}
+}
+
+func TestLoginAcceptsAUsernameNotOnlyAnEmail(t *testing.T) {
+	app, backend := newLoginApp(t)
+	resp := doPostForm(t, app, "/admin/login?next=%2Fadmin%2Fusers", url.Values{
+		"identifier": {"demo"},
+		"password":   {"correct horse"},
+	}, nil)
+	if resp.StatusCode != fiber.StatusSeeOther {
+		t.Fatalf("got %d, want 303 -- a username should sign in the same as the email", resp.StatusCode)
+	}
+	if backend.begins != 1 {
+		t.Errorf("BeginSession called %d times, want exactly 1", backend.begins)
 	}
 }
 

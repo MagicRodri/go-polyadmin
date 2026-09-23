@@ -140,7 +140,7 @@ func (r *Renderer) RenderDeleteSelected(principal *core.Principal, csrfToken str
 		breadcrumb{Label: r.t(modelAdmin.VerboseName()), URL: fmt.Sprintf("%s/%s", r.basePath, modelAdmin.Slug())},
 		breadcrumb{Label: r.t("Delete"), Active: true})
 	data := deleteSelectedData{
-		pageBase:  r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), crumbs, nil),
+		pageBase:  r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), modelAdmin, crumbs, nil),
 		Heading:   title,
 		Selection: sel,
 		Preview:   r.deletePreviewView(preview),

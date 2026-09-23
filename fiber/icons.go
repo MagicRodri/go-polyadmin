@@ -45,6 +45,8 @@ var iconPaths = map[string]string{
 	"chevron-double-left":  "M18.75 19.5l-7.5-7.5 7.5-7.5|M11.25 19.5l-7.5-7.5 7.5-7.5",
 	"chevron-double-right": "M5.25 4.5l7.5 7.5-7.5 7.5|M12.75 4.5l7.5 7.5-7.5 7.5",
 	"plus-circle":          "M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z",
+	// The image field's broken-thumbnail fallback (Heroicons "photo").
+	"photo": "M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z",
 	// The toast's per-level glyphs (components/toasts.html) -- Sonner
 	// leads each toast with the icon for its type.
 	"check-circle":   "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z",

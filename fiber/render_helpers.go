@@ -37,6 +37,9 @@ var (
 
 	classPlaceholder = mustUI("text", "placeholder")
 	classLink        = mustUI("text", "link")
+
+	classImageThumb    = mustUI("image", "thumb")
+	classImageFallback = mustUI("image", "fallback")
 )
 
 // isBlank reports whether a value is an empty string or the zero
@@ -103,8 +106,32 @@ func (r *Renderer) fieldValueHTML(relationPermissions map[string]bool, field cor
 	case core.FieldTypeDecimal:
 		raw := html.EscapeString(decimalText(value))
 		return template.HTML(`<span data-format="decimal" data-value="` + raw + `">` + raw + `</span>`)
+	case core.FieldTypeImage:
+		return imageFieldHTML(fmt.Sprint(value))
 	}
 	return template.HTML(html.EscapeString(fmt.Sprint(value)))
+}
+
+// imageFieldHTML renders an image field's value as a thumbnail linking
+// to the full image. A failed load flips the img and its fallback
+// sibling's inline display rather than replacing DOM: no JS dependency
+// beyond the one-line onerror, matching how the rest of this file builds
+// HTML by hand.
+//
+// The fallback is hidden via an inline style, not the `hidden`
+// attribute: the browser's `[hidden] { display: none }` is a
+// lowest-priority UA rule, so classImageFallback's own
+// display:inline-flex (an ordinary author-stylesheet rule, which always
+// outranks a UA one regardless of selector order) would otherwise win
+// and show it beside every successfully-loaded thumbnail. An inline
+// style outranks both.
+func imageFieldHTML(url string) template.HTML {
+	escaped := html.EscapeString(url)
+	return template.HTML(`<a href="` + escaped + `" target="_blank" rel="noopener">` +
+		`<img src="` + escaped + `" alt="" class="` + classImageThumb + `" ` +
+		`onerror="this.style.display='none';this.nextElementSibling.style.display=''">` +
+		`<span class="` + classImageFallback + `" style="display:none">` + string(iconHTML("photo", "size-4")) + `</span>` +
+		`</a>`)
 }
 
 // decimalText renders a decimal value as fixed-point text. fmt.Sprint on
@@ -214,7 +241,7 @@ func inputTypeFor(fieldType core.FieldType) string {
 		return "number"
 	case core.FieldTypeEmail:
 		return "email"
-	case core.FieldTypeURL:
+	case core.FieldTypeURL, core.FieldTypeImage:
 		return "url"
 	case core.FieldTypeDate:
 		return "date"

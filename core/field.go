@@ -26,10 +26,14 @@ const (
 	FieldTypeDateTime    FieldType = "datetime"
 	FieldTypeEmail       FieldType = "email"
 	FieldTypeURL         FieldType = "url"
-	FieldTypeUUID        FieldType = "uuid"
-	FieldTypeEnum        FieldType = "enum"
-	FieldTypeJSON        FieldType = "json"
-	FieldTypePassword    FieldType = "password"
+	// An image's URL, not an upload -- the value is a plain string, but
+	// list/detail render it as a thumbnail instead of link text. See
+	// fiber/render_helpers.go's fieldValueHTML.
+	FieldTypeImage    FieldType = "image"
+	FieldTypeUUID     FieldType = "uuid"
+	FieldTypeEnum     FieldType = "enum"
+	FieldTypeJSON     FieldType = "json"
+	FieldTypePassword FieldType = "password"
 
 	// Relation field types. Set Field.Relation alongside one
 	// of these.

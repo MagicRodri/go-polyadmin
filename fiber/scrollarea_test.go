@@ -48,12 +48,66 @@ func TestTabularInlineTableCanScrollRatherThanClip(t *testing.T) {
 	org, _ := seedOrgWithUsers(orgAdmin, userAdmin, "a@example.com")
 
 	section := inlineSection(t, body(t, doGet(t, app, "/admin/organizations/"+strconv.Itoa(org.ID), nil)))
-	scroll, err := uiClasses("table", "scroll")
+	scroll, err := uiClasses("table", "inline-scroll")
 	if err != nil {
 		t.Fatalf("uiClasses: %v", err)
 	}
 	if !strings.Contains(section, scroll) {
 		t.Error("the inline table has no scroll container, so it clips instead of scrolling")
+	}
+}
+
+// TestALongTabularInlineScrollsInsideItsOwnCard: unlike the top-level
+// list table (which is meant to grow the page), a tabular inline sits
+// inside a parent's detail/edit page -- many child rows should scroll
+// in place, not stretch the page, same reasoning as the widget and
+// stacked-inline cards.
+func TestALongTabularInlineScrollsInsideItsOwnCard(t *testing.T) {
+	emails := make([]string, 50)
+	for i := range emails {
+		emails[i] = "user" + strconv.Itoa(i) + "@example.com"
+	}
+	app, orgAdmin, userAdmin := newInlineTestApp(t, core.InlineLayoutTabular)
+	org, _ := seedOrgWithUsers(orgAdmin, userAdmin, emails...)
+
+	inlineScroll, err := uiClasses("table", "inline-scroll")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	section := inlineSection(t, body(t, doGet(t, app, "/admin/organizations/"+strconv.Itoa(org.ID), nil)))
+	if !strings.Contains(section, "user49@example.com") {
+		t.Fatal("the tabular inline did not render every row; the assertion below would be vacuous")
+	}
+	if !strings.Contains(inlineScroll, "max-h-") || !strings.Contains(inlineScroll, "overflow-y-auto") {
+		t.Errorf("the inline table is not bounded and scrollable: %q", inlineScroll)
+	}
+	if !strings.Contains(inlineScroll, "ui-scroll-area") {
+		t.Errorf("the inline table does not use the themed scrollbar: %q", inlineScroll)
+	}
+	// The main list table must keep the page-level scroll it already had.
+	listScroll, _ := uiClasses("table", "scroll")
+	if strings.Contains(listScroll, "max-h-") {
+		t.Errorf("the list table's own scroll part got bounded too: %q", listScroll)
+	}
+}
+
+// TestScrollAreaContainsOverscrollRatherThanChainingToThePage: without
+// overscroll-behavior, wheel input that outruns a bounded box's own
+// scroll range chains into whichever ancestor scrolls next -- on the
+// edit page that is the whole document, so scrolling to the bottom of a
+// tabular inline suddenly yanks the page too. Verified live with
+// Playwright: scrollY stayed 0 with `overscroll-behavior: contain` set,
+// and jumped to 1200 without it.
+func TestScrollAreaContainsOverscrollRatherThanChainingToThePage(t *testing.T) {
+	app, _ := makeApp(t)
+	page := body(t, doGet(t, app, "/admin/users", nil))
+	idx := strings.Index(page, ".ui-scroll-area {")
+	if idx < 0 {
+		t.Fatal("no .ui-scroll-area rule on the page; the assertion below would be vacuous")
+	}
+	rule := page[idx : idx+500]
+	if !strings.Contains(rule, "overscroll-behavior: contain") {
+		t.Errorf("the scroll area does not contain overscroll, so scrolling past its own edge leaks into the page: %q", rule)
 	}
 }
 
@@ -174,6 +228,33 @@ func TestAStackedInlineKeepsTheNarrowBody(t *testing.T) {
 	wide, _ := uiClasses("page", "body-wide")
 	if strings.Contains(page, wide) {
 		t.Error("a stacked inline widened the page")
+	}
+}
+
+// TestAStackedInlineRecordScrollsInsideItsOwnCard: a related record with
+// many fields otherwise grows its card to fit them, same problem as a
+// long dashboard widget. The body is bounded instead, and scrolls with
+// the themed scrollbar -- see TestALongWidgetScrollsInsideItsOwnCard.
+func TestAStackedInlineRecordScrollsInsideItsOwnCard(t *testing.T) {
+	app, orgAdmin, userAdmin := newInlineTestApp(t, core.InlineLayoutStacked)
+	org, _ := seedOrgWithUsers(orgAdmin, userAdmin, "a@example.com")
+
+	panelBody, err := uiClasses("panel", "body")
+	if err != nil {
+		t.Fatalf("uiClasses: %v", err)
+	}
+	section := inlineSection(t, body(t, doGet(t, app, "/admin/organizations/"+strconv.Itoa(org.ID), nil)))
+	if !strings.Contains(section, "a@example.com") {
+		t.Fatal("the related record rendered nothing; the assertion below would be vacuous")
+	}
+	if !strings.Contains(section, panelBody) {
+		t.Fatal("the related record's card is not the bounded scroll box")
+	}
+	if !strings.Contains(panelBody, "max-h-") || !strings.Contains(panelBody, "overflow-y-auto") {
+		t.Errorf("the card body is not bounded and scrollable: %q", panelBody)
+	}
+	if !strings.Contains(panelBody, "ui-scroll-area") {
+		t.Errorf("the card body does not use the themed scrollbar: %q", panelBody)
 	}
 }
 

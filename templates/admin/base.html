@@ -9,6 +9,7 @@
        htmx:configRequest listener. */}}
   <meta name="csrf-token" content="{{.CSRFToken}}">
   <title>{{.Title}} &middot; {{.SiteTitle}}</title>
+  {{if .FaviconURL}}<link rel="icon" href="{{.FaviconURL}}">{{end}}
   {{/* Design tokens, Tailwind config, Alpine + plugins, HTMX, and the
        theme store -- all of it, in the one load order that works. See
        admin/theme.html. */}}

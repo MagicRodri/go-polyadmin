@@ -14,6 +14,9 @@ type Admin struct {
 	Authorizer    Authorizer
 	SiteTitle     string
 	SiteLogoURL   string
+	// SiteFaviconURL is the browser-tab icon a ModelAdmin without its own
+	// FaviconURL falls back to. Empty means no <link rel="icon"> at all.
+	SiteFaviconURL string
 
 	// DisableCSRF turns off CSRF verification. The zero value is
 	// therefore "enabled", matching the Disable* convention on
@@ -70,6 +73,10 @@ func WithSiteTitle(title string) Option {
 
 func WithSiteLogoURL(url string) Option {
 	return func(a *Admin) { a.SiteLogoURL = url }
+}
+
+func WithSiteFaviconURL(url string) Option {
+	return func(a *Admin) { a.SiteFaviconURL = url }
 }
 
 func WithModelAdmins(modelAdmins ...ModelAdmin) Option {
