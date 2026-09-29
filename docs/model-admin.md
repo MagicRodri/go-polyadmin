@@ -380,6 +380,90 @@ Placement is not authorization: hiding a button does not stop a request
 to `POST /{slug}/actions/{name}`. Restrict who may run an action with
 `core.WithActionPermission(...)`.
 
+### Actions that ask for input
+
+`core.WithActionForm(...)` makes an action ask for values on a page of its
+own before it runs. The fields are ordinary `core.Field` values, so they
+parse, validate and render as a ModelAdmin's form does, and the handler is a
+`core.ActionFormHandler` set with `core.WithActionFormHandler(...)`, which
+receives the validated values as `data`:
+
+```go
+core.NewAction("move", nil,
+	core.WithActionLabel("Move to organization"),
+	core.WithActionSubmitLabel("Move"),
+	core.WithActionForm(
+		core.NewField("Organization", core.FieldTypeForeignKey, core.WithRelation(organizationRelation), core.WithRequired()),
+		core.NewField("Reason", core.FieldTypeText),
+	),
+	core.WithActionFormHandler(func(ctx context.Context, ma core.ModelAdmin, objects []any, data map[string]any, p *core.Principal) (core.ActionResult, error) {
+		org := lookupOrganization(data["Organization"])
+		if org.Archived {
+			return core.ActionResult{}, &core.ActionFormError{Errors: map[string][]string{
+				"Organization": {"Pick an organization that is still active."},
+			}}
+		}
+		for _, obj := range objects {
+			obj.(*User).Organization = org
+		}
+		return core.ActionResult{Message: fmt.Sprintf("Moved %d user(s).", len(objects))}, nil
+	}),
+)
+```
+
+Picking the action posts to the same `POST /{slug}/actions/{name}` route as
+any other. The first post answers with the form page — the selected records,
+the fields prefilled from each field's default, and the submit label (the
+action's label when unset) on the button — and runs nothing. Submitting it
+posts again with the selection carried along: a field that fails its own
+validation redisplays the page with the values kept, and only a valid
+submission calls the handler. When the selection was "all N matching" and the
+matching set changed in between, the page comes back with a notice instead of
+running over records nobody reviewed, as the delete confirmation does.
+
+Checks that span fields, or need a lookup, belong in the handler: return a
+`*core.ActionFormError` to redisplay the form with its messages, using the
+`""` key for one that belongs to no single field.
+
+A relation field posts the chosen record's primary key as a string. A
+foreign key renders as the lookup-backed combobox when its target resource
+has search fields, and as a list of every target record otherwise; a
+many-to-many always renders as the multi-select. A relation whose target the
+principal may not view (`{target}.view`) offers no records at all, and a
+posted pk for one is never resolved to its label.
+
+`NewAction` panics on a form without a form handler (or the reverse), on a
+form combined with `WithActionConfirm` — the form page is the confirmation —
+and on an action carrying more than one kind of handler. The built-in bulk
+edit is a form action too — see [`bulk-edit.md`](bulk-edit.md).
+
+### Answering with a file
+
+A form handler's `core.ActionResult` may carry a `*core.Download` instead of
+a message; for an action that asks for nothing, use
+`core.WithActionDownloadHandler(...)`, whose handler returns the same
+`ActionResult`. The browser saves the file and stays on the page it posted
+from:
+
+```go
+core.NewAction("export_emails", nil,
+	core.WithActionLabel("Export emails"),
+	core.WithActionDownloadHandler(func(ctx context.Context, ma core.ModelAdmin, objects []any, p *core.Principal) (core.ActionResult, error) {
+		lines := []string{"email"}
+		for _, obj := range objects {
+			lines = append(lines, obj.(*User).Email)
+		}
+		return core.ActionResult{Download: &core.Download{
+			Filename: "users.csv", ContentType: "text/csv", Content: []byte(strings.Join(lines, "\n")),
+		}}, nil
+	}),
+)
+```
+
+Set `Content` for bytes already in hand or `Stream` (an `io.Reader`), never
+both; neither is an empty file. The filename may be any Unicode: it is sent both as an ASCII fallback
+and in the RFC 5987 `filename*` form that current browsers read.
+
 ## Save as new
 
 `AllowSaveAs` adds a second submit to the edit form. It saves the

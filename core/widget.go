@@ -1,6 +1,10 @@
 package core
 
-import "math"
+import (
+	"context"
+	"fmt"
+	"math"
+)
 
 // Widget is a single dashboard tile. Each type computes its own data and
 // names its template, so a custom widget needs no framework change.
@@ -13,16 +17,65 @@ type Widget interface {
 }
 
 type baseWidget struct {
-	title      string
-	size       string
-	permission string
-	template   string
+	title       string
+	size        string
+	permission  string
+	template    string
+	key         string
+	dependsOn   []string
+	dependsSet  bool
+	description string
+	describe    func(DashboardContext) string
+	emptyText   string
+	placement   string
 }
 
 func (w baseWidget) Title() string      { return w.title }
 func (w baseWidget) Size() string       { return w.size }
 func (w baseWidget) Permission() string { return w.permission }
 func (w baseWidget) Template() string   { return w.template }
+
+func (w baseWidget) Key() string                 { return w.key }
+func (w baseWidget) DependsOn() ([]string, bool) { return w.dependsOn, w.dependsSet }
+func (w baseWidget) HasDescription() bool        { return w.describe != nil || w.description != "" }
+func (w baseWidget) EmptyText() string           { return w.emptyText }
+func (w baseWidget) Description(dc DashboardContext) string {
+	if w.describe != nil {
+		return w.describe(dc)
+	}
+	return w.description
+}
+
+func WithKey(key string) WidgetOption { return func(w *baseWidget) { w.key = key } }
+
+// WithDependsOn names the filters the widget reloads on; called with no
+// names it reloads on none. Without it, a widget reloads on every filter.
+func WithDependsOn(names ...string) WidgetOption {
+	return func(w *baseWidget) { w.dependsOn, w.dependsSet = append([]string{}, names...), true }
+}
+
+func WithDescription(text string) WidgetOption { return func(w *baseWidget) { w.description = text } }
+func WithDescriptionFunc(fn func(DashboardContext) string) WidgetOption {
+	return func(w *baseWidget) { w.describe = fn }
+}
+
+// Placement is "grid" (the default) or "top": a top widget renders above
+// the filter bar, full width and without the card's header.
+func (w baseWidget) Placement() string {
+	if w.placement == "" {
+		return "grid"
+	}
+	return w.placement
+}
+
+func WithPlacement(placement string) WidgetOption {
+	if placement != "grid" && placement != "top" {
+		panic(fmt.Sprintf("polyadmin: widget placement must be grid or top, not %q", placement))
+	}
+	return func(w *baseWidget) { w.placement = placement }
+}
+
+func WithEmptyText(text string) WidgetOption { return func(w *baseWidget) { w.emptyText = text } }
 
 // WidgetOption configures the common baseWidget fields shared by every
 // concrete widget type below.
@@ -194,6 +247,26 @@ var donutColors = [...]string{"chart-1", "chart-2", "chart-3", "chart-4", "chart
 type Donut struct {
 	baseWidget
 	GetSeries func() []ChartPoint
+	// GetSeriesCtx, when set, replaces GetSeries with a series drawn from
+	// the request's filters; the donut then loads from its fragment route.
+	GetSeriesCtx func(ctx context.Context, wc WidgetContext) ([]ChartPoint, error)
+}
+
+func NewDonutCtx(title string, getSeries func(ctx context.Context, wc WidgetContext) ([]ChartPoint, error), opts ...WidgetOption) Donut {
+	return Donut{baseWidget: newBaseWidget(title, "admin/widgets/donut.html", opts), GetSeriesCtx: getSeries}
+}
+
+func (d Donut) IsLazy() bool { return d.GetSeriesCtx != nil }
+
+func (d Donut) Data(ctx context.Context, wc WidgetContext) (any, error) {
+	if d.GetSeriesCtx == nil {
+		return d.GetData(), nil
+	}
+	series, err := d.GetSeriesCtx(ctx, wc)
+	if err != nil {
+		return nil, err
+	}
+	return donutData(series), nil
 }
 
 func NewDonut(title string, getSeries func() []ChartPoint, opts ...WidgetOption) Donut {
@@ -201,7 +274,13 @@ func NewDonut(title string, getSeries func() []ChartPoint, opts ...WidgetOption)
 }
 
 func (d Donut) GetData() any {
-	series := d.GetSeries()
+	if d.GetSeries == nil {
+		return donutData(nil)
+	}
+	return donutData(d.GetSeries())
+}
+
+func donutData(series []ChartPoint) any {
 	total := 0.0
 	for _, point := range series {
 		total += point.Value
@@ -304,4 +383,38 @@ func (t Tabs) Panels() []TabPanel { return t.panels }
 // "Panels" key before admin/widgets/tabs.html runs -- see Container.
 func (t Tabs) GetData() any {
 	return map[string]any{"Panels": t.panels}
+}
+
+// TabPanelData is one panel of a lazy Tabs with its data already resolved.
+type TabPanelData struct {
+	Label  string
+	Widget Widget
+	Data   any
+}
+
+type TabsData struct {
+	Panels []TabPanelData
+}
+
+// IsLazy reports whether any panel loads from the request, which makes the
+// whole Tabs load from its fragment route.
+func (t Tabs) IsLazy() bool {
+	for _, panel := range t.panels {
+		if IsLazyWidget(panel.Widget) {
+			return true
+		}
+	}
+	return false
+}
+
+func (t Tabs) Data(ctx context.Context, wc WidgetContext) (any, error) {
+	panels := make([]TabPanelData, len(t.panels))
+	for i, panel := range t.panels {
+		data, err := ResolveWidgetData(ctx, panel.Widget, wc)
+		if err != nil {
+			return nil, err
+		}
+		panels[i] = TabPanelData{Label: panel.Label, Widget: panel.Widget, Data: data}
+	}
+	return TabsData{Panels: panels}, nil
 }

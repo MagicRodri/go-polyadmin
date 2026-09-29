@@ -1,0 +1,12 @@
+{{/* One bulk-edit row: the field's control behind a "Change" box. The
+     fieldset disables every control of the row while the box is unticked;
+     without JS the handler still ignores an unticked row. */}}
+{{define "bulk-edit-row"}}
+<div class="flex items-start gap-3" x-data="{ on: {{if .Ticked}}true{{else}}false{{end}} }">
+  <label class="mt-2 flex shrink-0 items-center gap-2 text-sm">
+    <input type="checkbox" name="_change_{{.Name}}" value="1" x-model="on"{{if .Ticked}} checked{{end}} class="{{ui "checkbox"}}">
+    <span>{{t "Change"}}</span>
+  </label>
+  <fieldset class="min-w-0 flex-1" :disabled="!on">{{.Input}}</fieldset>
+</div>
+{{end}}

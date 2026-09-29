@@ -1,0 +1,24 @@
+{{define "dashboard-filters"}}
+<form id="dashboard-filters" method="get" action="{{.BasePath}}" class="mb-4 flex flex-wrap items-end gap-3"
+      x-data @change="window.polyadminDashboardFilterChanged($event, $el)">
+  <button type="submit" class="sr-only" tabindex="-1">{{t "Apply"}}</button>
+  {{range .Filters}}
+  <div class="flex flex-col gap-1" data-dashboard-filter="{{.Name}}">
+    <span class="{{ui "field" "label"}}">{{t .Label}}</span>
+    {{if eq .Kind "date_range"}}
+    <div class="flex items-center gap-2">
+      <span class="sr-only">{{t "From"}}</span>{{template "ui/date-picker" dict "name" .FromParam "value" .Start "required" false "disabled" false}}
+      <span class="{{ui "text" "muted"}}" aria-hidden="true">–</span>
+      <span class="sr-only">{{t "To"}}</span>{{template "ui/date-picker" dict "name" .ToParam "value" .End "required" false "disabled" false}}
+    </div>
+    {{else if eq .Kind "select"}}
+    {{template "ui/select" dict "name" .Name "options" .Options "placeholder" .Placeholder "disabled" false "searchable" .Searchable}}
+    {{end}}
+  </div>
+  {{end}}
+  {{range .Exports}}
+  <button type="submit" formaction="{{$.BasePath}}/_exports/{{.Name}}" formmethod="get"
+          class="{{ui "button" "outline"}}" data-dashboard-export="{{.Name}}">{{t .Label}}</button>
+  {{end}}
+</form>
+{{end}}

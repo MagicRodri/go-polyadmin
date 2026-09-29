@@ -21,6 +21,7 @@ func TestTemplateTreeMatchesThePythonImplementationPathForPath(t *testing.T) {
 		"admin/resource/detail.html":          true,
 		"admin/resource/form.html":            true,
 		"admin/resource/delete_selected.html": true,
+		"admin/resource/action_form.html":     true,
 		"admin/resource/delete.html":          true,
 
 		"admin/components/list_content.html":         true,
@@ -31,6 +32,13 @@ func TestTemplateTreeMatchesThePythonImplementationPathForPath(t *testing.T) {
 		"admin/components/lookup_results.html":       true,
 		"admin/components/toasts.html":               true,
 		"admin/components/action_confirm_modal.html": true,
+		"admin/components/bulk_edit_row.html":        true,
+		"admin/components/dashboard_filters.html":    true,
+		"admin/components/widget_card.html":          true,
+		"admin/components/widget_body.html":          true,
+		"admin/widgets/metric_group.html":            true,
+		"admin/widgets/data_table.html":              true,
+		"admin/widgets/data_table_rows.html":         true,
 		"admin/components/csrf-field.html":           true,
 		"admin/components/error_fragment.html":       true,
 

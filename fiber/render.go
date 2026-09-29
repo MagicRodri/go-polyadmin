@@ -343,6 +343,8 @@ type Renderer struct {
 	form              *template.Template
 	deleteTpl         *template.Template
 	deleteSelectedTpl *template.Template
+	actionFormTpl     *template.Template
+	widgetBodyTpl     *template.Template
 	dashboard         *template.Template
 	// login renders without layoutFiles: it is the one full page that
 	// is not framed by the admin shell -- see admin/login.html.
@@ -463,7 +465,10 @@ func newRenderer(admin *core.Admin, i18n *core.I18n, locale, basePath string, te
 	if r.deleteSelectedTpl, err = buildTemplate(r.funcs, "admin/resource/delete_selected.html"); err != nil {
 		return nil, err
 	}
-	if r.dashboard, err = buildTemplate(r.funcs, "admin/dashboard.html"); err != nil {
+	if r.actionFormTpl, err = buildTemplate(r.funcs, "admin/components/bulk_edit_row.html", "admin/resource/action_form.html"); err != nil {
+		return nil, err
+	}
+	if r.dashboard, err = buildTemplate(r.funcs, "admin/components/dashboard_filters.html", "admin/components/widget_card.html", "admin/components/widget_body.html", "admin/dashboard.html"); err != nil {
 		return nil, err
 	}
 	// Not a fragment, but not a base.html page either: it needs the
@@ -473,6 +478,9 @@ func newRenderer(admin *core.Admin, i18n *core.I18n, locale, basePath string, te
 		return nil, err
 	}
 	if r.widgets, err = buildFragment("admin/widgets/*.html"); err != nil {
+		return nil, err
+	}
+	if r.widgetBodyTpl, err = buildFragment("admin/components/widget_body.html"); err != nil {
 		return nil, err
 	}
 	if r.lookup, err = buildFragment("admin/components/lookup_results.html"); err != nil {
@@ -1734,32 +1742,6 @@ func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, mod
 	return buf.String(), nil
 }
 
-type renderedWidget struct {
-	Title string
-	Size  string
-	Icon  string
-	Body  template.HTML
-}
-
-type dashboardData struct {
-	pageBase
-	Widgets []renderedWidget
-}
-
-// widgetIcons maps a widget's Template() to the icon shown in its
-// dashboard card badge.
-var widgetIcons = map[string]string{
-	"admin/widgets/metric.html":   "metric",
-	"admin/widgets/progress.html": "progress",
-	"admin/widgets/table.html":    "table",
-	"admin/widgets/chart.html":    "chart",
-	"admin/widgets/activity.html": "activity",
-	"admin/widgets/donut.html":    "donut",
-	"admin/widgets/stat.html":     "stat",
-	"admin/widgets/timeline.html": "timeline",
-	"admin/widgets/tabs.html":     "tabs",
-}
-
 // renderedPanel is one already-rendered child of a core.Container
 // widget, as admin/widgets/tabs.html consumes it.
 type renderedPanel struct {
@@ -1812,12 +1794,19 @@ func (r *Renderer) widgetTemplate(name string) (*template.Template, error) {
 // html/template cannot execute a name known only at runtime, so the
 // recursion happens here rather than inside tabs.html.
 func (r *Renderer) renderWidgetBody(widget core.Widget, depth int) (template.HTML, error) {
+	html, _, err := r.renderWidgetBodyAndData(widget, depth)
+	return html, err
+}
+
+// renderWidgetBodyAndData also returns the data the body was rendered from,
+// so a caller needing it does not evaluate the widget a second time.
+func (r *Renderer) renderWidgetBodyAndData(widget core.Widget, depth int) (template.HTML, any, error) {
 	if depth > maxWidgetDepth {
-		return "", fmt.Errorf("polyadmin: widget %q nests more than %d levels deep (a container widget's panels contain itself?)", widget.Template(), maxWidgetDepth)
+		return "", nil, fmt.Errorf("polyadmin: widget %q nests more than %d levels deep (a container widget's panels contain itself?)", widget.Template(), maxWidgetDepth)
 	}
 	tmpl, err := r.widgetTemplate(widget.Template())
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	data := widget.GetData()
 	if container, ok := widget.(core.Container); ok {
@@ -1825,7 +1814,7 @@ func (r *Renderer) renderWidgetBody(widget core.Widget, depth int) (template.HTM
 		for _, panel := range container.Panels() {
 			body, err := r.renderWidgetBody(panel.Widget, depth+1)
 			if err != nil {
-				return "", err
+				return "", nil, err
 			}
 			panels = append(panels, renderedPanel{Label: panel.Label, Body: body})
 		}
@@ -1833,38 +1822,11 @@ func (r *Renderer) renderWidgetBody(widget core.Widget, depth int) (template.HTM
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, widget.Template(), data); err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return template.HTML(buf.String()), nil
+	return template.HTML(buf.String()), data, nil
 }
 
-func (r *Renderer) RenderDashboard(principal *core.Principal, csrfToken string, dashboard core.Dashboard, widgets []core.Widget) (string, error) {
-	rendered := make([]renderedWidget, 0, len(widgets))
-	for _, widget := range widgets {
-		body, err := r.renderWidgetBody(widget, 0)
-		if err != nil {
-			return "", err
-		}
-		icon := widgetIcons[widget.Template()]
-		if icon == "" {
-			icon = "metric"
-		}
-		rendered = append(rendered, renderedWidget{Title: widget.Title(), Size: widget.Size(), Icon: icon, Body: body})
-	}
-	title := dashboard.Title
-	if title == "" {
-		title = "Dashboard"
-	}
-	title = r.t(title)
-	// A single active crumb -- since base.html has no separate <h1>,
-	// this is the only page-title element the dashboard gets.
-	data := dashboardData{pageBase: r.pageBase(principal, csrfToken, title, title, "", nil, []breadcrumb{{Label: title, Active: true}}, nil), Widgets: rendered}
-	var buf bytes.Buffer
-	if err := r.dashboard.ExecuteTemplate(&buf, "base", data); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
 
 type pageData struct {
 	pageBase

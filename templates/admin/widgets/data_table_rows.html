@@ -1,0 +1,16 @@
+{{define "admin/widgets/data_table_rows.html"}}
+{{if eq .State "unavailable"}}
+<tr data-widget-state="unavailable"><td colspan="{{.ColumnCount}}" class="px-2 py-1.5 {{ui "text" "muted"}}">{{if .Message}}{{.Message}}{{else}}{{t "This section is unavailable."}}{{end}}</td></tr>
+{{else}}
+{{range .Rows}}
+<tr class="hover:bg-muted/50" data-row>
+  {{range .}}<td class="px-2 py-1.5 break-words{{if eq .Align "end"}} text-right{{end}}{{if .Strong}} font-semibold{{end}}">{{.HTML}}</td>{{end}}
+</tr>
+{{end}}
+{{if .NextURL}}
+<tr hx-get="{{.NextURL}}" hx-trigger="intersect once" hx-swap="outerHTML" data-next-page>
+  <td colspan="{{.ColumnCount}}" class="px-2 py-1.5 {{ui "text" "muted"}}">{{t "Loading…"}}</td>
+</tr>
+{{end}}
+{{end}}
+{{end}}

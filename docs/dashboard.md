@@ -53,6 +53,8 @@ the box's edge, as a negative margin does, is clipped.
 | Activity | A recent-activity feed (short text entries) | `core.NewActivity(title, func() []string)` |
 | Timeline | Dated events on a rail — time, title, description | `core.NewTimeline(title, func() []core.TimelineEntry)` |
 | Tabs | Several widgets in one card, one visible at a time | `core.NewTabs(title, []core.TabPanel{...})` |
+| MetricGroup | A row of headline numbers from one data call | `core.NewMetricGroup(title, func(ctx, wc) ([]core.Tile, error))` |
+| DataTable | Paged, searchable rows fetched by the host | `core.NewDataTable(title, []core.Column{...}, func(ctx, wc) (core.Rows, error))` |
 
 `Chart` and `Donut` are deliberately dependency-free — no JS charting
 library is bundled (matching the CDN-only frontend approach), so
@@ -118,6 +120,175 @@ instead of one column, and an optional `core.WithPermission(...)`: a
 widget naming a permission is simply omitted (not shown-disabled) if
 the `Authorizer` denies it for the current principal — see
 [`permissions.md`](permissions.md).
+
+## Filters
+
+A dashboard can carry a filter bar. Each filter reads its own query
+parameters, so a filtered dashboard is a plain URL you can reload or share.
+
+```go
+dashboard := &core.Dashboard{
+	Title: "Statistics",
+	Filters: []core.DashboardFilter{
+		core.NewDateRangeFilter("period", 30, core.WithFilterLabel("Period")),
+		core.NewSelectFilter("contract_id", core.WithFilterLabel("Client"), core.WithEmptyLabel("All clients"),
+			core.WithFilterChoicesFunc(loadContracts)),
+	},
+	Widgets: []core.Widget{...},
+}
+```
+
+| Filter | Query parameters | Value |
+|---|---|---|
+| `core.NewDateRangeFilter(name, defaultDays)` | `{name}_from`, `{name}_to` (ISO dates) | `wc.DateRange(name)` |
+| `core.NewSelectFilter(name, ...)` | `{name}` | `wc.String(name)` ("" when none) |
+
+`core.WithSearchableSelect()` puts a search box in a select filter's open
+list that narrows the choices by label as you type, for a long list such as
+clients.
+
+A filter never fails on what it is given: an unreadable date falls back to
+the default range and a reversed range is swapped. The choices function is
+only called to render the page; a widget's request passes the chosen value
+through without checking it against the choices.
+
+## Widgets that depend on the request
+
+A widget implementing `core.ContextWidget`
+(`Data(ctx context.Context, wc core.WidgetContext) (any, error)`) is loaded
+after the page, from `GET {basePath}/_widgets/{key}`, so a slow service
+never holds up the whole dashboard. `core.WidgetContext` carries `Filters`,
+`Principal`, `Search` (the widget's own search box) and `Offset`/`Limit`
+(the page a `DataTable` is asking for).
+
+The widgets built on `GetData()` — every built-in one listed above except
+`MetricGroup` and `DataTable` — keep rendering with the page, as before.
+
+Options every widget takes:
+
+- `core.WithKey(key)` — the widget's URL slug. Defaults to a slug of the
+  title (transliterated, so Cyrillic titles work); set it explicitly to keep
+  URLs stable when a title changes. Keys must be unique within a dashboard.
+- `core.WithDependsOn(names...)` — the filters the widget reloads on.
+  Without it a widget reloads on every filter; called with no names it never
+  reloads. Changing a filter re-fetches only the widgets that depend on it.
+- `core.WithDescription(text)` / `core.WithDescriptionFunc(func(core.DashboardContext) string)`
+  — a subtitle, e.g. the period being shown.
+- `core.WithEmptyText(text)` — shown when the widget has nothing to show.
+- `core.WithSize("full")` spans the whole row.
+- `core.WithPlacement("top")` renders the widget above the filter bar, full
+  width and without its card header -- a summary row such as the headline
+  numbers.
+
+## MetricGroup
+
+Several numbers that one call answers:
+
+```go
+core.NewMetricGroup("Overview", func(ctx context.Context, wc core.WidgetContext) ([]core.Tile, error) {
+	data, err := analytics.Overview(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []core.Tile{
+		{Label: "Contracts", Value: data.Contracts, Icon: "file-text"},
+		{Label: "Using the portal", Value: data.Active, Icon: "activity", Hint: fmt.Sprintf("dormant: %d", data.Dormant)},
+	}, nil
+}, core.WithKey("overview"), core.WithSize("full"), core.WithDependsOn())
+```
+
+## DataTable
+
+Rows the host fetches a page at a time, e.g. from another service:
+
+```go
+table := core.NewDataTable("Passages", []core.Column{
+	{Key: "contract", Label: "Contract", Strong: true},
+	{Key: "total", Label: "Total", Align: "end", Format: "number"},
+	{Key: "keypass", Label: "By key", Align: "end", Format: "share"},
+}, func(ctx context.Context, wc core.WidgetContext) (core.Rows, error) {
+	page, err := analytics.Passages(ctx, wc.DateRange("period"), wc.Limit, wc.Offset)
+	if err != nil {
+		return core.Rows{}, err
+	}
+	return core.Rows{Items: page.Items, Total: core.Total(page.Total), Totals: page.Overall}, nil
+}, core.WithKey("passages"), core.WithSize("full"))
+table.Searchable = true
+table.TotalLabel = "{total} contracts"
+```
+
+- `core.Rows{Items, Total, Totals}`: `Items` are maps keyed by column key.
+  `Totals`, returned with the first page, is a bold summary row pinned above
+  it. With `Total` (`core.Total(n)`) the table knows when it has shown
+  everything; without it, a page shorter than the page size is the last.
+- Scrolling to the last row loads the next page. `PageSizeValue` defaults to
+  50; 0 loads everything at once.
+- `Searchable` adds a search box to the card; its text arrives as `wc.Search`.
+- `TotalLabel` is a footer with `{total}` filled in.
+
+| `Format` | Value | Renders |
+|---|---|---|
+| `text` (or "") | anything | as is |
+| `number` | int or float | in the viewer's locale |
+| `datetime` | `time.Time` or ISO string | in the viewer's locale and time zone |
+| `share` | `map[string]any{"count": 12, "percentage": 34.5}` | `12 (34.5%)`; just `0` when the count is 0 |
+| `percent` | a number | `87.3%` |
+
+`Empty: "never used"` on a column shows that text as a badge in an empty
+cell instead of a dash. It goes through translation like other labels. An
+unknown `Format` or `Align` makes `core.New` panic.
+
+`Tones: []core.Tone{{Min: 80, Variant: "success"}, {Min: 50, Variant: "warning"}, {Min: 0, Variant: "danger"}}`
+colours a numeric cell: it renders as a badge in the colour of the highest
+`Min` the value reaches, and stays plain below all of them.
+
+### Filter-aware donuts and tabs
+
+`core.NewDonutCtx(title, func(ctx, wc) ([]core.ChartPoint, error))` builds a
+donut drawn from the request's filters; it loads from its fragment route like
+a `DataTable`. A `Tabs` loads that way as soon as one of its panels does, so a
+card of breakdowns can follow the filters.
+
+## When a widget fails
+
+Return `&core.WidgetUnavailable{Message: "The analytics service is down."}`
+to show that message in the widget's card. Any other error shows "This
+section is unavailable." and is logged; either way the other widgets load
+normally. A request that never reaches the admin shows "Couldn't load this
+section." with a Retry button.
+
+## Exports
+
+A dashboard export is a button on the filter bar that submits the current
+filters to `GET {basePath}/_exports/{name}`:
+
+```go
+Exports: []core.DashboardExport{{
+	Name:  "xlsx",
+	Label: "Export to Excel",
+	Handler: func(ctx context.Context, dc core.DashboardContext) (*core.Download, error) {
+		workbook, err := buildWorkbook(ctx, dc.DateRange("period"))
+		if err != nil {
+			return nil, err
+		}
+		return &core.Download{Filename: "statistics.xlsx", ContentType: xlsxContentType, Content: workbook}, nil
+	},
+}},
+```
+
+It requires the `dashboard.export` permission unless `Permission` names
+another; without it the button is hidden and the route answers 403.
+
+## Routes
+
+| Route | Serves |
+|---|---|
+| `GET {basePath}` | the page: filter bar, exports, a card per widget |
+| `GET {basePath}/_widgets/{key}` | one widget's body; rows only when `offset` > 0 |
+| `GET {basePath}/_exports/{name}` | an export's file |
+
+All of them require `dashboard.view`. A widget hidden by its permission
+answers 404 on its route, as an unknown key does.
 
 ## Custom widgets
 

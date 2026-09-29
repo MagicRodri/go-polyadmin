@@ -1,0 +1,30 @@
+{{define "widget-card"}}
+<div class="{{if .Top}}mb-4{{else}}{{ui "widget"}}{{if eq .Size "lg"}} {{ui "widget" "span-lg"}}{{else if eq .Size "full"}} {{ui "widget" "span-full"}}{{end}}{{end}}"
+     id="widget-{{.Key}}" data-widget="{{.Key}}"{{if .Top}} data-placement="top"{{end}}>
+  {{if not .Top}}
+  <div class="{{ui "widget" "header"}}">
+    <span class="{{ui "widget" "icon"}}">{{icon .Icon "w-5 h-5"}}</span>
+    <div class="min-w-0 flex-1">
+      <h2 class="{{ui "widget" "title"}}">{{t .Title}}</h2>
+      {{if .HasDescription}}<p id="widget-description-{{.Key}}" class="{{ui "text" "muted-xs"}}" data-widget-description>{{.Description}}</p>{{end}}
+    </div>
+    {{if .Searchable}}
+    <input type="search" name="search" id="widget-search-{{.Key}}" autocomplete="off"
+           placeholder="{{if .SearchPlaceholder}}{{t .SearchPlaceholder}}{{else}}{{t "Search…"}}{{end}}"
+           class="{{ui "input"}} max-w-xs"
+           hx-get="{{.URL}}" hx-trigger="input changed delay:300ms, search"
+           hx-target="#widget-body-{{.Key}}"{{if .Include}} hx-include="{{.Include}}"{{end}}>
+    {{end}}
+  </div>
+  {{end}}
+  <div id="widget-body-{{.Key}}"{{if not .Top}} class="{{ui "widget" "body"}}"{{end}} data-widget-body{{if .Trigger}} hx-get="{{.URL}}" hx-trigger="{{.Trigger}}"{{if .BodyInclude}} hx-include="{{.BodyInclude}}"{{end}}{{end}}>
+    {{if .Lazy}}<p class="{{ui "text" "muted"}}" data-widget-state="loading">{{t "Loading…"}}</p>{{else}}{{template "widget-body" .BodyState}}{{end}}
+  </div>
+  <template data-widget-error>
+    <div class="flex flex-col items-center gap-2 py-6 text-center" data-widget-state="error">
+      <p class="{{ui "text" "muted"}}">{{t "Couldn't load this section."}}</p>
+      <button type="button" class="{{ui "button" "outline"}}" data-widget-retry>{{t "Retry"}}</button>
+    </div>
+  </template>
+</div>
+{{end}}

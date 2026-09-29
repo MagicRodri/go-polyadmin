@@ -124,6 +124,25 @@ func confirmDeleteSelected(c *fiber.Ctx, admin *core.Admin, modelAdmin core.Mode
 	return true, c.SendString(html)
 }
 
+// selectionSample is the part of a selection a confirmation page lists,
+// each linked only when the principal may view it, and how many more there
+// are.
+func (r *Renderer) selectionSample(principal *core.Principal, modelAdmin core.ModelAdmin, objects []any) ([]deleteItemView, int) {
+	sample := objects
+	if len(sample) > core.DeletePreviewSample {
+		sample = sample[:core.DeletePreviewSample]
+	}
+	items := make([]deleteItemView, 0, len(sample))
+	for _, obj := range sample {
+		item := deleteItemView{Label: objectLabel(modelAdmin, obj)}
+		if computePermissions(r.admin, principal, modelAdmin, obj).CanView {
+			item.URL = fmt.Sprintf("%s/%s/%v", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))
+		}
+		items = append(items, item)
+	}
+	return items, len(objects) - len(sample)
+}
+
 type deleteSelectedData struct {
 	pageBase
 	Heading   string
@@ -145,18 +164,7 @@ func (r *Renderer) RenderDeleteSelected(principal *core.Principal, csrfToken str
 		Selection: sel,
 		Preview:   r.deletePreviewView(preview),
 	}
-	sample := sel.Objects
-	if len(sample) > core.DeletePreviewSample {
-		sample = sample[:core.DeletePreviewSample]
-	}
-	data.More = count - len(sample)
-	for _, obj := range sample {
-		item := deleteItemView{Label: objectLabel(modelAdmin, obj)}
-		if computePermissions(r.admin, principal, modelAdmin, obj).CanView {
-			item.URL = fmt.Sprintf("%s/%s/%v", r.basePath, modelAdmin.Slug(), modelAdmin.GetPK(obj))
-		}
-		data.Items = append(data.Items, item)
-	}
+	data.Items, data.More = r.selectionSample(principal, modelAdmin, sel.Objects)
 	tmpl, err := r.contentTemplate(modelAdmin, "delete_selected", r.deleteSelectedTpl)
 	if err != nil {
 		return "", err

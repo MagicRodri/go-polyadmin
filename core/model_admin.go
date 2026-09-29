@@ -159,6 +159,9 @@ type BaseModelAdmin struct {
 	// <select> over the target's full queryset -- for relations too large, or
 	// too principal-sensitive, to dump into a page.
 	AutocompleteFieldNames []string
+	// BulkEditFieldNames opts form fields into the built-in bulk_edit
+	// action (docs/bulk-edit.md). Empty offers no bulk edit.
+	BulkEditFieldNames []string
 	// PK returns the primary key used to build this object's URL,
 	// defaulting to reading an exported "ID" field via reflection.
 	PK func(obj any) any
@@ -347,26 +350,40 @@ func (b BaseModelAdmin) DetailFields() []string {
 
 func (b BaseModelAdmin) Filters() []Filter { return b.DeclaredFilters }
 
-// Actions are the declared ones plus the built-in bulk delete every admin
-// that can delete gets for free. Declaring one named DeleteSelectedName
-// replaces it rather than duplicating it.
+// Actions are the declared ones, then the built-in bulk edit when
+// BulkEditFieldNames is set and the ModelAdmin can update, then the
+// built-in bulk delete every admin that can delete gets for free.
+// Declaring an action with either built-in's name replaces it rather than
+// duplicating it. The bulk delete comes last: an application's own actions
+// are the ones it went to the trouble of writing, and the destructive one
+// should not be the first thing in the listbox.
 func (b BaseModelAdmin) Actions() []Action {
-	if b.DisableDeleteSelected || !b.CanDelete() {
-		return b.DeclaredActions
-	}
-	for _, action := range b.DeclaredActions {
-		if action.Name == DeleteSelectedName {
-			return b.DeclaredActions
+	declared := func(name string) bool {
+		for _, action := range b.DeclaredActions {
+			if action.Name == name {
+				return true
+			}
 		}
+		return false
 	}
-	// Appended, not prepended: an application's own actions are the ones
-	// it went to the trouble of writing, and the destructive one should
-	// not be the first thing in the listbox.
-	return append(append([]Action{}, b.DeclaredActions...), NewDeleteSelectedAction())
+	actions := append([]Action{}, b.DeclaredActions...)
+	if len(b.BulkEditFieldNames) > 0 && b.CanUpdate() && !declared(BulkEditName) {
+		fields := b.Fields()
+		form := make([]Field, 0, len(b.BulkEditFieldNames))
+		for _, name := range b.BulkEditFieldNames {
+			form = append(form, fields[name])
+		}
+		actions = append(actions, NewBulkEditAction(form))
+	}
+	if !b.DisableDeleteSelected && b.CanDelete() && !declared(DeleteSelectedName) {
+		actions = append(actions, NewDeleteSelectedAction())
+	}
+	return actions
 }
 func (b BaseModelAdmin) DetailActions() []string      { return b.DeclaredDetailActions }
 func (b BaseModelAdmin) Inlines() []Inline            { return b.DeclaredInlines }
 func (b BaseModelAdmin) AutocompleteFields() []string { return b.AutocompleteFieldNames }
+func (b BaseModelAdmin) BulkEditFields() []string     { return b.BulkEditFieldNames }
 
 func (b BaseModelAdmin) GetPK(obj any) any {
 	if b.PK != nil {

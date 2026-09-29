@@ -1,0 +1,13 @@
+{{define "widget-body"}}
+{{if eq .State "unavailable"}}
+<div class="flex flex-col items-center gap-1 py-6 text-center" data-widget-state="unavailable">
+  <p class="{{ui "text" "heading"}}">{{t "This section is unavailable."}}</p>
+  {{if .Message}}<p class="{{ui "text" "muted"}}">{{.Message}}</p>{{end}}
+</div>
+{{else if .Empty}}
+<p class="{{ui "text" "empty"}}" data-widget-state="empty">{{if .EmptyText}}{{t .EmptyText}}{{else}}{{t "No data."}}{{end}}</p>
+{{else}}{{.Body}}{{end}}
+{{if .RefreshDescription}}
+<p id="widget-description-{{.Key}}" class="{{ui "text" "muted-xs"}}" data-widget-description hx-swap-oob="true">{{.Description}}</p>
+{{end}}
+{{end}}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/MagicRodri/go-polyadmin/core"
 )
@@ -82,7 +83,31 @@ func NewUserAdmin(repository *UserRepository, organizations *OrganizationReposit
 				core.NewAction("deactivate", func(ctx context.Context, ma core.ModelAdmin, objects []any, p *core.Principal) (string, error) {
 					return setActive(ctx, ma, objects, p, false)
 				}, core.WithActionLabel("Deactivate"), core.WithActionConfirm("Deactivate the selected users?")),
+				core.NewAction("assign_organization", nil,
+					core.WithActionLabel("Assign organization"),
+					core.WithActionSubmitLabel("Assign"),
+					core.WithActionForm(core.NewField("Organization", core.FieldTypeForeignKey, core.WithRelation(organizationRelation), core.WithRequired())),
+					core.WithActionFormHandler(func(ctx context.Context, ma core.ModelAdmin, objects []any, data map[string]any, p *core.Principal) (core.ActionResult, error) {
+						org := ma.(*UserAdmin).resolveOrganization(data)
+						for _, obj := range objects {
+							obj.(*User).Organization = org
+						}
+						return core.ActionResult{Message: "Assigned " + strconv.Itoa(len(objects)) + " user(s) to " + org.Name + "."}, nil
+					})),
+				core.NewAction("export_emails", nil,
+					core.WithActionLabel("Export emails"),
+					core.WithActionDownloadHandler(func(ctx context.Context, ma core.ModelAdmin, objects []any, p *core.Principal) (core.ActionResult, error) {
+						lines := []string{"email"}
+						for _, obj := range objects {
+							lines = append(lines, obj.(*User).Email)
+						}
+						return core.ActionResult{Download: &core.Download{Filename: "users.csv", ContentType: "text/csv", Content: []byte(strings.Join(lines, "\n"))}}, nil
+					})),
 			},
+			// "Edit selected" on the list page. Its Update call carries only
+			// the fields ticked, which is why Update below keeps whatever is
+			// absent.
+			BulkEditFieldNames: []string{"IsActive", "Plan", "Organization"},
 			// The detail page offers Deactivate only; Activate stays a bulk action.
 			DeclaredDetailActions: []string{"deactivate"},
 			DeclaredFields: []core.Field{
@@ -171,10 +196,24 @@ func (a *UserAdmin) Create(ctx context.Context, data map[string]any) (any, error
 
 func (a *UserAdmin) Update(ctx context.Context, obj any, data map[string]any) (any, error) {
 	user := obj.(*User)
-	email, _ := data["Email"].(string)
-	isActive, _ := data["IsActive"].(bool)
-	plan, _ := data["Plan"].(string)
-	return a.repository.Update(user, email, isActive, plan, a.resolveOrganization(data), a.resolveRoles(data)), nil
+	email, isActive, plan := user.Email, user.IsActive, user.Plan
+	organization, roles := user.Organization, user.Roles
+	if v, ok := data["Email"].(string); ok {
+		email = v
+	}
+	if v, ok := data["IsActive"].(bool); ok {
+		isActive = v
+	}
+	if v, ok := data["Plan"].(string); ok {
+		plan = v
+	}
+	if _, ok := data["Organization"]; ok {
+		organization = a.resolveOrganization(data)
+	}
+	if _, ok := data["Roles"]; ok {
+		roles = a.resolveRoles(data)
+	}
+	return a.repository.Update(user, email, isActive, plan, organization, roles), nil
 }
 
 func (a *UserAdmin) Delete(ctx context.Context, obj any) error {

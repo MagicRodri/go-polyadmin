@@ -1,0 +1,14 @@
+{{define "admin/widgets/metric_group.html"}}
+<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  {{range .Tiles}}
+  <div class="flex items-center gap-3 rounded-md border border-border p-3" data-tile>
+    {{if .Icon}}<span class="{{ui "widget" "icon"}}">{{icon .Icon "w-5 h-5"}}</span>{{end}}
+    <div class="min-w-0">
+      <p class="text-xl font-semibold text-foreground"><span data-format="decimal" data-value="{{.Value}}">{{.Value}}</span></p>
+      <p class="{{ui "text" "muted"}}">{{t .Label}}</p>
+      {{if .Hint}}<p class="{{ui "text" "muted-xs"}}">{{.Hint}}</p>{{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}

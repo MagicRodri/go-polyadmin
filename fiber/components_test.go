@@ -72,13 +72,19 @@ func TestDateFieldRendersNativeInputPlusCalendarPopover(t *testing.T) {
 	for _, want := range []string{
 		`x-data="adminCalendar()"`,
 		`x-ref="dateInput"`,
-		`aria-label="Open calendar"`,
-		`x-anchor.bottom-end.offset.6="$refs.trigger"`,
+		`@click="show()"`,
+		`x-anchor.bottom-start.offset.6="$refs.dateInput"`,
+		`[&::-webkit-calendar-picker-indicator]:hidden`,
+		`w-max p-0`,
 		`x-for="day in days"`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("date picker missing %q", want)
 		}
+	}
+	// Clicking the field opens the calendar; there is no separate button.
+	if strings.Contains(page, `aria-label="Open calendar"`) {
+		t.Error("date picker still renders the calendar button")
 	}
 }
 

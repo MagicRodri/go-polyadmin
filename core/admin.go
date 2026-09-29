@@ -64,6 +64,11 @@ func New(opts ...Option) *Admin {
 	for _, opt := range opts {
 		opt(a)
 	}
+	if a.Dashboard != nil {
+		if err := a.Dashboard.Validate(); err != nil {
+			panic("polyadmin: " + err.Error())
+		}
+	}
 	return a
 }
 
@@ -174,6 +179,9 @@ func (a *Admin) Register(modelAdmin ModelAdmin) {
 	slug := modelAdmin.Slug()
 	if _, exists := a.registry[slug]; exists {
 		panic(fmt.Sprintf("polyadmin: a ModelAdmin is already registered for slug %q", slug))
+	}
+	if err := ValidateBulkEditFields(modelAdmin); err != nil {
+		panic("polyadmin: " + err.Error())
 	}
 	if err := ValidateDetailActions(modelAdmin); err != nil {
 		panic("polyadmin: " + err.Error())

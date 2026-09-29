@@ -96,6 +96,11 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		router.Post(core.LocalePath, handleLocalePost(i18n, basePath))
 	}
 
+	if admin.Dashboard != nil {
+		router.Get("/_widgets/:key", handleWidgetFragment(admin, renderers, basePath))
+		router.Get("/_exports/:name", handleDashboardExport(admin, basePath))
+	}
+
 	router.Get("/", func(c *fiber.Ctx) error {
 		principal, result := authorize(admin, c, core.DashboardView, nil)
 		if result != authOK {
@@ -103,7 +108,8 @@ func Mount(router fiber.Router, admin *core.Admin, basePath string, opts ...Moun
 		}
 		if admin.Dashboard != nil {
 			widgets := admin.Dashboard.VisibleWidgets(principal, admin.Authorizer)
-			html, err := renderers.For(c).RenderDashboard(principal, csrfToken(c), *admin.Dashboard, widgets)
+			dc := admin.Dashboard.Context(func(k string) string { return c.Query(k) }, principal)
+			html, err := renderers.For(c).RenderDashboard(c.Context(), principal, csrfToken(c), *admin.Dashboard, widgets, dc)
 			if err != nil {
 				return err
 			}

@@ -1,18 +1,31 @@
 {{define "content"}}
+{{range .Cards}}{{if .Top}}{{template "widget-card" .}}{{end}}{{end}}
+{{if or .Filters .Exports}}{{template "dashboard-filters" .}}{{end}}
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-  {{range .Widgets}}
-  <div class="{{ui "widget"}} {{if eq .Size "lg"}}{{ui "widget" "span-lg"}}{{end}}">
-    <div class="{{ui "widget" "header"}}">
-      <span class="{{ui "widget" "icon"}}">
-        {{icon .Icon "w-5 h-5"}}
-      </span>
-      <h2 class="{{ui "widget" "title"}}">{{t .Title}}</h2>
-    </div>
-    {{/* Bounded, so a widget with hundreds of rows scrolls inside its
-         own card instead of stretching every card beside it. */}}
-    <div class="{{ui "widget" "body"}}">{{.Body}}</div>
-  </div>
-  {{end}}
-  {{if not .Widgets}}<p class="{{ui "text" "muted"}}">{{t "No widgets configured."}}</p>{{end}}
+  {{range .Cards}}{{if not .Top}}{{template "widget-card" .}}{{end}}{{end}}
+  {{if not .Cards}}<p class="{{ui "text" "muted"}}">{{t "No widgets configured."}}</p>{{end}}
 </div>
+<script>
+  window.polyadminDashboardFilterChanged = function (event, form) {
+    var wrapper = event.target.closest("[data-dashboard-filter]");
+    if (!wrapper) return;
+    var query = new URLSearchParams(new FormData(form)).toString();
+    history.replaceState(null, "", query ? "?" + query : location.pathname);
+    document.body.dispatchEvent(new CustomEvent("dashboard-filter-" + wrapper.dataset.dashboardFilter));
+  };
+  (function () {
+    function showError(evt) {
+      var target = evt.detail && evt.detail.target;
+      var body = target && target.closest && target.closest("[data-widget-body]");
+      if (!body) return;
+      var card = body.closest("[data-widget]");
+      body.innerHTML = card.querySelector("template[data-widget-error]").innerHTML;
+      body.querySelector("[data-widget-retry]").addEventListener("click", function () {
+        htmx.ajax("GET", body.getAttribute("hx-get"), { source: body, target: body });
+      });
+    }
+    document.addEventListener("htmx:responseError", showError);
+    document.addEventListener("htmx:sendError", showError);
+  })();
+</script>
 {{end}}

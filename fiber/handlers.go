@@ -2,6 +2,7 @@ package fiber
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -671,16 +672,46 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Rend
 				return err
 			}
 		}
-		message, err := action.Handler(c.Context(), modelAdmin, objects, principal)
+		var data map[string]any
+		var formReq *actionFormRequest
+		if action.HasForm() {
+			formReq = &actionFormRequest{admin: admin, modelAdmin: modelAdmin, renderer: renderers.For(c), principal: principal,
+				action: action, objects: objects, selectAll: selectAll, returnTo: redirectTarget}
+			done, resolved, err := resolveActionForm(c, formReq)
+			if done || err != nil {
+				return err
+			}
+			data = resolved
+		}
+		outcome, err := action.Run(c.Context(), modelAdmin, objects, data, principal)
+		var formErr *core.ActionFormError
+		if formReq != nil && errors.As(err, &formErr) {
+			return renderActionFormPage(c, formReq, data, formErr.Errors, nil, false, fiber.StatusUnprocessableEntity)
+		}
 		if err != nil {
 			return err
+		}
+		// A bulk edit is an ordinary update of each record as far as the
+		// log is concerned.
+		if outcome.Download != nil {
+			if err := outcome.Download.Validate(); err != nil {
+				return err
+			}
+		}
+		auditName := action.Name
+		if action.Name == core.BulkEditName {
+			auditName = core.AuditUpdate
 		}
 		// One entry per record, not one per action: the log's question
 		// is "what happened to this record", and a bulk run over 500
 		// rows is 500 answers to it.
 		for _, obj := range objects {
-			recordAudit(c.Context(), admin, principal, modelAdmin, action.Name, obj)
+			recordAudit(c.Context(), admin, principal, modelAdmin, auditName, obj)
 		}
+		if outcome.Download != nil {
+			return sendDownload(c, *outcome.Download)
+		}
+		message := outcome.Message
 		if message == "" {
 			message = trn(c, "%s applied to %d record.", "%s applied to %d records.", len(objects), tr(c, action.Label), len(objects))
 		} else {

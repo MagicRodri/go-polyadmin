@@ -48,12 +48,21 @@ type Action struct {
 	// serves every action whichever page offered it, and checks Permission
 	// there.
 	Where ActionWhere
+	// Form, when set, makes the action ask for input on a page of its own
+	// before FormHandler runs with the validated values.
+	Form            []Field
+	SubmitLabel     string
+	FormHandler     ActionFormHandler
+	DownloadHandler ActionDownloadHandler
 }
 
 func NewAction(name string, handler ActionHandler, opts ...func(*Action)) Action {
 	a := Action{Name: name, Label: defaultLabel(name), Handler: handler, Where: ActionWhereBoth}
 	for _, opt := range opts {
 		opt(&a)
+	}
+	if err := validateAction(a); err != nil {
+		panic("polyadmin: " + err.Error())
 	}
 	return a
 }
@@ -149,7 +158,7 @@ func ActionsForList(modelAdmin ModelAdmin) []Action {
 func ActionsForDetail(modelAdmin ModelAdmin) []Action {
 	var candidates []Action
 	for _, action := range modelAdmin.Actions() {
-		if action.Name != DeleteSelectedName {
+		if action.Name != DeleteSelectedName && action.Name != BulkEditName {
 			candidates = append(candidates, action)
 		}
 	}
