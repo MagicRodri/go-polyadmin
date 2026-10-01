@@ -119,7 +119,7 @@ Every widget accepts `core.WithSize("lg")` to span the full grid width
 instead of one column, and an optional `core.WithPermission(...)`: a
 widget naming a permission is simply omitted (not shown-disabled) if
 the `Authorizer` denies it for the current principal — see
-[`permissions.md`](permissions.md).
+[`permissions`](permissions.md).
 
 ## Filters
 
@@ -321,7 +321,7 @@ fiberadapter.Mount(group, admin, "/admin", fiberadapter.WithTemplateDirs("templa
 The framework's own widget templates (`Metric`, `Stat`, `Progress`,
 `Chart`, `Donut`, `Table`, `Activity`, `Timeline`, `Tabs`) are checked
 first, so a custom `Template()` value only needs to avoid colliding
-with `admin/widgets/*.html` — see [`templates.md`](templates.md) for
+with `admin/widgets/*.html` — see [`templates`](templates.md) for
 the full resolution order shared with per-resource overrides.
 
 A custom widget that nests other widgets only has to implement

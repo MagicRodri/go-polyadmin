@@ -53,7 +53,7 @@ An override translates its own text the same way the framework's own
 templates do — `{{t "Save"}}`, `{{t .Label}}` — and gets `{{tn}}`/
 `{{tjs}}`/`{{locale}}` for free: every template set's functions are
 bound to that set's locale, override files included, so there's
-nothing extra to wire up. See [`i18n.md`](i18n.md#in-templates).
+nothing extra to wire up. See [`i18n`](i18n.md#in-templates).
 
 Custom dashboard widgets get the same treatment through the same
 option: a widget whose `Template()` name isn't one of the built-ins is
@@ -61,11 +61,11 @@ looked up across the `WithTemplateDirs` directories the same way, and
 must define a block named after its own `Template()` value (not
 `"content"` — widgets don't have a base layout of their own to layer
 into, they're inserted directly into the dashboard's widget grid). See
-[`dashboard.md`](dashboard.md#custom-widgets).
+[`dashboard`](dashboard.md#custom-widgets).
 
 ## Custom admin page templates
 
-A custom `AdminPage` (see [`routing.md`](routing.md#custom-admin-pages))
+A custom `AdminPage` (see [`routing`](routing.md#custom-admin-pages))
 renders its own template, not a framework-owned one — there's no
 `admin/page.html` default to fall back to, since the whole point is
 application-specific markup.
@@ -149,7 +149,7 @@ actually needs to render.
 ## Styling
 
 The design system is [shadcn/ui](https://ui.shadcn.com), hand-ported to
-Alpine.js — see [`components.md`](components.md) for the full component
+Alpine.js — see [`components`](components.md) for the full component
 list and the porting rationale. In short:
 
 - **Colors are tokens, never literals.** `bg-background`,

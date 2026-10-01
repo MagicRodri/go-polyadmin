@@ -58,4 +58,4 @@ automatically; add your own route by hand outside `Mount`.
 (`core.T(ctx, field.Label)`) themselves, inside their own `Write` — a
 custom `Exporter` gets bare column names and builds (and translates)
 its own header the same way, with the `ctx` `Write` is called with.
-See [`i18n.md`](i18n.md).
+See [`i18n`](i18n.md).

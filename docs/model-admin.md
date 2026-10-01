@@ -67,10 +67,10 @@ func (a *UserAdmin) Delete(ctx context.Context, obj any) error { /* ... */ }
   accordion section, in first-registration-appearance order. Unset
   (`""`) keeps a flat top-level nav link. Also prepended to the
   breadcrumb trail when set. See
-  [`routing.md`](routing.md#sidebar-categories).
+  [`routing`](routing.md#sidebar-categories).
 - `NavIcon` — the sidebar-nav icon shown next to this ModelAdmin's own
   link, flat or nested inside a category's accordion; defaults to
-  `"collection"`. See [`routing.md`](routing.md#sidebar-categories).
+  `"collection"`. See [`routing`](routing.md#sidebar-categories).
 
 ## Fields
 
@@ -249,7 +249,7 @@ those are only ever called with data that already passed validation.
 A field's own `Validator func(ctx context.Context, value any) error`
 receives the same `ctx`: translate a message with `core.T(ctx, ...)`,
 or return a static English message and let the framework translate it
-from a host catalog entry. See [`i18n.md`](i18n.md#in-code).
+from a host catalog entry. See [`i18n`](i18n.md#in-code).
 
 ## Search, filters, ordering
 
@@ -270,7 +270,7 @@ from a host catalog entry. See [`i18n.md`](i18n.md#in-code).
 All three compose: the query pipeline applies search, then every
 active filter, then ordering, then pagination — in that order, every
 time, so a query string fully determines what's on screen (and what
-an export produces, see [`exports.md`](exports.md)).
+an export produces, see [`exports`](exports.md)).
 
 `EnableReordering` (default `false`, unlike the `Disable*` flags above)
 puts a drag handle on the list view's rows via a small vanilla sortable
@@ -314,7 +314,7 @@ on the server side changes.
 A relation's *reverse* side — showing/managing a child's records from
 the parent's own create/detail/edit pages, Django-admin
 StackedInline/TabularInline style — is `Inline`. See
-[`inlines.md`](inlines.md).
+[`inlines`](inlines.md).
 
 ## Actions
 
@@ -337,7 +337,7 @@ view, picking one from the bulk-actions listbox runs it immediately —
 there's no separate "Apply" step. `WithActionConfirm(...)` shows a
 shadcn/ui Dialog before the request goes out;
 `WithActionPermission(...)` checks an extra `{slug}.{permission}`
-permission (see [`permissions.md`](permissions.md)) beyond the
+permission (see [`permissions`](permissions.md)) beyond the
 resource's own `.view`. The handler's return value (a string, or `""`)
 becomes the success toast text, falling back to
 `"{label} applied to N record(s)."` when empty.
@@ -346,7 +346,7 @@ The built-in **`delete_selected`** is the one exception to the Dialog. On
 a ModelAdmin that implements `core.DeletePreviewer` it opens a
 server-rendered confirmation page instead, listing the selected records
 and what deleting them takes with it — see
-[`deletes.md`](deletes.md). That applies to an action of your own named
+[`deletes`](deletes.md). That applies to an action of your own named
 `delete_selected` too: the page is keyed on the name.
 
 ### Where an action appears
@@ -435,7 +435,7 @@ posted pk for one is never resolved to its label.
 `NewAction` panics on a form without a form handler (or the reverse), on a
 form combined with `WithActionConfirm` — the form page is the confirmation —
 and on an action carrying more than one kind of handler. The built-in bulk
-edit is a form action too — see [`bulk-edit.md`](bulk-edit.md).
+edit is a form action too — see [`bulk-edit`](bulk-edit.md).
 
 ### Answering with a file
 
@@ -509,4 +509,4 @@ is a convenience, not a constraint.
 
 `BaseModelAdmin.ListTemplate`/`DetailTemplate`/`FormTemplate`/
 `DeleteTemplate` name an explicit template for one view. See
-[`templates.md`](templates.md) for the full override resolution order.
+[`templates`](templates.md) for the full override resolution order.

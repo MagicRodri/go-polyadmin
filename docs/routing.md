@@ -45,7 +45,7 @@ one is configured, otherwise redirects to the first resource the
 requester can view.
 
 And, **only when a `LoginBackend` is configured** (see
-[`authentication.md`](authentication.md#the-login-page)), three more:
+[`authentication`](authentication.md#the-login-page)), three more:
 
 | Method | Path | Requires | Purpose |
 |---|---|---|---|
@@ -60,8 +60,8 @@ a resource whose slug is `login` collides visibly rather than silently
 shadowing the login page.
 
 Every route above runs the same authenticate → authorize sequence
-before anything else — see [`authentication.md`](authentication.md) and
-[`permissions.md`](permissions.md). A denied request never reaches the
+before anything else — see [`authentication`](authentication.md) and
+[`permissions`](permissions.md). A denied request never reaches the
 `ModelAdmin` at all.
 
 ## HTMX partial routes
@@ -90,7 +90,7 @@ section's initial content is already built as part of the parent's own
 `GET /{slug}/{pk}` (detail) or `GET /{slug}/{pk}/edit` (edit) page, and
 every mutating response already carries a fresh copy — no third moment
 exists that would need its own fetch. See
-[`inlines.md`](inlines.md) for the full feature.
+[`inlines`](inlines.md) for the full feature.
 
 ## Custom admin pages
 
@@ -123,7 +123,7 @@ page's `Handler` isn't actually a `fiberadapter.PageHandler`.
 - `.IsHTMX()` — whether the request came from an HTMX interaction.
 - `.Render(templateName string, data any)` — renders `templateName`
   (must define a `{{define "content"}}` block, resolved from
-  `WithTemplateDirs` — see [`templates.md`](templates.md)) inside the
+  `WithTemplateDirs` — see [`templates`](templates.md)) inside the
   shared admin layout, with `data` handed to the template as `.Data`.
 - `.Redirect(url)` / `.RedirectWithFlash(url, level, text)`.
 
@@ -133,7 +133,7 @@ can be narrowed with `core.WithPageMethods(...)`. Its permission
 defaults to `"page.<path-with-dots>"` (`/reports/contracts` →
 `"page.reports.contracts"`), checked the same way a resource route
 checks `ResourcePermission` — see
-[`permissions.md`](permissions.md#permission-names). Registering two
+[`permissions`](permissions.md#permission-names). Registering two
 pages at the same path panics, mirroring `Admin.Register`'s
 duplicate-slug behavior. Pages mount after all `ModelAdmin` routes, in
 registration order.

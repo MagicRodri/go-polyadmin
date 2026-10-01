@@ -34,7 +34,7 @@ admin := core.New(
 `Principal.Extra` is a free-form bag for whatever your own `Authorizer`
 needs beyond `IsSuperuser` (roles, team IDs, scopes, ...) — core never
 reads it itself. A `core.LocaleResolver` (see
-[`i18n.md`](i18n.md#how-a-requests-locale-is-chosen)) can read it too —
+[`i18n`](i18n.md#how-a-requests-locale-is-chosen)) can read it too —
 a per-user language preference stashed in `Extra` is a common use —
 since it receives the same `*Principal` `Authenticate` produced for
 this request. Authentication still runs at most once per request even
@@ -135,7 +135,7 @@ If `Authenticator.Authenticate` returns `nil`, the adapter responds
 `401 Unauthorized` before any `ModelAdmin` code runs — or redirects to
 the login page, if a `LoginBackend` is configured (see above). A
 `Principal` that authenticates successfully but fails the subsequent
-authorization check (see [`permissions.md`](permissions.md)) gets
+authorization check (see [`permissions`](permissions.md)) gets
 `403 Forbidden` instead — the two failure modes are distinguished
 deliberately, same as any standard web framework's auth stack.
 
