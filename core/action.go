@@ -123,7 +123,11 @@ func NewDeleteSelectedAction() Action {
 					// Stop at the first failure and report how far it
 					// got: silently continuing would leave the user
 					// unable to tell which records survived.
-					return "", fmt.Errorf("%s: %w", T(ctx, "Deleted %d of %d, then failed", deleted, len(objects)), err)
+					return "", &ActionError{
+						Message: T(ctx, "Deleted %d of %d, then failed: %s", deleted, len(objects), RecordErrorText(err)),
+						Done:    objects[:deleted],
+						Err:     err,
+					}
 				}
 				deleted++
 			}
@@ -197,3 +201,18 @@ func ValidateDetailActions(modelAdmin ModelAdmin) error {
 	}
 	return nil
 }
+
+// ActionError fails an action with a message flashed at Level ("error"
+// when empty). Done lists the records it had already handled, which are
+// audited as if the action had run on them alone. Err is the cause, if
+// any, kept for errors.Is and errors.As.
+type ActionError struct {
+	Message string
+	Level   string
+	Done    []any
+	Err     error
+}
+
+func (e *ActionError) Error() string { return e.Message }
+
+func (e *ActionError) Unwrap() error { return e.Err }

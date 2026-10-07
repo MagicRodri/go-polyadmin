@@ -96,9 +96,14 @@ func TestDefaultBulkUpdateReportsProgressOnFailure(t *testing.T) {
 	ma := newBulkAdmin("IsActive")
 	ma.failOn = 2
 	a, _ := GetAction(ma, BulkEditName)
-	_, err := a.Run(context.Background(), ma, []any{&bulkItem{ID: 1}, &bulkItem{ID: 2}}, map[string]any{"IsActive": false}, nil)
-	if err == nil || !strings.Contains(err.Error(), "Updated 1 of 2, then failed") {
-		t.Fatalf("got %v", err)
+	first, second := &bulkItem{ID: 1}, &bulkItem{ID: 2}
+	_, err := a.Run(context.Background(), ma, []any{first, second}, map[string]any{"IsActive": false}, nil)
+	var actionErr *ActionError
+	if !errors.As(err, &actionErr) {
+		t.Fatalf("got %T %v", err, err)
+	}
+	if actionErr.Message != "Updated 1 of 2, then failed: boom" || len(actionErr.Done) != 1 || actionErr.Done[0] != first {
+		t.Fatalf("got %+v", actionErr)
 	}
 }
 

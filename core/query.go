@@ -61,6 +61,14 @@ type ListQuerier interface {
 	ListPage(ctx context.Context, req ListRequest) (objects []any, total int, err error)
 }
 
+// DefaultFilterer is an optional ModelAdmin capability: filters its data
+// source applies until the user picks them. The filter panel spells out
+// "All" for these (filter[name]=), since dropping the parameter would
+// bring the default back.
+type DefaultFilterer interface {
+	DefaultFilters() map[string]any
+}
+
 func ApplySearch(modelAdmin ModelAdmin, objects []any, search string) []any {
 	if search == "" {
 		return objects

@@ -62,8 +62,19 @@ See [`docs/components.md`](docs/components.md).
 ## Quickstart
 
 ```bash
-go get github.com/MagicRodri/go-polyadmin
+go get github.com/MagicRodri/go-polyadmin                # core
+go get github.com/MagicRodri/go-polyadmin/contrib/fiber  # Fiber adapter
+go get github.com/MagicRodri/go-polyadmin/contrib/gorm   # GORM model admin
 ```
+
+Each integration under `contrib/` is its own Go module, so an application
+only downloads the dependencies of the adapters it imports. Since
+`v0.1.0-beta.4` the Fiber adapter lives at
+`github.com/MagicRodri/go-polyadmin/contrib/fiber` (it was
+`github.com/MagicRodri/go-polyadmin/fiber`); the package is still named
+`fiber`. In the same release `core.ChoiceFilter.Choices` became a slice of
+`[2]string` (value, label) pairs; `core.NewChoiceFilter(name, []string)` is
+unchanged, and `core.NewChoicePairsFilter` takes labeled pairs.
 
 The first beta release is available as a reproducible Go module version:
 
@@ -83,7 +94,7 @@ import (
 	"strconv"
 
 	"github.com/MagicRodri/go-polyadmin/core"
-	fiberadapter "github.com/MagicRodri/go-polyadmin/fiber"
+	fiberadapter "github.com/MagicRodri/go-polyadmin/contrib/fiber"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -189,6 +200,35 @@ actions, a dashboard, exports, delete previews), see
 theming, [`docs/components.md`](docs/components.md); and for the rest,
 [`docs/`](docs/).
 
+## Running the tests
+
+`./scripts/test.sh` builds, vets and tests every module: the core,
+`contrib/fiber`, `contrib/gorm` and `examples/fiber`. `go test ./...` at
+the root only covers the core module.
+
+## Releasing
+
+The core and each contrib module are tagged separately. `contrib/fiber/go.mod`
+keeps its `replace github.com/MagicRodri/go-polyadmin => ../..` permanently:
+Go ignores a dependency's `replace`, so consumers are unaffected, and local
+development keeps building the adapter against the core in the same checkout.
+What consumers do see is the adapter's `require` on the core, which must name a
+published core version.
+
+1. Tag the core (`v0.1.0-beta.4`) and push the tag.
+2. In `contrib/fiber/go.mod`, change the core `require` from the
+   `v0.0.0-00010101000000-000000000000` placeholder to that tag (it must contain
+   every core API the adapter uses); run `go mod tidy` there and commit.
+3. Tag that commit `contrib/fiber/v0.1.0-beta.4` and push the tag.
+4. `contrib/gorm` requires both the core and `contrib/fiber` (the latter for its
+   tests only), and keeps a `replace` for each. Change both placeholder
+   `require`s to the tags from steps 1 and 3, run `go mod tidy` there, commit,
+   and tag that commit `contrib/gorm/v0.1.0-beta.4`.
+
+Until the first `contrib/fiber/` tag is published, `go get
+github.com/MagicRodri/go-polyadmin/contrib/fiber` cannot resolve the placeholder
+core version; publish the tags together.
+
 ## Languages
 
 French and Russian are **on by default** next to English: a visitor
@@ -229,7 +269,7 @@ delete previews (see what a delete takes with it; protected records
 block it), an optional login page, an optional audit log,
 flash-message toasts,
 and per-resource/per-widget template overrides. The API is idiomatic Go
-— see the package doc comments in `core/*.go` and `fiber/*.go` for
+— see the package doc comments in `core/*.go` and `contrib/fiber/*.go` for
 specifics (functional options, `BaseModelAdmin` embedding instead of
 inheritance, comma-ok lookups, `Disable*` flags, field/form HTML built
 in Go functions rather than inside `html/template` files for tighter
@@ -282,3 +322,32 @@ go run .
 adapter's list/detail/relation-option code to work — Go doesn't
 implicitly convert between slice types. See `examples/fiber/user_admin.go`
 for the pattern.
+
+## Contributing
+
+Issues and pull requests are welcome at
+[MagicRodri/go-polyadmin](https://github.com/MagicRodri/go-polyadmin).
+
+go-polyadmin ships alongside the Python package
+[polyadmin](https://github.com/MagicRodri/polyadmin), kept at parity. A
+change to behaviour, markup or a translatable string usually belongs in
+both; if yours only touches one side, say so in the pull request so the
+other can follow.
+
+- Run `./scripts/test.sh` (see [Running the tests](#running-the-tests)).
+  The browser suite drives the example app in a real browser with
+  Playwright, on Python; see [`browsertests/README.md`](browsertests/README.md).
+- Add a test with the change, in the module it touches.
+- New user-facing text goes through `core.T`/`core.N_` (or the templates'
+  `t`) and into `locales/fr.json` and `locales/ru.json`;
+  `contrib/fiber`'s catalog test fails on a missing or unused entry.
+- Keep `core` free of web-framework and ORM imports; `core/layering_test.go`
+  enforces it. Integrations live under `contrib/`, each its own module.
+- Note user-facing changes under **Unreleased** in
+  [`CHANGELOG.md`](CHANGELOG.md).
+- Update [`docs/`](docs/) when behaviour changes. Examples there and in
+  [`examples/`](examples/) use neutral sample domains.
+
+## License
+
+[MIT](LICENSE) © 2026

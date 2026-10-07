@@ -73,23 +73,34 @@ func toBool(value any) bool {
 }
 
 // ChoiceFilter matches a field's string representation against one of
-// a fixed set of choices.
+// a fixed set of choices, each a (value, label) pair.
 type ChoiceFilter struct {
 	baseFilter
-	Choices []string
+	Choices [][2]string
 }
 
 func NewChoiceFilter(name string, choices []string) ChoiceFilter {
+	pairs := make([][2]string, 0, len(choices))
+	for _, choice := range choices {
+		pairs = append(pairs, [2]string{choice, choice})
+	}
+	return NewChoicePairsFilter(name, pairs)
+}
+
+func NewChoicePairsFilter(name string, choices [][2]string) ChoiceFilter {
 	return ChoiceFilter{baseFilter: newBaseFilter(name, ""), Choices: choices}
 }
 
-func (f ChoiceFilter) ChoicesWithLabels() [][2]string {
-	pairs := make([][2]string, 0, len(f.Choices)+1)
-	pairs = append(pairs, [2]string{"", N_("All")})
+func (f ChoiceFilter) Values() []string {
+	values := make([]string, 0, len(f.Choices))
 	for _, choice := range f.Choices {
-		pairs = append(pairs, [2]string{choice, choice})
+		values = append(values, choice[0])
 	}
-	return pairs
+	return values
+}
+
+func (f ChoiceFilter) ChoicesWithLabels() [][2]string {
+	return append([][2]string{{"", N_("All")}}, f.Choices...)
 }
 
 func (f ChoiceFilter) Apply(objects []any, raw string, modelAdmin ModelAdmin) []any {

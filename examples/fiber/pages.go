@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/MagicRodri/go-polyadmin/core"
-	fiberadapter "github.com/MagicRodri/go-polyadmin/fiber"
+	fiberadapter "github.com/MagicRodri/go-polyadmin/contrib/fiber"
 
 	"github.com/gofiber/fiber/v2"
 )

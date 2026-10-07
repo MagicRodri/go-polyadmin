@@ -117,7 +117,7 @@ type pageBase struct {
 	// Admin.SiteFaviconURL. "" renders no <link rel="icon"> at all.
 	FaviconURL  string
 	Breadcrumbs []breadcrumb
-	Messages     []flashMessage
+	Messages    []flashMessage
 	// CanSignOut is whether a core.LoginBackend is configured -- i.e.
 	// whether there is a session to end. Without one the admin has no
 	// logout route, so offering the control would be a dead button.
@@ -926,6 +926,12 @@ func (r *Renderer) buildListData(
 			}
 		}
 
+		defaulted := false
+		if filterer, ok := modelAdmin.(core.DefaultFilterer); ok {
+			_, defaulted = filterer.DefaultFilters()[filter.Name()]
+		}
+		_, chosen := req.Filters[filter.Name()]
+
 		pairs := filter.ChoicesWithLabels()
 		for _, sourcedChoice := range sourced {
 			pairs = append(pairs, [2]string{sourcedChoice.Value, sourcedChoice.Label})
@@ -935,8 +941,8 @@ func (r *Renderer) buildListData(
 			choices = append(choices, filterChoice{
 				Value:    pair[0],
 				Label:    pair[1],
-				Selected: pair[0] == current,
-				URL:      filterChoiceURL(r.basePath, slug, req, filter.Name(), pair[0]),
+				Selected: filterChoiceSelected(pair[0], current, chosen, defaulted),
+				URL:      filterChoiceURL(r.basePath, slug, req, filter.Name(), pair[0], defaulted),
 			})
 		}
 		active := ""
@@ -1048,8 +1054,9 @@ func (r *Renderer) buildListData(
 }
 
 // queryString incrementally builds a "?k=v&k=v" query string, skipping
-// empty values -- shared by exportQuery and filterChoiceURL so both
-// stay consistent about escaping and omitting defaults.
+// empty values except where addKept says otherwise -- shared by
+// exportQuery and filterChoiceURL so both stay consistent about escaping
+// and omitting defaults.
 type queryString struct {
 	values string
 }
@@ -1058,6 +1065,12 @@ func (q *queryString) add(k, v string) {
 	if v == "" {
 		return
 	}
+	q.addKept(k, v)
+}
+
+// addKept adds k even when v is empty: a filter spelled out as "All"
+// (filter[name]=) means something its absence does not.
+func (q *queryString) addKept(k, v string) {
 	if q.values == "" {
 		q.values = "?"
 	} else {
@@ -1070,7 +1083,7 @@ func exportQuery(req core.ListRequest) string {
 	var q queryString
 	q.add("search", req.Search)
 	for name, value := range req.Filters {
-		q.add("filter["+name+"]", value)
+		q.addKept("filter["+name+"]", value)
 	}
 	q.add("sort", req.Ordering)
 	return q.values
@@ -1111,14 +1124,14 @@ func filterFormHidden(req core.ListRequest, exclude string) []filterHidden {
 	return hidden
 }
 
-func filterChoiceURL(basePath, slug string, req core.ListRequest, filterName, value string) string {
+func filterChoiceURL(basePath, slug string, req core.ListRequest, filterName, value string, keepEmpty bool) string {
 	filters := make(map[string]string, len(req.Filters))
 	for name, other := range req.Filters {
 		if name != filterName {
 			filters[name] = other
 		}
 	}
-	if value != "" {
+	if value != "" || keepEmpty {
 		filters[filterName] = value
 	}
 	return listURL(basePath, slug, req, listURLOpts{Filters: filters, HasFilters: true})
@@ -1178,7 +1191,7 @@ func listURL(basePath, slug string, req core.ListRequest, opts listURLOpts) stri
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		q.add("filter["+name+"]", filters[name])
+		q.addKept("filter["+name+"]", filters[name])
 	}
 	q.add("sort", ordering)
 	// Page 1 and the default size are the implied state; leaving them
@@ -1465,6 +1478,7 @@ func (r *Renderer) executeForm(
 		// map: otherwise the button renders for a principal the route then
 		// rejects.
 		Permissions:    computePermissions(r.admin, principal, modelAdmin, obj),
+		NonFieldErrors: errs[""],
 		Fieldsets:      fieldsets,
 		InlineSections: inlineSections,
 		WideBody:       wideBody(inlineSections),
@@ -1722,10 +1736,10 @@ type deleteData struct {
 	Preview     deletePreviewView
 }
 
-func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, preview core.ResolvedDeletePreview, listToken string) (string, error) {
+func (r *Renderer) RenderDelete(principal *core.Principal, csrfToken string, modelAdmin core.ModelAdmin, obj any, preview core.ResolvedDeletePreview, messages []flashMessage, listToken string) (string, error) {
 	title := r.t("Delete %s", r.t(modelAdmin.VerboseName()))
 	data := deleteData{
-		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), modelAdmin, r.deleteBreadcrumbs(modelAdmin, obj, listToken), nil),
+		pageBase:    r.pageBase(principal, csrfToken, title, title, "resource:"+modelAdmin.Slug(), modelAdmin, r.deleteBreadcrumbs(modelAdmin, obj, listToken), messages),
 		VerboseName: modelAdmin.VerboseName(),
 		ObjectLabel: objectLabel(modelAdmin, obj),
 		Preview:     r.deletePreviewView(preview),
@@ -1826,7 +1840,6 @@ func (r *Renderer) renderWidgetBodyAndData(widget core.Widget, depth int) (templ
 	}
 	return template.HTML(buf.String()), data, nil
 }
-
 
 type pageData struct {
 	pageBase
@@ -1934,4 +1947,11 @@ func (r *Renderer) RenderLookup(options []lookupOption) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// filterChoiceSelected marks the choice in force. Under a default nothing
+// is: "All" would claim rows the default is hiding, and the default's own
+// value was never chosen.
+func filterChoiceSelected(value, current string, chosen, defaulted bool) bool {
+	return value == current && (chosen || !defaulted || value != "")
 }

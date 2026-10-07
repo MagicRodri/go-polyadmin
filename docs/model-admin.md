@@ -162,6 +162,8 @@ Three things are worth knowing:
 
 Not implementing it changes nothing: the in-memory path is unchanged.
 
+For a GORM model, [`gorm`](gorm.md) implements all of this for you.
+
 ## Grouping the form: fieldsets
 
 By default a form is one flat column in `FormFieldNames` order. Past
@@ -251,12 +253,35 @@ receives the same `ctx`: translate a message with `core.T(ctx, ...)`,
 or return a static English message and let the framework translate it
 from a host catalog entry. See [`i18n`](i18n.md#in-code).
 
+### Refusing a write
+
+`Create`, `Update` and `Delete` can refuse with messages for the user by
+returning a `*core.RecordFormError`, wrapped or not — a unique
+constraint, a record still referenced elsewhere:
+
+```go
+return nil, &core.RecordFormError{Errors: map[string][]string{
+	"Email": {"Already taken."},
+	"":      {"That address is reserved."},
+}}
+```
+
+A refused create, update or "Save as new" re-renders the form with
+status 422, keeping what was submitted: field keys show under their
+input, the `""` key at the top of the form. Any other key must be the
+field's name exactly as the form uses it: messages under a key the form
+doesn't render are not shown. A refused delete returns to
+the delete page with the messages as an error notification. Any other
+error is still a server error.
+
 ## Search, filters, ordering
 
 - `SearchFieldNames` — a case-insensitive substring match against these
   fields, OR'd together, driven by the list view's search box.
 - `DeclaredFilters` — a slice of `Filter` values
-  (`core.NewBooleanFilter(name)`, `core.NewChoiceFilter(name, ...)`).
+  (`core.NewBooleanFilter(name)`, `core.NewChoiceFilter(name, []string{...})`,
+  or `core.NewChoicePairsFilter(name, [][2]string{{"paid", "Paid"}, ...})`
+  when the label shown differs from the value in the URL).
   They render behind a single **Filters** button in the list toolbar,
   which opens a right-hand drawer listing every filter vertically —
   Django admin's filter column, in the drawer form Unfold gives it.
@@ -341,6 +366,21 @@ permission (see [`permissions`](permissions.md)) beyond the
 resource's own `.view`. The handler's return value (a string, or `""`)
 becomes the success toast text, falling back to
 `"{label} applied to N record(s)."` when empty.
+
+An action fails cleanly by returning a `*core.ActionError`: the user goes
+back where the action was started, with `Message` as a notification at
+`Level` (`"error"`, the default, or `"warning"`). `Done` lists the
+records it had already handled; they are audited as if the action had
+run on them alone.
+
+```go
+return "", &core.ActionError{Message: "Archive is offline.", Done: objects[:n]}
+```
+
+The built-in `delete_selected` and bulk edit stop at the first failure
+this way — "Deleted 3 of 10, then failed: …" — where a
+`RecordFormError` contributes its messages. Any other error is a server
+error.
 
 The built-in **`delete_selected`** is the one exception to the Dialog. On
 a ModelAdmin that implements `core.DeletePreviewer` it opens a

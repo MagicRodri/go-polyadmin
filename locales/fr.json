@@ -24,6 +24,7 @@
     "other": "%s sur %d lignes sélectionnées"
   },
   "%s updated.": "« %s » : enregistrement mis à jour.",
+  "A record with these values already exists.": "Un enregistrement avec ces valeurs existe déjà.",
   "Action…": "Action…",
   "Add": "Ajouter",
   "Admin": "Administration",
@@ -60,11 +61,11 @@
   "Delete the selected records? This cannot be undone.": "Supprimer les enregistrements sélectionnés ? Cette action est irréversible.",
   "Delete this %s?": "Supprimer « %s » ?",
   "Delete «%s»?": "Supprimer « %s » ?",
+  "Deleted %d of %d, then failed: %s": "%d sur %d supprimé(s), puis échec : %s",
   "Deleted %d record.": {
     "one": "%d enregistrement supprimé.",
     "other": "%d enregistrements supprimés."
   },
-  "Deleted %d of %d, then failed": "%d sur %d supprimé(s), puis échec",
   "Desc": "Décroissant",
   "Drag to reorder": "Glisser pour réorganiser",
   "Drag to reorder (not saved)": "Glisser pour réorganiser (non enregistré)",
@@ -72,6 +73,7 @@
   "Edit %s": "Modifier %s",
   "Edit selected": "Modifier la sélection",
   "Empty": "Vide",
+  "Enter a valid value.": "Saisissez une valeur valide.",
   "Everything is selected.": "Tout est sélectionné.",
   "Export": "Exporter",
   "Filters": "Filtres",
@@ -100,6 +102,7 @@
   "Not found": "Introuvable",
   "Notifications": "Notifications",
   "Open menu": "Ouvrir le menu",
+  "Other records still refer to this one.": "D'autres enregistrements y font encore référence.",
   "Page": "Page",
   "Page %d of %d": "Page %d sur %d",
   "Password": "Mot de passe",
@@ -145,9 +148,12 @@
     "one": "Le %d de cette page est sélectionné.",
     "other": "Tous les %d de cette page sont sélectionnés."
   },
+  "The record no longer exists.": "L'enregistrement n'existe plus.",
+  "The related record does not exist.": "L'enregistrement lié n'existe pas.",
   "The selection changed since you reviewed it.": "La sélection a changé depuis votre vérification.",
   "These records can't be changed:": "Ces enregistrements ne peuvent pas être modifiés :",
   "These records must be removed first:": "Ces enregistrements doivent d'abord être supprimés :",
+  "These values are not allowed.": "Ces valeurs ne sont pas autorisées.",
   "This action cannot be undone.": "Cette action est irréversible.",
   "This can't be deleted": "Suppression impossible",
   "This month": "Ce mois-ci",
@@ -160,7 +166,7 @@
   "Toggle dark mode": "Basculer le mode sombre",
   "Toggle sidebar": "Basculer la barre latérale",
   "Total": "Total",
-  "Updated %d of %d, then failed": "%d sur %d mis à jour, puis échec",
+  "Updated %d of %d, then failed: %s": "%d sur %d mis à jour, puis échec : %s",
   "Updated %d record.": {
     "one": "%d enregistrement mis à jour.",
     "other": "%d enregistrements mis à jour."

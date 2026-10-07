@@ -1,6 +1,7 @@
 package core
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -328,5 +329,23 @@ func TestRelationFilterWithNoValueNarrowsNothing(t *testing.T) {
 	objects := []any{&relRow{ID: 1, Org: &relTarget{ID: 7}}, &relRow{ID: 2}}
 	if got := NewRelationFilter("Org").Apply(objects, "", admin); len(got) != 2 {
 		t.Errorf("an empty value narrowed the list to %d rows", len(got))
+	}
+}
+
+func TestChoicePairsFilterOffersLabelsAndMatchesValues(t *testing.T) {
+	f := NewChoicePairsFilter("Plan", [][2]string{{"paid", "Paid"}, {"free", "Free"}})
+	want := [][2]string{{"", "All"}, {"paid", "Paid"}, {"free", "Free"}}
+	if got := f.ChoicesWithLabels(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v", got)
+	}
+	if got := f.Values(); !reflect.DeepEqual(got, []string{"paid", "free"}) {
+		t.Fatalf("got %v", got)
+	}
+}
+
+func TestChoiceFilterFromPlainStringsUsesEachAsItsLabel(t *testing.T) {
+	f := NewChoiceFilter("Plan", []string{"paid"})
+	if got := f.ChoicesWithLabels(); !reflect.DeepEqual(got, [][2]string{{"", "All"}, {"paid", "paid"}}) {
+		t.Fatalf("got %v", got)
 	}
 }

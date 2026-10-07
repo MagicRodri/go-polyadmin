@@ -131,8 +131,8 @@ dashboard := &core.Dashboard{
 	Title: "Statistics",
 	Filters: []core.DashboardFilter{
 		core.NewDateRangeFilter("period", 30, core.WithFilterLabel("Period")),
-		core.NewSelectFilter("contract_id", core.WithFilterLabel("Client"), core.WithEmptyLabel("All clients"),
-			core.WithFilterChoicesFunc(loadContracts)),
+		core.NewSelectFilter("store_id", core.WithFilterLabel("Store"), core.WithEmptyLabel("All stores"),
+			core.WithFilterChoicesFunc(loadStores)),
 	},
 	Widgets: []core.Widget{...},
 }
@@ -191,8 +191,8 @@ core.NewMetricGroup("Overview", func(ctx context.Context, wc core.WidgetContext)
 		return nil, err
 	}
 	return []core.Tile{
-		{Label: "Contracts", Value: data.Contracts, Icon: "file-text"},
-		{Label: "Using the portal", Value: data.Active, Icon: "activity", Hint: fmt.Sprintf("dormant: %d", data.Dormant)},
+		{Label: "Orders", Value: data.Orders, Icon: "file-text"},
+		{Label: "Returning customers", Value: data.Returning, Icon: "activity", Hint: fmt.Sprintf("new: %d", data.New)},
 	}, nil
 }, core.WithKey("overview"), core.WithSize("full"), core.WithDependsOn())
 ```
@@ -202,19 +202,19 @@ core.NewMetricGroup("Overview", func(ctx context.Context, wc core.WidgetContext)
 Rows the host fetches a page at a time, e.g. from another service:
 
 ```go
-table := core.NewDataTable("Passages", []core.Column{
-	{Key: "contract", Label: "Contract", Strong: true},
-	{Key: "total", Label: "Total", Align: "end", Format: "number"},
-	{Key: "keypass", Label: "By key", Align: "end", Format: "share"},
+table := core.NewDataTable("Sales", []core.Column{
+	{Key: "store", Label: "Store", Strong: true},
+	{Key: "orders", Label: "Orders", Align: "end", Format: "number"},
+	{Key: "card", Label: "Paid by card", Align: "end", Format: "share"},
 }, func(ctx context.Context, wc core.WidgetContext) (core.Rows, error) {
-	page, err := analytics.Passages(ctx, wc.DateRange("period"), wc.Limit, wc.Offset)
+	page, err := analytics.Sales(ctx, wc.DateRange("period"), wc.Limit, wc.Offset)
 	if err != nil {
 		return core.Rows{}, err
 	}
 	return core.Rows{Items: page.Items, Total: core.Total(page.Total), Totals: page.Overall}, nil
-}, core.WithKey("passages"), core.WithSize("full"))
+}, core.WithKey("sales"), core.WithSize("full"))
 table.Searchable = true
-table.TotalLabel = "{total} contracts"
+table.TotalLabel = "{total} stores"
 ```
 
 - `core.Rows{Items, Total, Totals}`: `Items` are maps keyed by column key.
@@ -234,7 +234,7 @@ table.TotalLabel = "{total} contracts"
 | `share` | `map[string]any{"count": 12, "percentage": 34.5}` | `12 (34.5%)`; just `0` when the count is 0 |
 | `percent` | a number | `87.3%` |
 
-`Empty: "never used"` on a column shows that text as a badge in an empty
+`Empty: "no sales"` on a column shows that text as a badge in an empty
 cell instead of a dash. It goes through translation like other labels. An
 unknown `Format` or `Align` makes `core.New` panic.
 

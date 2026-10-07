@@ -6,11 +6,11 @@ import (
 )
 
 func TestNewAdminPageDefaults(t *testing.T) {
-	page := NewAdminPage("/reports/contracts", noopPageHandler)
-	if page.Label != "Contracts" {
+	page := NewAdminPage("/reports/sales", noopPageHandler)
+	if page.Label != "Sales" {
 		t.Fatalf("got label %q", page.Label)
 	}
-	if page.Permission != "page.reports.contracts" {
+	if page.Permission != "page.reports.sales" {
 		t.Fatalf("got permission %q", page.Permission)
 	}
 	if !reflect.DeepEqual(page.HTTPMethods, []string{"GET", "POST"}) {
@@ -33,16 +33,16 @@ func TestNewAdminPageDefaultLabelHandlesHyphensAndUnderscores(t *testing.T) {
 
 func TestPageOptionsOverrideDefaults(t *testing.T) {
 	page := NewAdminPage(
-		"/reports/contracts",
+		"/reports/sales",
 		noopPageHandler,
-		WithPageLabel("Contracts Report"),
+		WithPageLabel("Sales Report"),
 		WithPageCategory("Reports"),
 		WithPageIcon("chart"),
 		WithPagePermission("custom.permission"),
 		WithPageMethods("GET"),
 		WithPageHiddenFromNav(),
 	)
-	if page.Label != "Contracts Report" {
+	if page.Label != "Sales Report" {
 		t.Fatalf("got label %q", page.Label)
 	}
 	if page.Category != "Reports" {

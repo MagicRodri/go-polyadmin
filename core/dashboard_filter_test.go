@@ -48,13 +48,13 @@ func TestDateRangeQueryParamsRoundTrip(t *testing.T) {
 }
 
 func TestSelectFilterParsesEmptyAsBlankAndResolvesChoices(t *testing.T) {
-	f := NewSelectFilter("contract", WithFilterChoicesFunc(func(ctx context.Context) ([]Choice, error) {
+	f := NewSelectFilter("store", WithFilterChoicesFunc(func(ctx context.Context) ([]Choice, error) {
 		return []Choice{{Value: "1", Label: "One"}}, nil
 	}))
 	if f.Parse(query(nil)).(string) != "" || len(f.QueryParams("")) != 0 {
 		t.Fatal("blank select")
 	}
-	if f.Parse(query(map[string]string{"contract": "7"})).(string) != "7" {
+	if f.Parse(query(map[string]string{"store": "7"})).(string) != "7" {
 		t.Fatal("value")
 	}
 	choices, err := f.Choices(context.Background())

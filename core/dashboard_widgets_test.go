@@ -51,7 +51,7 @@ func TestNextOffset(t *testing.T) {
 
 func TestDataTablePagesWithTheContextAndFormatsTheFooter(t *testing.T) {
 	var seen WidgetContext
-	table := NewDataTable("Contracts", []Column{{Key: "name", Label: "Name"}},
+	table := NewDataTable("Stores", []Column{{Key: "name", Label: "Name"}},
 		func(ctx context.Context, wc WidgetContext) (Rows, error) {
 			seen = wc
 			return Rows{Items: []map[string]any{{"name": "a"}}, Total: Total(3), Totals: map[string]any{"name": "All"}}, nil

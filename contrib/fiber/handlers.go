@@ -301,27 +301,17 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *
 		data := parseFormData(c, modelAdmin, nil)
 		errs := validateWritable(c.Context(), modelAdmin, data, nil)
 		if len(errs) > 0 {
-			relOptions := computeRelationOptions(admin, modelAdmin, nil)
-			var html string
-			var err error
-			if isHTMXRequest(c) {
-				html, err = renderer.RenderFormFragment(principal, csrfToken(c), modelAdmin, nil, data, errs, relOptions, listToken(c, basePath))
-			} else {
-				html, err = renderer.RenderForm(principal, csrfToken(c), modelAdmin, nil, data, errs, relOptions, listToken(c, basePath))
-			}
-			if err != nil {
-				return err
-			}
-			c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
-			return c.Status(fiber.StatusUnprocessableEntity).SendString(html)
+			return renderInvalidForm(c, admin, modelAdmin, renderer, principal, nil, data, errs, basePath)
 		}
 		obj, err := modelAdmin.Create(c.Context(), data)
-		if err == nil {
-			recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditCreate, obj)
+		var recordErr *core.RecordFormError
+		if errors.As(err, &recordErr) {
+			return renderInvalidForm(c, admin, modelAdmin, renderer, principal, nil, data, recordErr.Errors, basePath)
 		}
 		if err != nil {
 			return err
 		}
+		recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditCreate, obj)
 		// Translators: %s is the model's name. French and Russian nouns
 		// carry gender, so phrase around agreement.
 		setFlash(c, "success", tr(c, "%s created.", tr(c, modelAdmin.VerboseName())))
@@ -340,6 +330,22 @@ func handleCreatePost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *
 		}
 		return redirectTo(c, core.WithListToken(target, back))
 	}
+}
+
+func renderInvalidForm(c *fiber.Ctx, admin *core.Admin, modelAdmin core.ModelAdmin, renderer *Renderer, principal *core.Principal, obj any, data map[string]any, errs map[string][]string, basePath string) error {
+	relOptions := computeRelationOptions(admin, modelAdmin, obj)
+	var html string
+	var err error
+	if isHTMXRequest(c) {
+		html, err = renderer.RenderFormFragment(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions, listToken(c, basePath))
+	} else {
+		html, err = renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions, listToken(c, basePath))
+	}
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
+	return c.Status(fiber.StatusUnprocessableEntity).SendString(html)
 }
 
 func handleEditGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Renderers, basePath string) fiber.Handler {
@@ -391,19 +397,9 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Re
 		data := parseFormData(c, modelAdmin, obj)
 		errs := validateWritable(c.Context(), modelAdmin, data, obj)
 		if len(errs) > 0 {
-			relOptions := computeRelationOptions(admin, modelAdmin, obj)
-			var html string
-			if isHTMXRequest(c) {
-				html, err = renderer.RenderFormFragment(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions, listToken(c, basePath))
-			} else {
-				html, err = renderer.RenderForm(principal, csrfToken(c), modelAdmin, obj, data, errs, relOptions, listToken(c, basePath))
-			}
-			if err != nil {
-				return err
-			}
-			c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
-			return c.Status(fiber.StatusUnprocessableEntity).SendString(html)
+			return renderInvalidForm(c, admin, modelAdmin, renderer, principal, obj, data, errs, basePath)
 		}
+		var recordErr *core.RecordFormError
 		// "Save as new": the submitted values become a new record, and the
 		// one being edited is left untouched. Gated on the option, so a
 		// forged field on an admin without it is an ordinary save.
@@ -412,6 +408,9 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Re
 				return writeForbidden(c, admin, basePath)
 			}
 			created, err := modelAdmin.Create(c.Context(), data)
+			if errors.As(err, &recordErr) {
+				return renderInvalidForm(c, admin, modelAdmin, renderer, principal, obj, data, recordErr.Errors, basePath)
+			}
 			if err != nil {
 				return err
 			}
@@ -424,7 +423,11 @@ func handleEditPost(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Re
 			}
 			return redirectTo(c, core.WithListToken(target, back))
 		}
-		if _, err := modelAdmin.Update(c.Context(), obj, data); err != nil {
+		_, err = modelAdmin.Update(c.Context(), obj, data)
+		if errors.As(err, &recordErr) {
+			return renderInvalidForm(c, admin, modelAdmin, renderer, principal, obj, data, recordErr.Errors, basePath)
+		}
+		if err != nil {
 			return err
 		}
 		recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditUpdate, obj)
@@ -465,13 +468,19 @@ func handleDeleteGet(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *R
 		if err != nil {
 			return err
 		}
-		html, err := renderer.RenderDelete(principal, csrfToken(c), modelAdmin, obj, preview, listToken(c, basePath))
+		html, err := renderer.RenderDelete(principal, csrfToken(c), modelAdmin, obj, preview, popFlash(c), listToken(c, basePath))
 		if err != nil {
 			return err
 		}
+		clearFlash(c)
 		c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
 		return c.SendString(html)
 	}
+}
+
+func deleteRefused(c *fiber.Ctx, basePath, slug string, pk any, recordErr *core.RecordFormError) error {
+	setFlash(c, "error", recordErr.Text())
+	return redirectTo(c, fmt.Sprintf("%s/%s/%v/delete", basePath, slug, pk))
 }
 
 func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath string) fiber.Handler {
@@ -499,6 +508,10 @@ func handleDeletePost(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 				return redirectTo(c, fmt.Sprintf("%s/%s/%v/delete", basePath, slug, modelAdmin.GetPK(obj)))
 			}
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
+				var recordErr *core.RecordFormError
+				if errors.As(err, &recordErr) {
+					return deleteRefused(c, basePath, slug, modelAdmin.GetPK(obj), recordErr)
+				}
 				return err
 			}
 			recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditDelete, obj)
@@ -539,6 +552,10 @@ func handleDeleteHTMX(admin *core.Admin, modelAdmin core.ModelAdmin, basePath st
 				return redirectTo(c, fmt.Sprintf("%s/%s/%v/delete", basePath, slug, modelAdmin.GetPK(obj)))
 			}
 			if err := modelAdmin.Delete(c.Context(), obj); err != nil {
+				var recordErr *core.RecordFormError
+				if errors.As(err, &recordErr) {
+					return deleteRefused(c, basePath, slug, modelAdmin.GetPK(obj), recordErr)
+				}
 				return err
 			}
 			recordAudit(c.Context(), admin, principal, modelAdmin, core.AuditDelete, obj)
@@ -597,6 +614,15 @@ func handleLookup(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Rend
 		c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
 		return c.SendString(html)
 	}
+}
+
+// actionAuditName is what an action's records are logged as: a bulk edit
+// is an ordinary update of each record as far as the log is concerned.
+func actionAuditName(action core.Action) string {
+	if action.Name == core.BulkEditName {
+		return core.AuditUpdate
+	}
+	return action.Name
 }
 
 // handleAction serves POST /{slug}/actions/:name, running an Action over
@@ -688,20 +714,27 @@ func handleAction(admin *core.Admin, modelAdmin core.ModelAdmin, renderers *Rend
 		if formReq != nil && errors.As(err, &formErr) {
 			return renderActionFormPage(c, formReq, data, formErr.Errors, nil, false, fiber.StatusUnprocessableEntity)
 		}
+		var actionErr *core.ActionError
+		if errors.As(err, &actionErr) {
+			for _, obj := range actionErr.Done {
+				recordAudit(c.Context(), admin, principal, modelAdmin, actionAuditName(action), obj)
+			}
+			level := actionErr.Level
+			if level == "" {
+				level = "error"
+			}
+			setFlash(c, level, tr(c, actionErr.Message))
+			return redirectTo(c, redirectTarget)
+		}
 		if err != nil {
 			return err
 		}
-		// A bulk edit is an ordinary update of each record as far as the
-		// log is concerned.
 		if outcome.Download != nil {
 			if err := outcome.Download.Validate(); err != nil {
 				return err
 			}
 		}
-		auditName := action.Name
-		if action.Name == core.BulkEditName {
-			auditName = core.AuditUpdate
-		}
+		auditName := actionAuditName(action)
 		// One entry per record, not one per action: the log's question
 		// is "what happened to this record", and a bulk run over 500
 		// rows is 500 answers to it.

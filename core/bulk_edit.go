@@ -52,7 +52,11 @@ func NewBulkEditAction(fields []Field) Action {
 				if _, err := modelAdmin.Update(ctx, obj, patch); err != nil {
 					// Stop at the first failure and report how far it got, as
 					// delete_selected does.
-					return ActionResult{}, fmt.Errorf("%s: %w", T(ctx, "Updated %d of %d, then failed", updated, len(objects)), err)
+					return ActionResult{}, &ActionError{
+						Message: T(ctx, "Updated %d of %d, then failed: %s", updated, len(objects), RecordErrorText(err)),
+						Done:    objects[:updated],
+						Err:     err,
+					}
 				}
 				updated++
 			}

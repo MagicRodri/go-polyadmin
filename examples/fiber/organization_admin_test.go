@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/MagicRodri/go-polyadmin/core"
-	fiberadapter "github.com/MagicRodri/go-polyadmin/fiber"
+	fiberadapter "github.com/MagicRodri/go-polyadmin/contrib/fiber"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -48,7 +48,7 @@ func newOrganizationTestApp(t *testing.T) (*fiber.App, *OrganizationRepository) 
 
 // postOrganizationForm double-submits a CSRF token as both cookie and
 // header, matching what a real browser's meta-tag/htmx wiring does
-// (see theme.html's htmx:configRequest listener and fiber/csrf.go).
+// (see theme.html's htmx:configRequest listener and contrib/fiber/csrf.go).
 func postOrganizationForm(t *testing.T, app *fiber.App, path string, form url.Values) *http.Response {
 	t.Helper()
 	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))

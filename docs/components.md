@@ -18,7 +18,7 @@ parts that don't come across (React, Radix UI, `cva`,
 `ui` is the server-side stand-in for shadcn's
 [`class-variance-authority`](https://cva.style). shadcn resolves a
 component's class list in JS at React render time; there is no JS render
-step here, so the same lookup lives in [`fiber/ui.go`](../fiber/ui.go)
+step here, so the same lookup lives in [`contrib/fiber/ui.go`](../contrib/fiber/ui.go)
 and resolves while the template executes.
 
 ```gotemplate
@@ -158,7 +158,7 @@ says otherwise.
 
 | Component | Notes |
 | --- | --- |
-| `field` | shadcn's `FormItem`/`FormLabel`/`FormDescription`/`FormMessage`. Its markup lives in `ui/field.html`; `fiber/render_helpers.go`'s `formInputHTML` does the per-type derivation (stringifying values, matching selections) in Go and hands the result to that partial to print — see the partial's own doc comment for why no comparison logic lives in the template itself. |
+| `field` | shadcn's `FormItem`/`FormLabel`/`FormDescription`/`FormMessage`. Its markup lives in `ui/field.html`; `contrib/fiber/render_helpers.go`'s `formInputHTML` does the per-type derivation (stringifying values, matching selections) in Go and hands the result to that partial to print — see the partial's own doc comment for why no comparison logic lives in the template itself. |
 | `combobox` | Radix Popover + `cmdk`, but the filtering stays **server-side**: `cmdk` filters a client array, whereas the whole point of `AutocompleteFieldNames` is never loading the target's dataset into the page. htmx owns the round trip to `/lookup`; Alpine owns open/close and arrow keys. Its `content`/`item` parts are also reused, unmodified, by `ui/select` and `ui/bulk-actions` below — the same popover/listbox look, just without a search box. |
 | `select` (`ui/select.html`) | Radix Select — a styled trigger + listbox for a *static* choice list (enum fields, and a plain foreignkey/onetoone without `AutocompleteFieldNames`). A hidden input carries the posted value, same reasoning as the relation combobox above: the model layer never has to know a value came from anything but a plain `<select>`. Not used for many-to-many — that's `ui/multi-select.html` below. The list view's bulk-actions control (`ui/bulk-actions.html`) is the same trigger+listbox shape generalized to *run* an action on pick instead of holding a value. |
 | `multi-select` (`ui/multi-select.html`) | The many-to-many control: a Command-style searchable list with the selection as removable chips — Django admin's `filter_horizontal` job, without the two-pane layout. Filtering is client-side, unlike the relation combobox, because a many-to-many's options are already all in the page. Posts one hidden input per selection under the field's name, which is what a `<select multiple>` posted, so the handler's `PeekMulti`/`getlist` is unchanged. |
@@ -201,7 +201,7 @@ with `pc.C.FormValue` — no JSON body, no client-side state.
 
 1. Read the component's rendered DOM on ui.shadcn.com (the markup and
    class list), not its `.tsx` source.
-2. Add its class lists to `uiRegistry` in [`fiber/ui.go`](../fiber/ui.go),
+2. Add its class lists to `uiRegistry` in [`contrib/fiber/ui.go`](../contrib/fiber/ui.go),
    splitting variants/sizes from parts, and keeping colors on tokens.
 3. If it needs markup, add a `{{define "ui/<name>"}}` partial under
    `templates/admin/components/ui/`. It's picked up automatically by the
@@ -211,4 +211,4 @@ with `pc.C.FormValue` — no JSON body, no client-side state.
    `@keydown.escape`) and keep every `aria-*`/`role` attribute from the
    reference markup verbatim — Radix's accessibility work is the part
    most worth keeping.
-5. Add a render test. `fiber/components_test.go` is the pattern.
+5. Add a render test. `contrib/fiber/components_test.go` is the pattern.

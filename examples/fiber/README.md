@@ -5,6 +5,12 @@ Reference Fiber application exercising go-polyadmin: `User`,
 relations, inlines, a dashboard, search/filter/sort, actions, a custom
 Tools page, CSV/XLSX export, and a real login.
 
+Under **Projects**, `Client` and `Project` live in an in-memory SQLite database
+and are served by `contrib/gorm` (`sql_models.go`, `project_admin.go`): no
+repository and no data-access hooks of their own. Projects hide finished work
+by default (`Active`), refuse a duplicate name on the form, and a client that
+still has projects cannot be deleted.
+
 Run it:
 
 ```bash

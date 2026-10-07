@@ -86,7 +86,7 @@ same shape gives an `AuditLogger` an optional read side
 (`core.LoginBackend`).
 
 Field and form HTML is built in plain Go functions
-(`fiber/render_helpers.go`) rather than inside the template files, for
+(`contrib/fiber/render_helpers.go`) rather than inside the template files, for
 tighter control over escaping with `html/template`.
 
 ## Frontend

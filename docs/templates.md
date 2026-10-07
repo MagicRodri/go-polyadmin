@@ -129,7 +129,7 @@ rendered on their own as HTMX fragments. Keeping them in separate files
 means an override can invoke one by name instead of copying its markup.
 
 Icons and read-only field values have no template of their own: both
-are built in Go (`fiber/icons.go`, `fiber/render_helpers.go`), which is
+are built in Go (`contrib/fiber/icons.go`, `contrib/fiber/render_helpers.go`), which is
 the same split the `fiber` package's doc comment describes — field and
 form HTML is assembled in Go for tighter control over escaping with
 `html/template`.
@@ -138,7 +138,7 @@ form HTML is assembled in Go for tighter control over escaping with
 
 The `Renderer` builds a context struct per view — `listData`,
 `detailData`, `formData`, `deleteData`, `dashboardData`, each embedding
-a shared `pageBase` (`fiber/render.go`) — carrying: the resource's
+a shared `pageBase` (`contrib/fiber/render.go`) — carrying: the resource's
 rows/fields for that view, computed per-request permissions (so
 Edit/Delete/Create/Export controls are omitted server-side when
 unavailable, not just hidden with CSS), breadcrumbs, site title/logo,
@@ -161,7 +161,7 @@ list and the porting rationale. In short:
   shadcn's `class-variance-authority`: `{{ui "button" "outline" "size-sm"}}`
   composes a base with a variant and a size, while `{{ui "table" "th"}}`
   resolves a sub-component's own list. The registry lives in
-  `fiber/ui.go`.
+  `contrib/fiber/ui.go`.
 - **Radix is replaced by Alpine, not shipped.** Focus trapping is
   `x-trap`, portals are `x-teleport`, popover positioning is `x-anchor`,
   collapse is `x-collapse`. There is no React and no Radix runtime.

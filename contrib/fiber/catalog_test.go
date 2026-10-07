@@ -147,7 +147,7 @@ var codeCalls = map[string][]int{
 // codeMsgids collects literal msgid arguments from the non-test Go files of
 // core and fiber.
 func codeMsgids(t *testing.T, out msgids) {
-	for _, dir := range []string{"../core", "."} {
+	for _, dir := range []string{"../../core", ".", "../gorm"} {
 		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 		if err != nil {
 			t.Fatal(err)

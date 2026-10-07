@@ -8,7 +8,7 @@ from playwright.sync_api import expect
 
 # Data values in the example app, and the switcher's untranslated names.
 # Everything here is either a seeded record value (session.go/models.go)
-# or computed straight from one -- avatar/brand initials (fiber/icons.go's
+# or computed straight from one -- avatar/brand initials (contrib/fiber/icons.go's
 # siteInitials, upper-cased from a name) and the dashboard's chart/timeline
 # widgets (main.go builds these from literal Go strings and the widget
 # templates render Label/Title/Time/Description raw, the same way

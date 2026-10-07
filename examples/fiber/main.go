@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/MagicRodri/go-polyadmin/core"
-	fiberadapter "github.com/MagicRodri/go-polyadmin/fiber"
+	fiberadapter "github.com/MagicRodri/go-polyadmin/contrib/fiber"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -25,6 +25,15 @@ func main() {
 
 	dashboard := newDashboard(users, organizations, roles)
 
+	projectsDB, err := openProjectsDB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	clientAdmin, projectAdmin, err := newProjectAdmins(projectsDB)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Cookie sessions over an in-memory user table (session.go). One
 	// object serves as both halves: WithLoginBackend is what mounts the
 	// admin's login page and makes an unauthenticated request redirect
@@ -32,7 +41,7 @@ func main() {
 	// every subsequent request.
 	sessions := NewCookieSessionBackend()
 	options := []core.Option{
-		core.WithModelAdmins(NewUserAdmin(users, organizations, roles), NewOrganizationAdmin(organizations, users), NewRoleAdmin(roles, users)),
+		core.WithModelAdmins(NewUserAdmin(users, organizations, roles), NewOrganizationAdmin(organizations, users), NewRoleAdmin(roles, users), clientAdmin, projectAdmin),
 		core.WithDashboard(dashboard),
 		core.WithAuthenticator(sessions),
 		core.WithLoginBackend(sessions),

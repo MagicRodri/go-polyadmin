@@ -28,7 +28,7 @@ const (
 	FieldTypeURL         FieldType = "url"
 	// An image's URL, not an upload -- the value is a plain string, but
 	// list/detail render it as a thumbnail instead of link text. See
-	// fiber/render_helpers.go's fieldValueHTML.
+	// contrib/fiber/render_helpers.go's fieldValueHTML.
 	FieldTypeImage    FieldType = "image"
 	FieldTypeUUID     FieldType = "uuid"
 	FieldTypeEnum     FieldType = "enum"

@@ -52,8 +52,8 @@ func noopPageHandler(any) error { return nil }
 
 func TestRouteRegistersAndReturnsPage(t *testing.T) {
 	admin := New()
-	page := admin.Route("/reports/contracts", noopPageHandler)
-	if page.Path != "/reports/contracts" {
+	page := admin.Route("/reports/sales", noopPageHandler)
+	if page.Path != "/reports/sales" {
 		t.Fatalf("got path %q", page.Path)
 	}
 	if len(admin.Pages()) != 1 || admin.Pages()[0].Path != page.Path {
@@ -68,8 +68,8 @@ func TestRoutePanicsOnDuplicatePath(t *testing.T) {
 		}
 	}()
 	admin := New()
-	admin.Route("/reports/contracts", noopPageHandler)
-	admin.Route("/reports/contracts", noopPageHandler)
+	admin.Route("/reports/sales", noopPageHandler)
+	admin.Route("/reports/sales", noopPageHandler)
 }
 
 func TestPagesPreservesRegistrationOrder(t *testing.T) {

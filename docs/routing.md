@@ -100,14 +100,14 @@ admin's layout, authentication, and authorization. This is
 `AdminPage`, registered via `Admin.Route()`.
 
 ```go
-func contractsReportHandler(pc *fiberadapter.PageContext) error {
-	return pc.Render("pages/contracts_report.html", loadReport())
+func salesReportHandler(pc *fiberadapter.PageContext) error {
+	return pc.Render("pages/sales_report.html", loadReport())
 }
 
 admin.Route(
-	"/reports/contracts",
-	fiberadapter.PageHandler(contractsReportHandler),
-	core.WithPageLabel("Contracts Report"),
+	"/reports/sales",
+	fiberadapter.PageHandler(salesReportHandler),
+	core.WithPageLabel("Sales Report"),
 	core.WithPageCategory("Reports"),
 )
 ```
@@ -130,8 +130,8 @@ page's `Handler` isn't actually a `fiberadapter.PageHandler`.
 A page's HTTP methods default to `GET` and `POST` — enough to render a
 form and repost to itself, the shape a multi-step wizard needs — and
 can be narrowed with `core.WithPageMethods(...)`. Its permission
-defaults to `"page.<path-with-dots>"` (`/reports/contracts` →
-`"page.reports.contracts"`), checked the same way a resource route
+defaults to `"page.<path-with-dots>"` (`/reports/sales` →
+`"page.reports.sales"`), checked the same way a resource route
 checks `ResourcePermission` — see
 [`permissions`](permissions.md#permission-names). Registering two
 pages at the same path panics, mirroring `Admin.Register`'s
@@ -173,7 +173,7 @@ link renders flat or nested inside a category's accordion:
 BaseModelAdmin{NavIcon: "table"}
 ```
 
-See `fiber/icons.go`'s `iconPaths` for the available icon names.
+See `contrib/fiber/icons.go`'s `iconPaths` for the available icon names.
 
 The breadcrumb trail also reflects grouping: a `ModelAdmin`/`AdminPage`
 with a category gets that category prepended as a plain (non-link,

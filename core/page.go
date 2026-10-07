@@ -21,7 +21,7 @@ type AdminPage struct {
 	Handler  any
 	Label    string
 	Category string
-	// Icon names the sidebar-nav icon (see fiber/icons.go's iconPaths)
+	// Icon names the sidebar-nav icon (see contrib/fiber/icons.go's iconPaths)
 	// shown next to this page's own link. Defaults to defaultIcon.
 	Icon       string
 	Permission string
@@ -91,7 +91,7 @@ func defaultPageLabel(path string) string {
 }
 
 // defaultPagePermission mirrors ResourcePermission's "{slug}.{action}"
-// shape: "/reports/contracts" -> "page.reports.contracts".
+// shape: "/reports/sales" -> "page.reports.sales".
 func defaultPagePermission(path string) string {
 	return "page." + strings.ReplaceAll(strings.Trim(path, "/"), "/", ".")
 }

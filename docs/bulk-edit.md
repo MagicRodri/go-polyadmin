@@ -81,9 +81,11 @@ either check, nothing is changed and the form lists the records that blocked
 it.
 
 The default loop stops at the first record whose `Update` returns an error
-and reports how far it got — "Updated 3 of 10, then failed: …" — the same way
-the bulk delete does. Records before the failure keep their change; there is
-no transaction to roll back. Implement `BulkUpdater` when your storage can do
+and reports how far it got — "Updated 3 of 10, then failed: …", as an error
+notification — the same way the bulk delete does. Records before the failure
+keep their change and are audited as updates; there is no transaction to roll
+back. A `*core.RecordFormError` from `Update` contributes its messages after
+"then failed:". Implement `BulkUpdater` when your storage can do
 better.
 
 ## Audit log

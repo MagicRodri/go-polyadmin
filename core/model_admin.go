@@ -26,7 +26,7 @@ type ModelAdmin interface {
 	// Category groups this ModelAdmin, and any AdminPages sharing the
 	// category, into one sidebar section. "" keeps a flat top-level link.
 	Category() string
-	// Icon names the sidebar-nav icon (see fiber/icons.go's iconPaths)
+	// Icon names the sidebar-nav icon (see contrib/fiber/icons.go's iconPaths)
 	// shown next to this ModelAdmin's own link, whether it renders flat
 	// or nested inside a category's accordion. Defaults to "collection".
 	Icon() string
@@ -458,4 +458,35 @@ func (b BaseModelAdmin) Delete(ctx context.Context, obj any) error {
 func defaultPK(obj any) any {
 	value, _ := structFieldOrMapValue(obj, "ID")
 	return value
+}
+
+// RecordFormError is how a ModelAdmin refuses a save or a delete with
+// messages for the user: Errors maps a field name to its messages, and
+// the "" key holds the ones that belong to no field.
+type RecordFormError struct {
+	Errors map[string][]string
+}
+
+func (e *RecordFormError) Text() string {
+	keys := make([]string, 0, len(e.Errors))
+	for key := range e.Errors {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	var messages []string
+	for _, key := range keys {
+		messages = append(messages, e.Errors[key]...)
+	}
+	return strings.Join(messages, "; ")
+}
+
+func (e *RecordFormError) Error() string { return e.Text() }
+
+// RecordErrorText is the text a user sees for a failed write.
+func RecordErrorText(err error) string {
+	var recordErr *RecordFormError
+	if errors.As(err, &recordErr) {
+		return recordErr.Text()
+	}
+	return err.Error()
 }

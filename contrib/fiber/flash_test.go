@@ -64,3 +64,32 @@ func flashText(t *testing.T, resp *http.Response) string {
 	}
 	return strings.Join(texts, "\n")
 }
+
+// flashLevels is flashText's companion: the levels of the messages a
+// response sets, one per line.
+func flashLevels(t *testing.T, resp *http.Response) string {
+	t.Helper()
+	var levels []string
+	for _, header := range resp.Header.Values("Set-Cookie") {
+		rest, ok := strings.CutPrefix(header, flashCookieName+"=")
+		if !ok {
+			continue
+		}
+		value, _, _ := strings.Cut(rest, ";")
+		if value == "" {
+			continue
+		}
+		raw, err := flashEncoding.DecodeString(value)
+		if err != nil {
+			t.Fatalf("flash cookie %q: %v", value, err)
+		}
+		var messages []flashMessage
+		if err := json.Unmarshal(raw, &messages); err != nil {
+			t.Fatalf("flash cookie %q: %v", raw, err)
+		}
+		for _, m := range messages {
+			levels = append(levels, m.Level)
+		}
+	}
+	return strings.Join(levels, "\n")
+}

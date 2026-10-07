@@ -182,6 +182,16 @@ This also applies to a `delete_selected` action of your own. The
 confirmation is keyed on the action's name, not on the built-in
 implementation.
 
+## Refused deletes
+
+`Delete` can refuse a record the preview let through — the database
+still references it, say — by returning a `*core.RecordFormError`. A
+single delete, from the delete page or a list row, goes back to the
+delete page with the messages as an error notification, and nothing is
+audited. A bulk delete stops at that record with "Deleted 3 of 10, then
+failed: …"; the records before it are deleted and audited. See
+[`model-admin`](model-admin.md#refusing-a-write).
+
 ## Enforcement
 
 The preview is not advice. **Every delete route re-runs it immediately
